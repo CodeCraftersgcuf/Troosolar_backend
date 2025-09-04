@@ -34,6 +34,13 @@ class TermController extends Controller
     {
         try{
             $data = $request->validated();
+            // $data['check'] = $request->has('check') ? 1 : 0;
+            if($data['check'] == 0){
+                return ResponseHelper::error('Term is not add');
+            }
+            else{
+                $data['check'] = 1;
+            }
             $terms = Term::create($data);
             return ResponseHelper::success($terms, "Term is add succesfully");
         }

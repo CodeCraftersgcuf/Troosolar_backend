@@ -1,0 +1,7342 @@
+{
+	"info": {
+		"_postman_id": "0b9511e6-9961-4474-8a5b-67867e71f144",
+		"name": "Toosolar",
+		"description": "This template contains a boilerplate for documentation that you can quickly customize and reuse.\n\n### How to use this template:\n\n- Replace the content given brackets (()) with your API's details.\n- Tips are formatted in `codespan` - feel free to read and remove them.\n    \n\n---\n\n`Start with a brief overview of what your API offers.`\n\nThe ((product name)) provides many API products, tools, and resources that enable you to ((add product value here)).\n\n`You can also list the APIs you offer, link to the relevant pages, or do both in this section.`\n\n## **Getting started guide**\n\n`List the steps or points required to start using your APIs. Make sure to cover everything required to reach success with your API as quickly as possible.`\n\nTo start using the ((add APIs here)), you need to -\n\n`The points given below are from The Postman API's documentation. You can reference it to write your own getting started guide.`\n\n- You must use a valid API Key to send requests to the API endpoints. You can get your API key from Postman's [integrations dashboard](https://go.postman.co/settings/me/api-keys).\n- The API has [rate and usage limits](https://learning.postman.com/docs/developer/postman-api/postman-api-rate-limits/).\n- The API only responds to HTTPS-secured communications. Any requests sent via HTTP return an HTTP 301 redirect to the corresponding HTTPS resources.\n- The API returns request responses in JSON format. When an API request returns an error, it is sent in the JSON response as an error key.\n    \n\n## Authentication\n\n`Add details on the authorization keys/tokens required, steps that cover how to get them, and the relevant error codes.`\n\nThe ((product name)) API uses ((add your API's authorization type)) for authentication.\n\n`The details given below are from the Postman API's documentation. You can reference it to write your own authentication section.`\n\nPostman uses API keys for authentication. You can generate a Postman API key in the [API keys](https://postman.postman.co/settings/me/api-keys) section of your Postman account settings.\n\nYou must include an API key in each request to the Postman API with the X-Api-Key request header.\n\n### Authentication error response\n\nIf an API key is missing, malformed, or invalid, you will receive an HTTP 401 Unauthorized response code.\n\n## Rate and usage limits\n\n`Use this section to cover your APIs' terms of use. Include API limits, constraints, and relevant error codes, so consumers understand the permitted API usage and practices.`\n\n`The example given below is from The Postman API's documentation. Use it as a reference to write your APIs' terms of use.`\n\nAPI access rate limits apply at a per-API key basis in unit time. The limit is 300 requests per minute. Also, depending on your plan, you may have usage limits. If you exceed either limit, your request will return an HTTP 429 Too Many Requests status code.\n\nEach API response returns the following set of headers to help you identify your use status:\n\n| Header | Description |\n| --- | --- |\n| `X-RateLimit-Limit` | The maximum number of requests that the consumer is permitted to make per minute. |\n| `X-RateLimit-Remaining` | The number of requests remaining in the current rate limit window. |\n| `X-RateLimit-Reset` | The time at which the current rate limit window resets in UTC epoch seconds. |\n\n### 503 response\n\nAn HTTP `503` response from our servers indicates there is an unexpected spike in API access traffic. The server is usually operational within the next five minutes. If the outage persists or you receive any other form of an HTTP `5XX` error, [contact support](https://support.postman.com/hc/en-us/requests/new/).\n\n### **Need some help?**\n\n`Add links that customers can refer to whenever they need help.`\n\nIn case you have questions, go through our tutorials ((link to your video or help documentation here)). Or visit our FAQ page ((link to the relevant page)).\n\nOr you can check out our community forum, there’s a good chance our community has an answer for you. Visit our developer forum ((link to developer forum)) to review topics, ask questions, and learn from others.\n\n`You can also document or add links to libraries, code examples, and other resources needed to make a request.`",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "40616658",
+		"_collection_link": "https://hrb999-6466.postman.co/workspace/HRB-Workspace~92a0f78a-10d0-4377-8d64-343609564596/collection/40616658-0b9511e6-9961-4474-8a5b-67867e71f144?action=share&source=collection_link&creator=40616658"
+	},
+	"item": [
+		{
+			"name": "Admin",
+			"item": [
+				{
+					"name": "Auth",
+					"item": [
+						{
+							"name": "login",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"email\": \"user@gmail.com\",\r\n  \"password\": \"12345678\"\r\n}\r\n\r\n",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/login?email=rohailamjad082@gmail.com&password=12345678",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"login"
+									],
+									"query": [
+										{
+											"key": "email",
+											"value": "rohailamjad082@gmail.com"
+										},
+										{
+											"key": "password",
+											"value": "12345678"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get All Users",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"first_name\": \"Ali\",\r\n\"\r\n}\r\n"
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/all-users",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"all-users"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Eidt Profile",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"first_name\": \"Ali\",\r\n\"\r\n}\r\n"
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/update-user/1?",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"update-user",
+										"1"
+									],
+									"query": [
+										{
+											"key": "",
+											"value": null
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "dashboard",
+					"item": [
+						{
+							"name": "dashboard",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/admin/dashboard",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"admin",
+										"dashboard"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "User Loans",
+					"item": [
+						{
+							"name": "Loan Detail",
+							"item": [
+								{
+									"name": "full loan detail",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n  \"loan_amount\": 100000,\r\n  \"repayment_duration\": 12,\r\n  \"status\": \"pending\",\r\n  \"product_id\": [1,2]\r\n\r\n}"
+										},
+										"url": {
+											"raw": "{{local_laravel}}/api/full-loan-detail/7",
+											"host": [
+												"{{local_laravel}}"
+											],
+											"path": [
+												"api",
+												"full-loan-detail",
+												"7"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "All Loan status",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": ""
+										},
+										"url": {
+											"raw": "{{local_laravel}}/api/all-loan-status",
+											"host": [
+												"{{local_laravel}}"
+											],
+											"path": [
+												"api",
+												"all-loan-status"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "KYC details send to partner",
+							"item": [
+								{
+									"name": "kyc",
+									"item": [
+										{
+											"name": "Document",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{local_laravel}}/api/single-document/2",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"single-document",
+														"2"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "single beneficiary",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{local_laravel}}/api/single-beneficiary/2",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"single-beneficiary",
+														"2"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "loan detail",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{local_laravel}}/api/single-loan-detail/2",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"single-loan-detail",
+														"2"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "Send to partner",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "POST",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json",
+														"type": "text"
+													},
+													{
+														"key": "Content-Type",
+														"value": "application/json",
+														"type": "text"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\r\n    \"partner_id\":2\r\n}"
+												},
+												"url": {
+													"raw": "{{local_laravel}}/api/send-to-partner/1",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"send-to-partner",
+														"1"
+													]
+												}
+											},
+											"response": []
+										}
+									]
+								},
+								{
+									"name": "User detail",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": ""
+										},
+										"url": {
+											"raw": "{{local_laravel}}/api/single-user/1",
+											"host": [
+												"{{local_laravel}}"
+											],
+											"path": [
+												"api",
+												"single-user",
+												"1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Credit Check",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "{{local_laravel}}/api/link-accounts/1",
+											"host": [
+												"{{local_laravel}}"
+											],
+											"path": [
+												"api",
+												"link-accounts",
+												"1"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "All Loans",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "down_payment",
+											"value": "120",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/all-loan-status",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"all-loan-status"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "User order",
+					"item": [
+						{
+							"name": "get all orders",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/orders",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"orders"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "single order",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/orders/64",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"orders",
+										"64"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Loan Mangment",
+					"item": [
+						{
+							"name": "KYC details send to partner",
+							"item": [
+								{
+									"name": "kyc",
+									"item": [
+										{
+											"name": "Document",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{local_laravel}}/api/single-document/2",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"single-document",
+														"2"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "single beneficiary",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{local_laravel}}/api/single-beneficiary/2",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"single-beneficiary",
+														"2"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "loan detail",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{local_laravel}}/api/single-loan-detail/2",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"single-loan-detail",
+														"2"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "Send to partner",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "POST",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json",
+														"type": "text"
+													},
+													{
+														"key": "Content-Type",
+														"value": "application/json",
+														"type": "text"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\r\n    \"partner_id\":3\r\n}"
+												},
+												"url": {
+													"raw": "{{local_laravel}}/api/send-to-partner/1",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"send-to-partner",
+														"1"
+													]
+												}
+											},
+											"response": []
+										}
+									]
+								},
+								{
+									"name": "User detail",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": ""
+										},
+										"url": {
+											"raw": "{{local_laravel}}/api/single-user/1",
+											"host": [
+												"{{local_laravel}}"
+											],
+											"path": [
+												"api",
+												"single-user",
+												"1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Credit Check",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "{{local_laravel}}/api/link-accounts/1",
+											"host": [
+												"{{local_laravel}}"
+											],
+											"path": [
+												"api",
+												"link-accounts",
+												"1"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "All Loans",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "down_payment",
+											"value": "120",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/all-loan-status",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"all-loan-status"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Loan distributment",
+					"item": [
+						{
+							"name": "Loan Detail",
+							"item": [
+								{
+									"name": "full loan detail",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n  \"loan_amount\": 100000,\r\n  \"repayment_duration\": 12,\r\n  \"status\": \"pending\",\r\n  \"product_id\": [1,2]\r\n\r\n}"
+										},
+										"url": {
+											"raw": "{{local_laravel}}/api/full-loan-detail/7",
+											"host": [
+												"{{local_laravel}}"
+											],
+											"path": [
+												"api",
+												"full-loan-detail",
+												"7"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "All Loan status",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": ""
+										},
+										"url": {
+											"raw": "{{local_laravel}}/api/all-loan-status",
+											"host": [
+												"{{local_laravel}}"
+											],
+											"path": [
+												"api",
+												"all-loan-status"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "All Loans Distributed",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "down_payment",
+											"value": "120",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/all-loan-distributed",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"all-loan-distributed"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Repayment History",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"message\":\"Teh new sale is comming\"\r\n}"
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/admin/notifications",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"admin",
+										"notifications"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Loan distribute",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"distribute_amount\": 2000,\r\n    \"status\": \"active\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/loan-distributed/11",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"loan-distributed",
+										"11"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Transactions",
+					"item": [
+						{
+							"name": "All transcastion",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/transactions",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"transactions"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "single transaction",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/transactions/174",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"transactions",
+										"174"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Balances",
+					"item": [
+						{
+							"name": "all balances",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"distribute_amount\": 2000,\r\n    \"status\": \"active\"\r\n}"
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/all-balances",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"all-balances"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Shop Management",
+					"item": [
+						{
+							"name": "get all orders",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/orders",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"orders"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "single order",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/orders/1",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"orders",
+										"1"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "All products",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/products",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"products"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Add product",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "brand_id",
+											"value": "1",
+											"type": "text"
+										},
+										{
+											"key": "category_id",
+											"value": "1",
+											"type": "text"
+										},
+										{
+											"key": "title",
+											"value": "fridge",
+											"type": "text"
+										},
+										{
+											"key": "discount_price",
+											"value": "100",
+											"type": "text"
+										},
+										{
+											"key": "price",
+											"value": "1000",
+											"type": "text"
+										},
+										{
+											"key": "discount_end_date",
+											"value": "2025-07-20",
+											"type": "text"
+										},
+										{
+											"key": "stock",
+											"value": "19",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/products",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"products"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "product by id",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/products/1",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"1"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Add Bundle",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "\r\n\r\n{\r\n  \"title\": \"Example Bundle\",\r\n  \"total_price\": 999.99,\r\n  \"discount_price\": 899.99,\r\n  \"discount_end_date\": \"2025-08-01\",\r\n  \"items\": [1,2,3,4,5],\r\n  \"custom_services\": [\r\n    {\r\n      \"title\": \"Installation Service\",\r\n      \"service_amount\": 50,\r\n      \"bundle_id\": 1\r\n    },\r\n    {\r\n      \"title\": \"Extended Warranty\",\r\n      \"service_amount\": 75,\r\n         \"bundle_id\": 1\r\n    }\r\n  ]\r\n}\r\n",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/bundles",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"bundles"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Setting",
+					"item": [
+						{
+							"name": "Financing partner",
+							"item": [
+								{
+									"name": "Add Partner",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n    \"name\":\"user\",\r\n    \"email\":\"user@gmail.com\"\r\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{local_laravel}}/api/add-partner",
+											"host": [
+												"{{local_laravel}}"
+											],
+											"path": [
+												"api",
+												"add-partner"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "All partner",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n    \"name\":\"Umar\",\r\n    \"email\":\"ali@gmail.com\"\r\n}"
+										},
+										"url": {
+											"raw": "{{local_laravel}}/api/all-partners",
+											"host": [
+												"{{local_laravel}}"
+											],
+											"path": [
+												"api",
+												"all-partners"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "delete partner",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n    \"name\":\"Umar\",\r\n    \"email\":\"ali@gmail.com\"\r\n}"
+										},
+										"url": {
+											"raw": "{{local_laravel}}/api/delete_partner/1",
+											"host": [
+												"{{local_laravel}}"
+											],
+											"path": [
+												"api",
+												"delete_partner",
+												"1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "update Partner",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n    \"name\":\"Ali\",\r\n    \"email\":\"ali@gmail.com\"\r\n}"
+										},
+										"url": {
+											"raw": "{{local_laravel}}/api/update-partner/2",
+											"host": [
+												"{{local_laravel}}"
+											],
+											"path": [
+												"api",
+												"update-partner",
+												"2"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Products",
+							"item": [
+								{
+									"name": "Category",
+									"item": [
+										{
+											"name": "Add Category",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "POST",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "application/json",
+														"type": "text"
+													},
+													{
+														"key": "Accept",
+														"value": "application/json",
+														"type": "text"
+													},
+													{
+														"key": "Content-Type",
+														"value": "multipart/form-data",
+														"type": "text"
+													}
+												],
+												"body": {
+													"mode": "formdata",
+													"formdata": [
+														{
+															"key": "title",
+															"value": "Batteries",
+															"type": "text"
+														},
+														{
+															"key": "icon",
+															"type": "file",
+															"src": "postman-cloud:///1f087dc8-0948-4fa0-ba2d-a0bf05b1de4c"
+														}
+													]
+												},
+												"url": {
+													"raw": "{{local_laravel}}/api/categories",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"categories"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "All Categories",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{local_laravel}}/api/categories/2",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"categories",
+														"2"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "Delete Category",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "DELETE",
+												"header": [],
+												"url": {
+													"raw": "{{local_laravel}}/api/categories/1",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"categories",
+														"1"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "Update Category",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "PUT",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json",
+														"type": "text"
+													},
+													{
+														"key": "Content-Type",
+														"value": "application/json",
+														"type": "text"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\r\n    \"title\": \"Ovens1111\"\r\n}"
+												},
+												"url": {
+													"raw": "{{local_laravel}}/api/categories/2",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"categories",
+														"2"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "Get Category by ID",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{local_laravel}}/api/categories/2",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"categories",
+														"2"
+													]
+												}
+											},
+											"response": []
+										}
+									]
+								},
+								{
+									"name": "Brands",
+									"item": [
+										{
+											"name": "Add brand",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "POST",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "application/json",
+														"type": "text"
+													},
+													{
+														"key": "Accept",
+														"value": "application/json",
+														"type": "text"
+													},
+													{
+														"key": "Content-Type",
+														"value": "multipart/form-data",
+														"type": "text"
+													}
+												],
+												"body": {
+													"mode": "formdata",
+													"formdata": [
+														{
+															"key": "title",
+															"value": "LED",
+															"type": "text"
+														},
+														{
+															"key": "category_id",
+															"value": "1",
+															"type": "text"
+														}
+													]
+												},
+												"url": {
+													"raw": "{{ere}}/api/brands",
+													"host": [
+														"{{ere}}"
+													],
+													"path": [
+														"api",
+														"brands"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "All brands",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{local_laravel}}/api/brands",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"brands"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "Delete brand",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "DELETE",
+												"header": [],
+												"url": {
+													"raw": "{{local_laravel}}/api/brands/1",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"brands",
+														"1"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "Update brand",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "PUT",
+												"header": [],
+												"body": {
+													"mode": "raw",
+													"raw": "{\r\n  \"title\":  \"Brand Name\"\r\n}\r\n",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{local_laravel}}/api/brands/3",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"brands",
+														"3"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "Get brand by ID",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{local_laravel}}/api/brands/2",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"brands",
+														"2"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "Get Brands by Category ID",
+											"protocolProfileBehavior": {
+												"disableBodyPruning": true
+											},
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json",
+														"type": "text"
+													},
+													{
+														"key": "Content-Type",
+														"value": "application/json",
+														"type": "text"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{local_laravel}}/api/categories/2/brands",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"categories",
+														"2",
+														"brands"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "Get single brand by Category ID",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{tokken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json",
+														"type": "text"
+													},
+													{
+														"key": "Content-Type",
+														"value": "application/json",
+														"type": "text"
+													}
+												],
+												"url": {
+													"raw": "{{local_laravel}}/api/categories/2/brands/2",
+													"host": [
+														"{{local_laravel}}"
+													],
+													"path": [
+														"api",
+														"categories",
+														"2",
+														"brands",
+														"2"
+													]
+												}
+											},
+											"response": []
+										}
+									]
+								}
+							]
+						},
+						{
+							"name": "Notifications",
+							"item": [
+								{
+									"name": "Notification",
+									"item": [
+										{
+											"name": "Add Notification",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+															"type": "string"
+														}
+													]
+												},
+												"method": "POST",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json",
+														"type": "text"
+													},
+													{
+														"key": "Content-Type",
+														"value": "application/json",
+														"type": "text"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\r\n    \"message\":\"The new sale is comminig\"\r\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "http://localhost:8000/api/admin/notifications",
+													"protocol": "http",
+													"host": [
+														"localhost"
+													],
+													"port": "8000",
+													"path": [
+														"api",
+														"admin",
+														"notifications"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "All Notifications",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+															"type": "string"
+														}
+													]
+												},
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "http://localhost:8000/api/admin/notifications",
+													"protocol": "http",
+													"host": [
+														"localhost"
+													],
+													"port": "8000",
+													"path": [
+														"api",
+														"admin",
+														"notifications"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "Delete Notification",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+															"type": "string"
+														}
+													]
+												},
+												"method": "DELETE",
+												"header": [],
+												"url": {
+													"raw": "http://localhost:8000/api/admin/notifications/2",
+													"protocol": "http",
+													"host": [
+														"localhost"
+													],
+													"port": "8000",
+													"path": [
+														"api",
+														"admin",
+														"notifications",
+														"2"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "Update Notification",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+															"type": "string"
+														}
+													]
+												},
+												"method": "PUT",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json",
+														"type": "text"
+													},
+													{
+														"key": "Content-Type",
+														"value": "application/json",
+														"type": "text"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\r\n    \"message\":\"The sale is ending\"\r\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "http://localhost:8000/api/admin/notifications/2",
+													"protocol": "http",
+													"host": [
+														"localhost"
+													],
+													"port": "8000",
+													"path": [
+														"api",
+														"admin",
+														"notifications",
+														"2"
+													]
+												}
+											},
+											"response": []
+										}
+									]
+								},
+								{
+									"name": "Banner",
+									"item": [
+										{
+											"name": "add banner",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+															"type": "string"
+														}
+													]
+												},
+												"method": "POST",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "multipart/form-data",
+														"type": "text"
+													},
+													{
+														"key": "Accept",
+														"value": "application/json",
+														"type": "text"
+													}
+												],
+												"body": {
+													"mode": "formdata",
+													"formdata": [
+														{
+															"key": "image",
+															"type": "file",
+															"src": [
+																"/C:/Users/hp/OneDrive/Pictures/contact us.jpg",
+																"/C:/Users/SMART TECH/OneDrive/Pictures/Saved Pictures/4K-Gaming-Wallpapers-76-background-pictures.jpg"
+															]
+														}
+													]
+												},
+												"url": {
+													"raw": "http://localhost:8000/api/admin/banners",
+													"protocol": "http",
+													"host": [
+														"localhost"
+													],
+													"port": "8000",
+													"path": [
+														"api",
+														"admin",
+														"banners"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "all banners",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+															"type": "string"
+														}
+													]
+												},
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "http://localhost:8000/api/admin/banners",
+													"protocol": "http",
+													"host": [
+														"localhost"
+													],
+													"port": "8000",
+													"path": [
+														"api",
+														"admin",
+														"banners"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "delete banner",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+															"type": "string"
+														}
+													]
+												},
+												"method": "DELETE",
+												"header": [],
+												"url": {
+													"raw": "http://localhost:8000/api/admin/banners/1",
+													"protocol": "http",
+													"host": [
+														"localhost"
+													],
+													"port": "8000",
+													"path": [
+														"api",
+														"admin",
+														"banners",
+														"1"
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "update banner",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+															"type": "string"
+														}
+													]
+												},
+												"method": "PUT",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "application/json",
+														"type": "text"
+													}
+												],
+												"body": {
+													"mode": "formdata",
+													"formdata": [
+														{
+															"key": "image",
+															"type": "file",
+															"src": "/C:/Users/hp/OneDrive/Pictures/WhatsApp Image 2023-11-03 at 16.38.35_5ccf645f.jpg"
+														}
+													]
+												},
+												"url": {
+													"raw": "http://localhost:8000/api/admin/banners/1",
+													"protocol": "http",
+													"host": [
+														"localhost"
+													],
+													"port": "8000",
+													"path": [
+														"api",
+														"admin",
+														"banners",
+														"1"
+													]
+												}
+											},
+											"response": []
+										}
+									]
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "Tickets",
+					"item": [
+						{
+							"name": "all tickets",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/admin/tickets",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"admin",
+										"tickets"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "reply message",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"message\": \"Hello user your issue has been resolved\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/admin/tickets/1/reply",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"admin",
+										"tickets",
+										"1",
+										"reply"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "single ticket",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/admin/tickets/1",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"admin",
+										"tickets",
+										"1"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Products",
+					"item": [
+						{
+							"name": "All products",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/products",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"products"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Add product",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "brand_id",
+											"value": "1",
+											"type": "text"
+										},
+										{
+											"key": "category_id",
+											"value": "1",
+											"type": "text"
+										},
+										{
+											"key": "title",
+											"value": "fridge",
+											"type": "text"
+										},
+										{
+											"key": "discount_price",
+											"value": "100",
+											"type": "text"
+										},
+										{
+											"key": "price",
+											"value": "1000",
+											"type": "text"
+										},
+										{
+											"key": "discount_end_date",
+											"value": "2025-07-20",
+											"type": "text"
+										},
+										{
+											"key": "stock",
+											"value": "19",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/products",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"products"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update product",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"title\" : \"Electronics\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/products/1",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"1"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete product",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "\r\n\r\n{\r\n  \"title\": \"Example Bundle\",\r\n  \"total_price\": 999.99,\r\n  \"discount_price\": 899.99,\r\n  \"discount_end_date\": \"2025-08-01\",\r\n  \"items\": [1],\r\n  \"custom_services\": [\r\n    {\r\n      \"title\": \"Installation Service\",\r\n      \"service_amount\": 50,\r\n      \"bundle_id\": 1\r\n    },\r\n    {\r\n      \"title\": \"Extended Warranty\",\r\n      \"service_amount\": 75,\r\n         \"bundle_id\": 1\r\n    }\r\n  ]\r\n}\r\n\r\n\r\n\r\n\r\n",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/products/2",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"2"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get product by ID",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{local_laravel}}/api/products/3",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"3"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get Products by  Category ID",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{local_laravel}}/api/categories/2/products",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"categories",
+										"2",
+										"products"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get single product by category ID",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{local_laravel}}/api/categories/1/products/6",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"categories",
+										"1",
+										"products",
+										"6"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get Products by Brand ID",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{local_laravel}}/api/brands/2/products",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"brands",
+										"2",
+										"products"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get single Product by Brand ID",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{local_laravel}}/api/brands/2/products/3",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"brands",
+										"2",
+										"products",
+										"3"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Bundles",
+					"item": [
+						{
+							"name": "Add Bundle",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "\r\n\r\n{\r\n  \"title\": \"Example Bundle\",\r\n  \"total_price\": 999.99,\r\n  \"discount_price\": 899.99,\r\n  \"discount_end_date\": \"2025-08-01\",\r\n  \"items\": [1,2,3,4,5],\r\n  \"custom_services\": [\r\n    {\r\n      \"title\": \"Installation Service\",\r\n      \"service_amount\": 50,\r\n      \"bundle_id\": 1\r\n    },\r\n    {\r\n      \"title\": \"Extended Warranty\",\r\n      \"service_amount\": 75,\r\n         \"bundle_id\": 1\r\n    }\r\n  ]\r\n}\r\n",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/bundles",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"bundles"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "All Bundles",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/bundles",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"bundles"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Bundles",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"title\": \"Noman Updated333\"\r\n}\r\n\r\n",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/bundles/1",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"bundles",
+										"1"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete Bundle",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "DELETE",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "\r\n\r\n{\r\n  \"title\": \"Example Bundle\",\r\n  \"total_price\": 999.99,\r\n  \"discount_price\": 899.99,\r\n  \"discount_end_date\": \"2025-08-01\",\r\n  \"items\": [1],\r\n  \"custom_services\": [\r\n    {\r\n      \"title\": \"Installation Service\",\r\n      \"service_amount\": 50,\r\n      \"bundle_id\": 1\r\n    },\r\n    {\r\n      \"title\": \"Extended Warranty\",\r\n      \"service_amount\": 75,\r\n         \"bundle_id\": 1\r\n    }\r\n  ]\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/bundles/1",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"bundles",
+										"1"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get bundle by ID",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{local_laravel}}/api/bundles/1",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"bundles",
+										"1"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Interest Percentage",
+					"item": [
+						{
+							"name": "Add Interest Percentage",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": ""
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/interest-percentage?interest_percentage=10",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"interest-percentage"
+									],
+									"query": [
+										{
+											"key": "interest_percentage",
+											"value": "10"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "All Interest Percentage",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"loan_amount\": 10000,\r\n  \"repayment_duration\": 12,\r\n  \"status\": \"pending\",\r\n  \"product_id\": [1, 2]\r\n}"
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/interest-percentage",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"interest-percentage"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Interest Percentage",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"loan_amount\": 10000,\r\n  \"repayment_duration\": 12,\r\n  \"status\": \"pending\",\r\n  \"product_id\": [1, 2]\r\n}"
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/interest-percentage/2?interest_percentage=5",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"interest-percentage",
+										"2"
+									],
+									"query": [
+										{
+											"key": "interest_percentage",
+											"value": "5"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete Interest Percentage",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "DELETE",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"loan_amount\": 10000,\r\n  \"repayment_duration\": 12,\r\n  \"status\": \"pending\",\r\n  \"product_id\": [1, 2]\r\n}"
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/interest-percentage/2",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"interest-percentage",
+										"2"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Terms",
+					"item": [
+						{
+							"name": "add terms",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "content",
+											"value": "hey",
+											"type": "text"
+										},
+										{
+											"key": "type",
+											"value": "third",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/terms",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"terms"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "all terms",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/terms",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"terms"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "update terms",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "content",
+											"value": "bye",
+											"type": "text"
+										},
+										{
+											"key": "type",
+											"value": "proceed",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/terms/2",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"terms",
+										"2"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "delete terms",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/terms/2",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"terms",
+										"2"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get single term",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": []
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/terms/proceed",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"terms",
+										"proceed"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "get single by id mono ",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/terms/mono term",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"terms",
+										"mono term"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "document term",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}/api/terms/document term",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"terms",
+										"document term"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Loan Application",
+					"item": [
+						{
+							"name": "Delete Loan Application",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{local_laravel}}pi/delete-loan-application/5",
+									"host": [
+										"{{local_laravel}}pi"
+									],
+									"path": [
+										"delete-loan-application",
+										"5"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "All loan application",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "down_payment",
+											"value": "120",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/all-loan-application",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"all-loan-application"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "single loan application",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{tokken}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "down_payment",
+											"value": "120",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{local_laravel}}/api/single-loan-application/1",
+									"host": [
+										"{{local_laravel}}"
+									],
+									"path": [
+										"api",
+										"single-loan-application",
+										"1"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Website",
+			"item": [
+				{
+					"name": "Dashboard",
+					"item": [
+						{
+							"name": "Category",
+							"item": [
+								{
+									"name": "All Categories",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/categories",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"categories"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get Category by ID",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "{{ere}}/api/categories/7",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"categories",
+												"7"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Brand",
+							"item": [
+								{
+									"name": "Get Brands by Category ID",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/categories/1/brands",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"categories",
+												"1",
+												"brands"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get All Brands",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "http://localhost:8000/api/brands",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"brands"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Product",
+							"item": [
+								{
+									"name": "Get  products by Brand ID",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/brands/7/products",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"brands",
+												"7",
+												"products"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get  products by Multiple Brand IDs",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/brands/1,7/products/",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"brands",
+												"1,7",
+												"products",
+												""
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get products by Category ID",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/categories/1/products",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"categories",
+												"1",
+												"products"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Show product by Category ID",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/categories/1/products/1",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"categories",
+												"1",
+												"products",
+												"1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Show product by Category & Brand",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/categories/1/brands/7/products/1",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"categories",
+												"1",
+												"brands",
+												"7",
+												"products",
+												"1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get all Products",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/products",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"products"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Show product by id",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "{{ere}}/api/products/1",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"products",
+												"1"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Loan Wallet Copy",
+							"item": [
+								{
+									"name": "Show loan wallet",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "7|eIhdHZoxlsThGyuDJsYGhuF7iTgtKYMUuOtM1ZhY3abf1da8",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": ""
+										},
+										"url": {
+											"raw": "http://localhost:8000/api/loan-wallet",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"loan-wallet"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Bundle Copy",
+							"item": [
+								{
+									"name": "Add Bundle",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text",
+												"disabled": true
+											},
+											{
+												"key": "Content-Type",
+												"value": "multipart/form-data",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "formdata",
+											"formdata": [
+												{
+													"key": "title",
+													"value": "Summer Saver Bundle",
+													"type": "text"
+												},
+												{
+													"key": "description",
+													"value": "This bundle includes top products with special discounts.",
+													"type": "text"
+												},
+												{
+													"key": "total_price",
+													"value": "5000",
+													"type": "text"
+												},
+												{
+													"key": "discount_price",
+													"value": "4500",
+													"type": "text"
+												},
+												{
+													"key": "discount_end_date",
+													"value": "2025-08-01",
+													"type": "text"
+												},
+												{
+													"key": "stock",
+													"value": "20",
+													"type": "text",
+													"disabled": true
+												},
+												{
+													"key": "top_deal",
+													"value": "1",
+													"type": "text",
+													"disabled": true
+												},
+												{
+													"key": "featured_image",
+													"type": "file",
+													"src": "/C:/Users/Bilal/Downloads/download.jpeg"
+												},
+												{
+													"key": "items[]",
+													"value": "1",
+													"type": "text"
+												},
+												{
+													"key": "items[]",
+													"value": "2",
+													"type": "text"
+												},
+												{
+													"key": "custom_services[0][title]",
+													"value": "xyz",
+													"type": "text"
+												},
+												{
+													"key": "custom_services[0][service_amount]",
+													"value": "500",
+													"type": "text"
+												},
+												{
+													"key": "custom_services[1][title]",
+													"value": "abc",
+													"type": "text"
+												},
+												{
+													"key": "custom_services[1][service_amount]",
+													"value": "400",
+													"type": "text"
+												}
+											]
+										},
+										"url": {
+											"raw": "{{ere}}/api/bundles",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"bundles"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get All Bundles",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/bundles",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"bundles"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "get bundles by id",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://localhost:8000/api/bundles/1",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"bundles",
+												"1"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "Store",
+					"item": [
+						{
+							"name": "Category",
+							"item": [
+								{
+									"name": "All Categories",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/categories",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"categories"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get Category by ID",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "{{ere}}/api/categories/7",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"categories",
+												"7"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Brand",
+							"item": [
+								{
+									"name": "Get Brands by Category ID",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/categories/1/brands",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"categories",
+												"1",
+												"brands"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get All Brands",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "http://localhost:8000/api/brands",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"brands"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Product",
+							"item": [
+								{
+									"name": "Get  products by Brand ID",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/brands/7/products",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"brands",
+												"7",
+												"products"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get  products by Multiple Brand IDs",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/brands/1,7/products/",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"brands",
+												"1,7",
+												"products",
+												""
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get products by Category ID",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/categories/1/products",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"categories",
+												"1",
+												"products"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Show product by Category ID",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/categories/1/products/1",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"categories",
+												"1",
+												"products",
+												"1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Show product by Category & Brand",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/categories/1/brands/7/products/1",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"categories",
+												"1",
+												"brands",
+												"7",
+												"products",
+												"1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get all Products",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/products",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"products"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Show product by id",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "{{ere}}/api/products/1",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"products",
+												"1"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Reviews",
+							"item": [
+								{
+									"name": "Add review",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n  \"product_id\": 1,\r\n  \"review\": \"This is amazing!\",\r\n  \"rating\": \"5\"\r\n}"
+										},
+										"url": {
+											"raw": "http://localhost:8000/api/product-reviews",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"product-reviews"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Update reviews",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PUT",
+										"header": [],
+										"url": {
+											"raw": "http://localhost:8000/api/product-reviews/1",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"product-reviews",
+												"1"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Loan Wallet Copy",
+							"item": [
+								{
+									"name": "Show loan wallet",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "7|eIhdHZoxlsThGyuDJsYGhuF7iTgtKYMUuOtM1ZhY3abf1da8",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": ""
+										},
+										"url": {
+											"raw": "http://localhost:8000/api/loan-wallet",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"loan-wallet"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "order Copy",
+							"item": [
+								{
+									"name": "all products",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "{{ere}}/api/products",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"products"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "product by id",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://localhost:8000/api/products/1",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"products",
+												"1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "all bundles",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://localhost:8000/api/bundles",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"bundles"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "bundles by id",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://localhost:8000/api/bundles/1",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"bundles",
+												"1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "place orders",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "6|jlIATTnVSV8GBkpAR70OjDRe5FapIqzYG8qVSRePb06f92da",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n  \"delivery_address_id\": 4,\r\n  \"payment_method\": \"direct\",\r\n  \"items\": [\r\n    {\r\n      \"itemable_type\": \"bundle\",\r\n      \"itemable_id\": 1,\r\n      \"quantity\": 4\r\n    }\r\n  ]\r\n}\r\n",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/orders",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"orders"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "get all orders",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/orders",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"orders"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "single order",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/orders/66",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"orders",
+												"66"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "delete order",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "DELETE",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/orders/3",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"orders",
+												"3"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "product add in cart",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n  \"itemable_type\": \"product\",   // or \"bundle\"\r\n  \"itemable_id\": 2,             // product or bundle ID\r\n  \"quantity\": 4\r\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/cart",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"cart"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "get all orders in cart",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/cart",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"cart"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "update cart order",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n              \r\n  \"quantity\": 4\r\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/cart/1",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"cart",
+												"1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "delete single order from cart",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "DELETE",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/cart/3",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"cart",
+												"3"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Checkout Summary",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/cart/checkout-summary",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"cart",
+												"checkout-summary"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Bundle Copy",
+							"item": [
+								{
+									"name": "Add Bundle",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text",
+												"disabled": true
+											},
+											{
+												"key": "Content-Type",
+												"value": "multipart/form-data",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "formdata",
+											"formdata": [
+												{
+													"key": "title",
+													"value": "Summer Saver Bundle",
+													"type": "text"
+												},
+												{
+													"key": "description",
+													"value": "This bundle includes top products with special discounts.",
+													"type": "text"
+												},
+												{
+													"key": "total_price",
+													"value": "5000",
+													"type": "text"
+												},
+												{
+													"key": "discount_price",
+													"value": "4500",
+													"type": "text"
+												},
+												{
+													"key": "discount_end_date",
+													"value": "2025-08-01",
+													"type": "text"
+												},
+												{
+													"key": "stock",
+													"value": "20",
+													"type": "text",
+													"disabled": true
+												},
+												{
+													"key": "top_deal",
+													"value": "1",
+													"type": "text",
+													"disabled": true
+												},
+												{
+													"key": "featured_image",
+													"type": "file",
+													"src": "/C:/Users/Bilal/Downloads/download.jpeg"
+												},
+												{
+													"key": "items[]",
+													"value": "1",
+													"type": "text"
+												},
+												{
+													"key": "items[]",
+													"value": "2",
+													"type": "text"
+												},
+												{
+													"key": "custom_services[0][title]",
+													"value": "xyz",
+													"type": "text"
+												},
+												{
+													"key": "custom_services[0][service_amount]",
+													"value": "500",
+													"type": "text"
+												},
+												{
+													"key": "custom_services[1][title]",
+													"value": "abc",
+													"type": "text"
+												},
+												{
+													"key": "custom_services[1][service_amount]",
+													"value": "400",
+													"type": "text"
+												}
+											]
+										},
+										"url": {
+											"raw": "{{ere}}/api/bundles",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"bundles"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get All Bundles",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "{{ere}}/api/bundles",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"bundles"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "get bundles by id",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://localhost:8000/api/bundles/1",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"bundles",
+												"1"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "Loans",
+					"item": [
+						{
+							"name": "Loan Wallet",
+							"item": [
+								{
+									"name": "Show loan wallet",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": ""
+										},
+										"url": {
+											"raw": "{{ere}}/api/loan-wallet",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"loan-wallet"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Terms",
+							"item": [
+								{
+									"name": "Get single term",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "formdata",
+											"formdata": []
+										},
+										"url": {
+											"raw": "{{ere}}/api/terms/proceed",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"terms",
+												"proceed"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Link Account",
+							"item": [
+								{
+									"name": "Add account",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "formdata",
+											"formdata": [
+												{
+													"key": "account_name",
+													"value": "savingtest",
+													"type": "text"
+												},
+												{
+													"key": "account_number",
+													"value": "4321",
+													"type": "text"
+												},
+												{
+													"key": "bank_name",
+													"value": "sadapay",
+													"type": "text"
+												},
+												{
+													"key": "",
+													"value": "",
+													"type": "text",
+													"disabled": true
+												}
+											]
+										},
+										"url": {
+											"raw": "{{ere}}/api/link-accounts",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"link-accounts"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get all account",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://localhost:8000/api/link-accounts",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"link-accounts"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Delete Account",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "DELETE",
+										"header": [],
+										"url": {
+											"raw": "http://localhost:8000/api/link-accounts/1",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"link-accounts",
+												"1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Update Link Account",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n  \"account_number\": \"1234567890\",\r\n  \"account_name\": \"John \",\r\n  \"bank_name\": \"Bank of Laravel\",\r\n  \"status\": \"active\"\r\n\r\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "http://localhost:8000/api/link-accounts/3",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"link-accounts",
+												"3"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get single account",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://localhost:8000/api/link-accounts/1",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"link-accounts",
+												"1"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Loan Calculation",
+							"item": [
+								{
+									"name": "Save Loan Calculation",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n    \"product_amount\": 830000,\r\n    \"loan_amount\": 230000,\r\n    \"repayment_duration\": 12\r\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{ere}}/api/loan-calculation",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"loan-calculation"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Terms Copy",
+							"item": [
+								{
+									"name": "Get single term",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "formdata",
+											"formdata": []
+										},
+										"url": {
+											"raw": "{{ere}}/api/terms/proceed",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"terms",
+												"proceed"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Loan Repayment",
+							"item": [
+								{
+									"name": "Loan Repayment",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "formdata",
+											"formdata": [
+												{
+													"key": "amount",
+													"value": "120",
+													"type": "text"
+												}
+											]
+										},
+										"url": {
+											"raw": "http://localhost:8000/api/loan-repayment/12",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"loan-repayment",
+												"12"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Mono Loan Calculation",
+							"item": [
+								{
+									"name": "Mono Loan Calculation",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "formdata",
+											"formdata": [
+												{
+													"key": "down_payment",
+													"value": "12000",
+													"type": "text",
+													"disabled": true
+												}
+											]
+										},
+										"url": {
+											"raw": "{{ere}}/api/mono-loan/6",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"mono-loan",
+												"6"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Mono Loan Calculation",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "formdata",
+											"formdata": [
+												{
+													"key": "down_payment",
+													"value": "12000",
+													"type": "text",
+													"disabled": true
+												},
+												{
+													"key": "product_amount",
+													"value": "100000",
+													"type": "text"
+												},
+												{
+													"key": "loan_amount",
+													"value": "50000",
+													"type": "text"
+												},
+												{
+													"key": "repayment_duration",
+													"value": "11",
+													"type": "text"
+												}
+											]
+										},
+										"url": {
+											"raw": "{{ere}}/api/mono-loan/edit/6",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"mono-loan",
+												"edit",
+												"6"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Loan Application",
+							"item": [
+								{
+									"name": "Loan Application",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "formdata",
+											"formdata": [
+												{
+													"key": "title_document",
+													"value": "Passport",
+													"type": "text"
+												},
+												{
+													"key": "upload_document",
+													"type": "file",
+													"src": "/D:/Phone Backup/M2101K7BG/photo/IMG-20250403-WA0038.jpg"
+												}
+											]
+										},
+										"url": {
+											"raw": "{{ere}}/api/loan-application/16",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"loan-application",
+												"16"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Beneficiary Detail",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n    \"beneficiary_name\": \"Bilal\",\r\n    \"beneficiary_email\": \"bilal@gmail.com\",\r\n    \"beneficiary_phone\": \"8787888\",\r\n    \"beneficiary_relationship\": \"close-friend\"\r\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{ere}}/api/beneficiary-detail/16",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"beneficiary-detail",
+												"16"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Loan Detail",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n    \"loan_amount\": \"230000\",\r\n    \"repayment_duration\": \"12\"  \r\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{ere}}/api/loan-details/16",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"loan-details",
+												"16"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Loan Installment",
+							"item": [
+								{
+									"name": "Loan Installment",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n    \"status\": \"Active\"\r\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "http://localhost:8000/api/loan-installment/12",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"loan-installment",
+												"12"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "All loan installments",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "formdata",
+											"formdata": [
+												{
+													"key": "amount",
+													"value": "120",
+													"type": "text"
+												}
+											]
+										},
+										"url": {
+											"raw": "http://localhost:8000/api/show-loan-installment/12",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"show-loan-installment",
+												"12"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Loan Dashboard",
+							"item": [
+								{
+									"name": "Loan Dashboard",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n  \"loan_amount\": 100000,\r\n  \"repayment_duration\": 12,\r\n  \"status\": \"pending\",\r\n  \"product_id\": [1,2]\r\n\r\n}"
+										},
+										"url": {
+											"raw": "{{ere}}/api/loan-dashboard",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"loan-dashboard"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "Carts",
+					"item": [
+						{
+							"name": "order",
+							"item": [
+								{
+									"name": "all products",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://localhost:8000/api/products",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"products"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "product by id",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://localhost:8000/api/products/1",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"products",
+												"1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "all bundles",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://localhost:8000/api/bundles",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"bundles"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "bundles by id",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://localhost:8000/api/bundles/1",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"bundles",
+												"1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "place orders",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "6|jlIATTnVSV8GBkpAR70OjDRe5FapIqzYG8qVSRePb06f92da",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n  \"delivery_address_id\": 4,\r\n  \"payment_method\": \"direct\",\r\n  \"items\": [\r\n    {\r\n      \"itemable_type\": \"bundle\",\r\n      \"itemable_id\": 1,\r\n      \"quantity\": 4\r\n    }\r\n  ]\r\n}\r\n",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/orders",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"orders"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "get all orders",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/orders",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"orders"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "single order",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/orders/66",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"orders",
+												"66"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "delete order",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "DELETE",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/orders/3",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"orders",
+												"3"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "product add in cart",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n  \"itemable_type\": \"product\",   // or \"bundle\"\r\n  \"itemable_id\": 2,             // product or bundle ID\r\n  \"quantity\": 4\r\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/cart",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"cart"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "get all orders in cart",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/cart",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"cart"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "update cart order",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n              \r\n  \"quantity\": 4\r\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/cart/1",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"cart",
+												"1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "delete single order from cart",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "DELETE",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/cart/3",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"cart",
+												"3"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "Delivery Address",
+							"item": [
+								{
+									"name": "Add Delivery Address",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{tokken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n  \"phone_number\": \"03206440155\",\r\n  \"title\": \"office\",\r\n  \"address\": \"main bakar mandi road, Faisalabad\",\r\n  \"state\": \"Punjab\"\r\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{ere}}/api/delivery-address/store",
+											"host": [
+												"{{ere}}"
+											],
+											"path": [
+												"api",
+												"delivery-address",
+												"store"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "All Addresses",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/delivery-address/index",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"delivery-address",
+												"index"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Update Address",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PUT",
+										"header": [],
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/delivery-address/update/2",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"delivery-address",
+												"update",
+												"2"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Delete Address",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "DELETE",
+										"header": [],
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/delivery-address/delete/3",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"delivery-address",
+												"delete",
+												"3"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get Address by id",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://127.0.0.1:8000/api/delivery-address/show/1",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"delivery-address",
+												"show",
+												"1"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "User",
+					"item": [
+						{
+							"name": "verify-otp",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:8000/api/verify-otp/6?verify_otp=4411",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "8000",
+									"path": [
+										"api",
+										"verify-otp",
+										"6"
+									],
+									"query": [
+										{
+											"key": "verify_otp",
+											"value": "4411"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Logout",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "1|el8L25pfZWUGW2feiEOnFAMBdaHlZGGkEniUPfpsba5162bc",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:8000/api/logout",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "8000",
+									"path": [
+										"api",
+										"logout"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "register",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"first_name\": \"bilal\",\r\n  \"sur_name\": \"shahbaz\",\r\n  \"email\": \"hoyaxa4776@besaies.com\",\r\n  \"password\": \"123456\",\r\n  \"phone\": \"03206440155\",\r\n  \"refferal_code\": \"reff222\",\r\n  \"role\": \"Admin\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:8000/api/register",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "8000",
+									"path": [
+										"api",
+										"register"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "login",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"email\": \"hoyaxa4776@besaies.com\",\r\n    \"password\": \"123456\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:8000/api/login",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "8000",
+									"path": [
+										"api",
+										"login"
+									],
+									"query": [
+										{
+											"key": "email",
+											"value": "rohailamjad082@gmail.com",
+											"disabled": true
+										},
+										{
+											"key": "password",
+											"value": "12345678",
+											"disabled": true
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "send OTP",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"first_name\": \"hamza\",\r\n  \"sur_name\": \"hafiz\",\r\n  \"email\": \"hamzahafiz306@gmail.com\",\r\n  \"password\": \"12345678\",\r\n  \"phone\": \"1234567890\",\r\n  \"refferal_code\": \"ref1123\",\r\n  \"role\": \"Admin\"\r\n}"
+								},
+								"url": {
+									"raw": "http://localhost:8000/api/send-otp",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "8000",
+									"path": [
+										"api",
+										"send-otp"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "More",
+					"item": [
+						{
+							"name": "Support",
+							"item": [
+								{
+									"name": "Edit profile",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "1|el8L25pfZWUGW2feiEOnFAMBdaHlZGGkEniUPfpsba5162bc",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n    \"first_name\": \"billyboxer\"\r\n \r\n\r\n  \r\n}"
+										},
+										"url": {
+											"raw": "http://localhost:8000/api/update-user",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"update-user"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Send message",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n    \"subject\":\"Login issue\",\r\n    \"message\":\"Teh login is not working\"\r\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "http://localhost:8000/api/website/tickets",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"website",
+												"tickets"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "All messages",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "4|2LgxKUhTUQa01asXy7MDMlyhXsIV8p69vYNkLnuNc5dcefef",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://localhost:8000/api/website/tickets",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8000",
+											"path": [
+												"api",
+												"website",
+												"tickets"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "apikey",
+		"apikey": [
+			{
+				"key": "key",
+				"value": "X-API-Key",
+				"type": "string"
+			},
+			{
+				"key": "value",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://farming-simulator.pstmn.io"
+		},
+		{
+			"key": "ere",
+			"value": "http://localhost:8000",
+			"type": "default"
+		}
+	]
+}

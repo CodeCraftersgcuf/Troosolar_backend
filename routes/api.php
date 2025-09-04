@@ -112,7 +112,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Loan
     Route::post('/loan-calculation', [LoanCalculationController::class, 'store']);
     Route::apiResource('/interest-percentage', InterestPercentageController::class);
-    Route::post('/mono-loan/{loanCalculationId}', [MonoLoanCalculationController::class, 'store']);
+    Route::get('/mono-loan/{loanCalculationId}', [MonoLoanCalculationController::class, 'store']);
+    Route::post('/mono-loan/edit/{loanCalculationId}', [MonoLoanCalculationController::class, 'edit']);
     Route::post('/loan-application/{monoLoanCalculationId}', [LoanApplicationController::class, 'documents']);
     Route::post('/beneficiary-detail/{monoLoanCalculationId}', [LoanApplicationController::class, 'beneficiary']);
     Route::post('/loan-details/{monoLoanCalculationId}', [LoanApplicationController::class, 'loanDetail']);
