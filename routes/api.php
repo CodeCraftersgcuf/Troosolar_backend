@@ -66,6 +66,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/categories/{category}/brands/{brand}', [BrandController::class, 'showBrandByCategory']);
     Route::get('/categories/{category}/products/{product}', [ProductController::class, 'showProductByCategoryBrand']);
     Route::get('/categories/{category}/brands/{brand}/products/{product}', [ProductController::class, 'showProductByCategory']);
+    Route::get('/cart/checkout-summary', [CartController::class, 'checkoutSummary']);
     // categories/{categoryId}/brands/{brandIds}/product/{productId}
     Route::apiResource('brands', BrandController::class);
     Route::apiResource('products', ProductController::class);
@@ -115,7 +116,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/loan-application/{monoLoanCalculationId}', [LoanApplicationController::class, 'documents']);
     Route::post('/beneficiary-detail/{monoLoanCalculationId}', [LoanApplicationController::class, 'beneficiary']);
     Route::post('/loan-details/{monoLoanCalculationId}', [LoanApplicationController::class, 'loanDetail']);
-    Route::get('/loan-dashboard/{loanApplicationId}', [LoanWalletController::class, 'loanDashboard']);
+    Route::get('/loan-dashboard', [LoanWalletController::class, 'loanDashboard']);
     Route::get('/all-loan-application', [LoanApplicationController::class, 'allLoanApplication']);
     Route::get('/single-loan-application/{id}', [LoanApplicationController::class, 'singleLoanApplication']);
     Route::delete('/delete-loan-application/{loanApplicationId}', [LoanApplicationController::class, 'destory']);

@@ -37,10 +37,11 @@ class LoanWalletController extends Controller
         }
     }
 
-    public function loanDashboard($loanApplicationId)
+    public function loanDashboard()
     {
       try{
-        $loanApplicationId = LoanApplication::where('id', $loanApplicationId)
+        $userId = Auth::id(); 
+        $loanApplicationId = LoanApplication::where('user_id', $userId)
             ->where('user_id', Auth::id())
             ->first();
             
