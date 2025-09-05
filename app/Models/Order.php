@@ -17,7 +17,20 @@ class Order extends Model
         'payment_status',
         'order_status',
         'note',
+        'installation_price',
+        'mono_calculation_id',
+        'product_id',   // ⬅️ new
+        'bundle_id',    // ⬅️ new
     ];
+    public function product()
+    {
+        return $this->belongsTo(\App\Models\Product::class);
+    }
+
+      public function bundle()
+    {
+        return $this->belongsTo(\App\Models\Bundles::class, 'bundle_id');
+    }
 
     public function user()
     {
