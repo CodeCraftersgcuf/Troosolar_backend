@@ -39,6 +39,7 @@ public function allLoansStatus()
             }
 
             $data[] = [
+                'id' => $loan->id,
                 'name' => $loan->loan_application->beneficiary_name,
                 'Amount' => $loan->loan_application->loan_amount,
                 'date' => $loan->loan_application->created_at->format('Y-m-d'),
@@ -63,6 +64,7 @@ public function fullLoanDetails(string $id)
         
         $interestRate = InterestPercentage::latest()->first();
         $loanDetails = [
+            'id' => $loanDetails->loan_application->id,
             'name' => $loanDetails->loan_application->beneficiary_name,
             'loan limit' => $loanDetails->loan_application->loan_limit,
             'amount' => $loanDetails->loan_application->loan_amount,

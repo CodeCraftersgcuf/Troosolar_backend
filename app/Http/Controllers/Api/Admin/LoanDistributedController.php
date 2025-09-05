@@ -88,6 +88,7 @@ class LoanDistributedController extends Controller
             }
 
             $data[] = [
+                'id' => $loan->id,
                 'name' => $loan->loan_application->beneficiary_name,
                 'Duration' => $loan->loan_application->repayment_duration.' months',
                 'date' => $loan->loan_application->created_at->format('Y-m-d'),
