@@ -27,7 +27,10 @@ class UserController extends Controller
      * @param UserRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-
+public function index()
+{
+    return $this->allUsers();
+}
     // User register
    public function register(UserRequest $request)
 {
