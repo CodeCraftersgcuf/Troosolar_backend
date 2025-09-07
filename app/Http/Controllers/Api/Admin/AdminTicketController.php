@@ -28,7 +28,19 @@ class AdminTicketController extends Controller
                     ];
                 });
 
-            return ResponseHelper::success($tickets, 'All tickets retrieved');
+            // Add summary counts
+            $totalTickets   = Ticket::count();
+            $pendingTickets = Ticket::where('status', 'pending')->count();
+            $answeredTickets = Ticket::where('status', 'answered')->count();
+
+            return ResponseHelper::success([
+                'summary' => [
+                    'total_tickets'    => $totalTickets,
+                    'pending_tickets'  => $pendingTickets,
+                    'answered_tickets' => $answeredTickets,
+                ],
+                'tickets' => $tickets,
+            ], 'All tickets retrieved');
         } catch (\Exception $e) {
             return ResponseHelper::error('Failed to fetch tickets: ' . $e->getMessage(), 500);
         }

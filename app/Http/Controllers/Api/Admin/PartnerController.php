@@ -13,6 +13,7 @@ use App\Models\LoanStatus;
 use App\Models\Partner;
 use App\Models\User;
 use Exception;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -25,12 +26,16 @@ class PartnerController extends Controller
         try
         {
             $data = $request->validated();
+            // Check for duplicate email
+            if (!empty($data['email']) && Partner::where('email', $data['email'])->exists()) {
+                return ResponseHelper::error('Email is already registered for a partner', 409);
+            }
             $partner = Partner::create($data);
             return ResponseHelper::success($data, 'Partner is added succesfully');
         }
         catch(Exception $ex)
         {
-            return ResponseHelper::error('Partner is not added ');
+            return ResponseHelper::error('Partner is not added: ' . $ex->getMessage());
         }
     }
 
@@ -43,6 +48,7 @@ class PartnerController extends Controller
             // dd($all_partners);
            $data = $all_partners->map(function ($partner) {
             return [
+                'id'=> $partner->id,
                 'Partner name' => $partner->name,
                 'No of Loans' => $partner->no_of_loans,
                 'Amount' => $partner->amount,
@@ -64,14 +70,23 @@ class PartnerController extends Controller
     {
         try
         {
-            $partner = Partner::findorfail( $partner_id);
+            $partner = Partner::findOrFail($partner_id);
             $data = $request->validated();
-            $update_partner = Partner::where('id', $partner_id)->update($data);
-            return ResponseHelper::success( $update_partner, 'Partner is updated succesfully');
+
+            // Check for duplicate email (exclude current partner)
+            if (!empty($data['email']) && Partner::where('email', $data['email'])->where('id', '!=', $partner_id)->exists()) {
+                return ResponseHelper::error('Email is already registered for another partner', 409);
+            }
+
+            $partner->update($data);
+            return ResponseHelper::success($partner, 'Partner is updated successfully');
+        }
+        catch (ModelNotFoundException $e) {
+            return ResponseHelper::error('Partner not found', 404);
         }
         catch(Exception $ex)
         {
-            return ResponseHelper::error('the partner is update deleted');
+            return ResponseHelper::error('Failed to update partner: ' . $ex->getMessage());
         }
     } 
 
@@ -80,13 +95,16 @@ class PartnerController extends Controller
     {
         try
         {
-            $delete_partner = Partner::findorfail( $partner_id);
+            $delete_partner = Partner::findOrFail($partner_id);
             $delete_partner->delete();
-            return ResponseHelper::success( 'Partner is deleted succesfully');
+            return ResponseHelper::success('Partner is deleted successfully');
+        }
+        catch (ModelNotFoundException $e) {
+            return ResponseHelper::error('Partner not found', 404);
         }
         catch(Exception $ex)
         {
-            return ResponseHelper::error('the partner is not deleted');
+            return ResponseHelper::error('Failed to delete partner: ' . $ex->getMessage());
         }
     }
 

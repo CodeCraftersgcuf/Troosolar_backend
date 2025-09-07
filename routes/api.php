@@ -17,7 +17,8 @@ use App\Http\Controllers\Api\Admin\{
     AdminTicketController,
     NotificationController,
     LoanDistributedController,
-    InterestPercentageController
+    InterestPercentageController,
+    AnalyticController
 };
 use App\Http\Controllers\Api\Website\{
     CartController,
@@ -161,6 +162,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ]);
         Route::post('tickets/{ticket}/reply', [AdminTicketController::class, 'reply'])->name('admin.tickets.reply');
     });
+    Route::get('admin/analytics', [AnalyticController::class, 'index']);
 
     // Orders
     Route::prefix('orders')->group(function () {
