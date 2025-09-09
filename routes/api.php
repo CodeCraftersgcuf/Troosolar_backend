@@ -185,22 +185,20 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Transactions
     
-   Route::middleware('auth:sanctum')->group(function () {
+// Transactions  ----------------------------------------------------
+Route::get('/transactions', [TransactionController::class, 'index']);                 // current user (or ALL if admin)
+Route::get('/single-trancastion', [TransactionController::class, 'singleTranscation']); 
+Route::get('/transactions/user/{userId}', [TransactionController::class, 'forUser'])
+    ->whereNumber('userId');                                                          
+Route::get('/transactions/{id}', [TransactionController::class, 'show'])
+    ->whereNumber('id');  
 
-    Route::get('/transactions', [TransactionController::class, 'index']);                 // GET /api/
-    Route::get('/single-trancastion', [TransactionController::class, 'singleTranscation']); // GET /api/ 
-    Route::get('/transactions/user/{userId}', [TransactionController::class, 'forUser'])
-        ->whereNumber('userId');                                                          // GET /api/
-    Route::get('/transactions/{id}', [TransactionController::class, 'show'])
-        ->whereNumber('id');  
-
-        
-         Route::prefix('admin')->group(function () {
-        Route::get('/users', [UserController::class, 'allUsers']);   // ⬅ use allUsers here
-        // (optional) single user details:
-        Route::get('/users/{userId}', [UserController::class, 'singleUser'])->whereNumber('userId');
-    });                                                           // GET /api/
+// Admin: use /api/admin/users to show the TRANSACTIONS table (not the raw users list)
+Route::prefix('admin')->group(function () {
+    Route::get('/users', [TransactionController::class, 'index']); // ⬅ REPOINTED to transactions
+    Route::get('/users/{userId}', [TransactionController::class, 'forUser'])->whereNumber('userId'); // ⬅ REPOINTED
 });
+
 
     // Banners
     Route::apiResource('admin/banners', BannerController::class);

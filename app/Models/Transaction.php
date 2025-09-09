@@ -8,8 +8,16 @@ use Illuminate\Database\Eloquent\Model;
 class Transaction extends Model
 {
     use HasFactory;
-      protected $fillable = [
-        'title', 'amount', 'status', 'type', 'method', 'transacted_at', 'user_id'
+        protected $fillable = [
+        'title',
+        'amount',
+        'status',
+        'type',
+        'method',
+        'transacted_at',
+        'user_id',
+        'tx_id',
+        'reference',
     ];
 
     protected $casts = [
