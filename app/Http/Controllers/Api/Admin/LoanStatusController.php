@@ -55,30 +55,80 @@ public function allLoansStatus()
     }
 }
 
-    // fullLoanDetails
+    // fullLoanDetails - Get all loans for a specific user
 public function fullLoanDetails(string $id)
 {
     try
     {
-        $loanDetails = LoanStatus::where('id', $id)->with('loan_application')->first();
+        // First, verify the user exists with wallet information
+        $user = \App\Models\User::with('wallet')->find($id);
+        if (!$user) {
+            return ResponseHelper::error('User not found', 404);
+        }
+
+        // Get all loan applications for this user with their loan status
+        $loanApplications = LoanApplication::where('user_id', $id)
+            ->with(['loanStatus', 'user'])
+            ->get();
         
+        if ($loanApplications->isEmpty()) {
+            return ResponseHelper::success([], 'No loans found for this user');
+        }
+
         $interestRate = InterestPercentage::latest()->first();
-        $loanDetails = [
-            'id' => $loanDetails->loan_application->id,
-            'name' => $loanDetails->loan_application->beneficiary_name,
-            'loan limit' => $loanDetails->loan_application->loan_limit,
-            'amount' => $loanDetails->loan_application->loan_amount,
-            'repayment duration' => $loanDetails->loan_application->repayment_duration,
-            'interest rate' => $interestRate->interest_percentage,
-            'financing partner' => 'allied bank',
-            'send_status' => $loanDetails->send_status,
-            'send_date' => $loanDetails->send_date,
-            'approval_status' => $loanDetails->approval_status,
-            'approval_date' => $loanDetails->approval_date,
-            'disbursement_status' => $loanDetails->disbursement_status,
-            'disbursement_date' => $loanDetails->disbursement_date
-        ];
-        return ResponseHelper::success($loanDetails, 'Loan Details Retrieved Successfully');    
+        $allLoanDetails = [];
+
+        foreach ($loanApplications as $loanApp) {
+            $loanDetails = [
+                'loan_application_id' => $loanApp->id,
+                'user_id' => $loanApp->user_id,
+                'user_name' => $loanApp->user->first_name . ' ' . $loanApp->user->sur_name,
+                'beneficiary_name' => $loanApp->beneficiary_name,
+                'beneficiary_email' => $loanApp->beneficiary_email,
+                'beneficiary_phone' => $loanApp->beneficiary_phone,
+                'beneficiary_relationship' => $loanApp->beneficiary_relationship,
+                'loan_limit' => $loanApp->loan_limit,
+                'loan_amount' => $loanApp->loan_amount,
+                'repayment_duration' => $loanApp->repayment_duration,
+                'interest_rate' => $interestRate ? $interestRate->interest_percentage : null,
+                'financing_partner' => 'allied bank',
+                'application_status' => $loanApp->status,
+                'created_at' => $loanApp->created_at,
+                'updated_at' => $loanApp->updated_at
+            ];
+
+            // Add loan status details if they exist
+            if ($loanApp->loanStatus) {
+                $loanDetails['loan_status'] = [
+                    'send_status' => $loanApp->loanStatus->send_status,
+                    'send_date' => $loanApp->loanStatus->send_date,
+                    'approval_status' => $loanApp->loanStatus->approval_status,
+                    'approval_date' => $loanApp->loanStatus->approval_date,
+                    'disbursement_status' => $loanApp->loanStatus->disbursement_status,
+                    'disbursement_date' => $loanApp->loanStatus->disbursement_date
+                ];
+            } else {
+                $loanDetails['loan_status'] = null;
+            }
+
+            $allLoanDetails[] = $loanDetails;
+        }
+
+        return ResponseHelper::success([
+            'user_info' => [
+                'id' => $user->id,
+                'name' => $user->first_name . ' ' . $user->sur_name,
+                'email' => $user->email,
+                'phone' => $user->phone
+            ],
+            'wallet_info' => [
+                'loan_balance' => $user->wallet ? $user->wallet->loan_balance : 0,
+                'shop_balance' => $user->wallet ? $user->wallet->shop_balance : 0,
+                'wallet_status' => $user->wallet ? $user->wallet->status : 'inactive'
+            ],
+            'total_loans' => count($allLoanDetails),
+            'loans' => $allLoanDetails
+        ], 'All Loan Details Retrieved Successfully');    
     }
     catch (Exception $e) {
         Log::error('Error retrieving loan details: ' . $e->getMessage());

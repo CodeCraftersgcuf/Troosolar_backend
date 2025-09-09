@@ -39,5 +39,10 @@ public function loanStatus()
      return $this->hasMany(LoanInstallment::class, 'mono_calculation_id', 'mono_loan_calculation');
  }
 
+ public function user()
+ {
+     return $this->belongsTo(User::class);
+ }
+
 
 }

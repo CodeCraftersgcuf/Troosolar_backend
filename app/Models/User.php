@@ -63,6 +63,12 @@ public function wallets()
 return $this->hasOne(Wallet::class);
 }
 
+// loan applications
+public function loanApplications()
+{
+    return $this->hasMany(LoanApplication::class);
+}
+
     /**
      * The attributes that should be hidden for serialization.
      *
