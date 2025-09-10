@@ -27,7 +27,7 @@ class Product extends Model
         // 'images' => 'array',
     ];
 
- protected $casts = [
+    protected $casts = [
         'discount_end_date' => 'date',
         'top_deal' => 'boolean',
         'installation_compulsory' => 'boolean',
@@ -37,7 +37,7 @@ class Product extends Model
         // If you keep a JSON column named `images`, cast it here instead:
         // 'images' => 'array',
     ];
-        protected $appends = ['featured_image_url'];
+    protected $appends = ['featured_image_url'];
 
 
     /**
@@ -56,28 +56,28 @@ class Product extends Model
         return $this->belongsTo(Brand::class);
     }
     public function images()
-{
-    return $this->hasMany(\App\Models\ProductImage::class);
-}
+    {
+        return $this->hasMany(\App\Models\ProductImage::class);
+    }
 
-public function details()
-{
-    return $this->hasMany(\App\Models\ProductDetail::class);
-}
+    public function details()
+    {
+        return $this->hasMany(\App\Models\ProductDetail::class);
+    }
 
-// loan calculation relationship
-public function loanCalculations()
-{
-    return $this->belongsToMany(LoanCalculation::class, 'loan_calculation_product');
-}
-public function reviews()
-{
-    return $this->hasMany(ProductReveiews::class);
-}
+    // loan calculation relationship
+    public function loanCalculations()
+    {
+        return $this->belongsToMany(LoanCalculation::class, 'loan_calculation_product');
+    }
+    public function reviews()
+    {
+        return $this->hasMany(ProductReveiews::class);
+    }
     public function getFeaturedImageUrlAttribute(): ?string
     {
         if (!$this->featured_image) return null;
-        if (Str::startsWith($this->featured_image, ['http://','https://','/storage/'])) {
+        if (Str::startsWith($this->featured_image, ['http://', 'https://', '/storage/'])) {
             return $this->featured_image;
         }
         return Storage::url($this->featured_image);
