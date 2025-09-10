@@ -65,7 +65,6 @@ Route::get('/migrate/rollback', function () {
     return response()->json(['message' => 'Migration rollback successfully'], 200);
 });
 
-// ================= PUBLIC ROUTES =================
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/verify-otp/{user_id}', [UserController::class, 'verifyOtp']);
 Route::post('/login', [UserController::class, 'login']);
