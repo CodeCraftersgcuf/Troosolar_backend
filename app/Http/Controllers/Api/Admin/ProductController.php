@@ -19,7 +19,7 @@ class ProductController extends Controller
     public function index()
     {
         try {
-            $products = Product::with(['details', 'images'])->get();
+            $products = Product::with(['details', 'images','reviews'])->get();
             return ResponseHelper::success($products, 'Products fetched successfully.');
         } catch (Exception $e) {
             return ResponseHelper::error('Failed to fetch products.', 500, $e->getMessage());
