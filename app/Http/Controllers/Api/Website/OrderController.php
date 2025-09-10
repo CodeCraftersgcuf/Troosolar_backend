@@ -24,26 +24,35 @@ class OrderController extends Controller
     public function index(Request $request)
     {
         try {
-            $userId = auth()->id();
+            $user = auth()->user();
+            $isAdmin = $user ;
 
-            $orders = Order::with(['items.itemable', 'deliveryAddress'])
-                ->where('user_id', $userId)
-                ->latest()
-                ->get();
+            // Build query based on user role
+            $query = Order::with(['items.itemable', 'deliveryAddress', 'user:id,first_name,sur_name,email,phone']);
+            
+            if (!$isAdmin) {
+                // Regular users only see their own orders
+                $query->where('user_id', $user->id);
+            }
+            // Admin users see all orders (no where clause needed)
+
+            /** @var \Illuminate\Database\Eloquent\Collection $orders */
+            $orders = $query->latest()->get();
 
             $summary = [
                 'total_orders'     => $orders->count(),
                 'pending_orders'   => $orders->where('order_status', 'pending')->count(),
                 'completed_orders' => $orders->where('order_status', 'delivered')->count(),
+                'user_type'        => $isAdmin ? 'admin' : 'user',
             ];
 
-            $formatted = $orders->map(fn ($o) => $this->formatOrder($o))->all();
+            $formatted = $orders->map(fn ($o) => $this->formatOrder($o, ['include_user_info' => $isAdmin]))->all();
 
             return response()->json([
                 'status'  => true,
                 'summary' => $summary,
                 'orders'  => $formatted,
-                'message' => 'Orders fetched successfully',
+                'message' => $isAdmin ? 'All orders fetched successfully for admin' : 'Orders fetched successfully',
             ]);
         } catch (\Throwable $e) {
             Log::error("Order Index Error: {$e->getMessage()}");
@@ -60,6 +69,7 @@ class OrderController extends Controller
         try {
             // Add authorization here if needed (e.g., Gate/Policy)
 
+            /** @var \Illuminate\Database\Eloquent\Collection $orders */
             $orders = Order::with(['items.itemable', 'deliveryAddress'])
                 ->where('user_id', $userId)
                 ->latest()
@@ -199,9 +209,18 @@ class OrderController extends Controller
     public function show($id)
     {
         try {
-            $order = Order::with(['items.itemable', 'deliveryAddress'])
-                ->where('user_id', auth()->id())
-                ->findOrFail($id);
+            $user = auth()->user();
+            $isAdmin = $user; // Based on your change: all authenticated users are treated as admin
+            
+            $query = Order::with(['items.itemable', 'deliveryAddress', 'user:id,first_name,sur_name,email,phone']);
+            
+            if (!$isAdmin) {
+                // Regular users only see their own orders
+                $query->where('user_id', $user->id);
+            }
+            // Admin users can see any order (no where clause needed)
+            
+            $order = $query->findOrFail($id);
 
             $extras = [];
             if ($order->payment_method === 'direct') {
@@ -239,12 +258,18 @@ class OrderController extends Controller
                 ];
             }
 
-            $response = $this->formatOrder($order, $extras);
+            $response = $this->formatOrder($order, array_merge($extras, ['include_user_info' => $isAdmin]));
 
             return ResponseHelper::success($response, 'Order fetched successfully');
-        } catch (\Throwable $e) {
-            Log::error("Order Show Error: {$e->getMessage()}");
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            Log::error("Order not found: {$e->getMessage()}");
             return ResponseHelper::error('Order not found', 404);
+        } catch (\Exception $e) {
+            Log::error("Order Show Error: {$e->getMessage()}");
+            return ResponseHelper::error('Failed to fetch order details', 500);
+        } catch (\Throwable $e) {
+            Log::error("Critical Order Show Error: {$e->getMessage()}");
+            return ResponseHelper::error('A critical error occurred while fetching order', 500);
         }
     }
 
@@ -268,7 +293,7 @@ class OrderController extends Controller
 
     private function formatOrder(Order $order, array $extras = []): array
     {
-        return array_merge([
+        $baseData = [
             'id'               => $order->id,
             'order_number'     => $order->order_number,
             'order_status'     => $order->order_status,
@@ -281,7 +306,19 @@ class OrderController extends Controller
             'created_at'       => optional($order->created_at)->format('Y-m-d H:i:s'),
             'delivery_address' => $order->relationLoaded('deliveryAddress') ? $order->deliveryAddress : null,
             'items'            => $order->items->map(fn ($i) => $this->formatOrderItem($i))->all(),
-        ], $extras);
+        ];
+
+        // Add user information if this is an admin request
+        if (isset($extras['include_user_info']) && $extras['include_user_info'] && $order->relationLoaded('user')) {
+            $baseData['user_info'] = [
+                'id' => $order->user->id,
+                'name' => $order->user->first_name . ' ' . $order->user->sur_name,
+                'email' => $order->user->email,
+                'phone' => $order->user->phone,
+            ];
+        }
+
+        return array_merge($baseData, $extras);
     }
 
     private function formatOrderItem(OrderItem $item): array
