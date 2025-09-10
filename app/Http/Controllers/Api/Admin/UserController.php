@@ -51,7 +51,7 @@ public function index()
         }
 
         $data['user_code'] = Str::lower($data['first_name']) . rand(100, 999);
-        $data['otp'] = rand(1000, 9999);
+        $data['otp'] = rand(10000, 99999);
         $user = User::create($data);
 
         $this->createWallet($user);
