@@ -23,6 +23,7 @@ class Product extends Model
         'top_deal',
         'installation_compulsory',
         'featured_image',
+        'old_quantity',
         // ❌ This line does nothing in $fillable and also conflicts with relation name:
         // 'images' => 'array',
     ];
