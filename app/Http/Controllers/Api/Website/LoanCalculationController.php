@@ -34,7 +34,8 @@ class LoanCalculationController extends Controller
             'interest_percentage_id' => $interestPercentageRate,
             'repayment_date' => $repaymentDate,
             'interest_percentage' => $interestPercentageRate,
-            'monthly_payment' => $monthlyPaymnet
+            'monthly_payment' => $monthlyPaymnet,
+            'status'=>'pending'
         ]); 
        
         return response()->json([
@@ -49,6 +50,20 @@ class LoanCalculationController extends Controller
         Log::error('no save loan calculation'.$e->getMessage());
         return ResponseHelper::error('Loan Calculation is not added');
        }
+    }
+    public function status(){
+      $user=Auth::user();
+      $loan = LoanCalculation::where('user_id', $user->id)->latest()->first();
+      $exists=false;
+      if($loan){
+        $exists=true;
+      }
+      return response()->json([
+        'status' => $loan->status,
+        'exists' => $exists,
+        'message' => 'Loan calculate successfully',
+        'data' => $loan,
+      ]);
     }
 
     

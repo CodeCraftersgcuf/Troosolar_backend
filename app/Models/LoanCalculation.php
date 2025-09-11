@@ -36,7 +36,7 @@ public function monoLoanCalculation()
 
 public function loanDistributed()
 {
-    return $this->hasOne(LoanDistributed::class, 'loan_calculation_id');
+    return $this->hasOne(LoanDistribute::class, 'loan_calculation_id');
 }
 public function loanApplication()
 {
