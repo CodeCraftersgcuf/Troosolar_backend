@@ -129,7 +129,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/single-user/{user_id}', [UserController::class, 'singleUser']);
 
     //wallet routes
-    Route::get('/fund-wallet', [LoanWalletController::class, 'fundWallet']);
+    Route::post('/fund-wallet', [LoanWalletController::class, 'fundWallet']);
     // Loan Wallet
     Route::get('/loan-wallet', [LoanWalletController::class, 'show']);
 
