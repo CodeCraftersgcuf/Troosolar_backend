@@ -12,6 +12,7 @@ use App\Models\Bundles;
 use App\Models\LoanApplication;
 use App\Models\LoanCalculation;
 use App\Helpers\ResponseHelper;
+use App\Models\Transaction;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -353,4 +354,30 @@ class OrderController extends Controller
             ] : null,
         ];
     }
-}
+    public function paymentConfirmation(Request $request)
+{
+    $amount=$request->amount;
+    $tx_id=$request->txId;
+    $orderId=$request->orderId;
+    $order=Order::where('id',$orderId)->first();
+    if(!$order){
+        return ResponseHelper::error("order does not found");
+
+    }
+    $order->payment_status="paid";
+    $order->update();
+    $transaction=Transaction::create([
+        'user_id'=>$order->user_id,
+        'amount'=>$amount,
+        'tx_id'=>$tx_id,
+        "title"=>"Order Payment - Direct",
+        "type"=>"outgoing",
+        "method"=>"Direct",
+        "status"=>"Completed",
+        "transacted_at"=>now()
+
+    ]);
+    return ResponseHelper::success($transaction,"payment confirmed");
+
+
+}}

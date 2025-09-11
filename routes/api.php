@@ -206,6 +206,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [CartController::class, 'destroy']);
         Route::delete('/', [CartController::class, 'clear']);
     });
+    Route::post('payment-confirmation',[OrderController::class, 'paymentConfirmation']);
 
     // Transactions
     
