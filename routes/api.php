@@ -132,7 +132,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/loan-wallet', [LoanWalletController::class, 'show']);
 
     // Loan
-    Route::get('loan-calculation-stauts', [LoanCalculationController::class, 'status']);
+    Route::get('/loan-calculation-stauts', [LoanCalculationController::class, 'status']);
     Route::post('/loan-calculation', [LoanCalculationController::class, 'store']);
     Route::apiResource('/interest-percentage', InterestPercentageController::class);
     Route::get('/mono-loan/{loanCalculationId}', [MonoLoanCalculationController::class, 'store']);
