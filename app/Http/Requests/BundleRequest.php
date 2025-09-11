@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class BundleRequest extends FormRequest
 {
@@ -28,5 +30,15 @@ class BundleRequest extends FormRequest
             'custom_services.*.title' => 'required|string|max:255',
             'custom_services.*.service_amount' => 'required|numeric|min:0',
         ];
+    }
+     protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(
+            response()->json([
+                'status' => 'error',
+                'data' => $validator->errors(),
+                'message' => $validator->errors()->first()
+            ], 422)
+        );
     }
 }
