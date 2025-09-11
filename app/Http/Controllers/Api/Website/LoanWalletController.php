@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Website;
 use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Controller;
 use App\Models\LoanApplication;
+use App\Models\Transaction;
 use App\Models\Wallet;
 use Exception;
 use Illuminate\Http\Request;
@@ -61,5 +62,24 @@ class LoanWalletController extends Controller
             Log::error('loan dashboard is not retrieved '. $ex->getMessage());
             return ResponseHelper::error('something wrong in loan wallet');
         }
+    }
+    public function fundWallet(Request $request){
+      $amount=$request->amount;
+      $txId=$request->txId;
+      $user=Auth::user();
+      $wallet=Wallet::where('user_id', $user->id)->first();
+      $wallet->shop_balance=$wallet->shop_balance+$amount;
+      $wallet->update();
+      $transaction=Transaction::create([
+        'user_id'=>$user->id,
+        'amount'=>$amount,
+        'tx_id'=>$txId,
+        "title"=>"Funding Wallet",
+        "type"=>"incoming",
+        "method"=>"Direct",
+        "status"=>"Completed",
+        "transacted_at"=>now()
+      ]);
+      return ResponseHelper::success($transaction,"Funding wallet successfully");
     }
 }
