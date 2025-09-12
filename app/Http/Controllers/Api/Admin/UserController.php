@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Http\Requests\ForgetPasswordRequest;
 use Exception;
 use App\Models\User;
 use App\Models\Wallet;
@@ -15,7 +16,9 @@ use App\Http\Requests\UserRequest;
 use App\Http\Requests\LoginRequest;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ResetPassword;
 use App\Http\Requests\UpdateRequest;
+use App\Http\Requests\VerifyForgetOtpRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -126,6 +129,47 @@ public function logout(Request $request)
     }
 }
 
+//password reset routes
+public function forgetPassword(ForgetPasswordRequest $request){
+    $data=$request->validated();
+    $email=$data['email'];
+    $user=User::where('email',$email)->first();
+    if(!$user){
+        return ResponseHelper::error('User not found',404);
+    }
+    $user->otp=rand(10000,99999);
+    $user->save();
+    Mail::to($user->email)->send(new SendOtpMail($user->otp,$user));
+    return ResponseHelper::success(null,'OTP sent successfully');
+
+}
+public function verifyResetPasswordOtp(VerifyForgetOtpRequest $request){
+    $data=$request->validated();
+    $user=User::where('email',$data['email'])->first();
+    if(!$user){
+        return ResponseHelper::error('User not found',404);
+    }
+    if($user->otp!=$data['otp']){
+        return ResponseHelper::error('Invalid OTP',400);
+    }
+    $user->otp=null;
+    $user->save();
+    return ResponseHelper::success(null,'OTP verified successfully');
+}
+
+public function resetPassword(ResetPassword $request){
+    $data=$request->validated();
+    $user=User::where('email',$data['email'])->first();
+    if(!$user){
+        return ResponseHelper::error('User not found',404);
+    }
+    $user->password=Hash::make($data['password']);
+    $user->save();
+    return ResponseHelper::success(null,'Password reset successfully');
+
+   
+
+}
 // get all users
 public function allUsers()
 {
