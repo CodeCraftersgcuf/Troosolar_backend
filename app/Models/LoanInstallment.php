@@ -14,6 +14,7 @@ class LoanInstallment extends Model
         'mono_calculation_id',
         'amount',
         'remaining_duration',
+        'payment_date',
     ];
 
       public function user()

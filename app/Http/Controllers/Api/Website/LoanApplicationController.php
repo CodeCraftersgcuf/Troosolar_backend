@@ -15,35 +15,49 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use App\Services\LoanInstallmentScheduler;
+
 
 class LoanApplicationController extends Controller
 {
     // upload documnets 
-    public function documents(LoanApplicationRequest $request, string $id)
-    {
-        try {
-            $data = $request->validated();
-            if (isset($data['upload_document']) && $data['upload_document']->isValid()) {
-                $img = $data['upload_document'];
-                $ext = $img->getClientOriginalExtension();
-                $imageName = time() . '.' . $ext;
-                $img->move(public_path('/loan_applications'), $imageName);
-                $data['upload_document'] = 'loan_applications/' . $imageName;
-            }
+   public function documents(LoanApplicationRequest $request, string $id)
+{
+    try {
+        $data = $request->validated();
 
-            $loanApplication = LoanApplication::create([
-                'title_document' => $data['title_document'],
-                'upload_document' => $data['upload_document'],
-                'user_id' => Auth::id(),
-                'mono_loan_calculation' => $id
-            ]);
-            return ResponseHelper::success($loanApplication, 'Loan Application documents is submitted');
-        } catch (Exception $ex) {
-            Log::error('no save the loan application ' . $ex->getMessage());
-            // Log::error('Loan application is not submitted'. $ex->getMessage());
-            return ResponseHelper::error('Loan Application documents is not submitted');
+        if (isset($data['upload_document']) && $data['upload_document']->isValid()) {
+            $img = $data['upload_document'];
+            $ext = $img->getClientOriginalExtension();
+            $imageName = time() . '.' . $ext;
+            $img->move(public_path('/loan_applications'), $imageName);
+            $data['upload_document'] = 'loan_applications/' . $imageName;
         }
+
+        $loanApplication = LoanApplication::create([
+            'title_document'      => $data['title_document'],
+            'upload_document'     => $data['upload_document'],
+            'user_id'             => Auth::id(),
+            'mono_loan_calculation'=> $id, // **keep your name**
+        ]);
+
+        // Generate installments for this MonoLoanCalculation id ($id)
+        // firstPaymentDate = null => will use LoanCalculation->repayment_date or now()->addMonth()
+        $schedule = LoanInstallmentScheduler::generate((int)$id);
+
+        return ResponseHelper::success(
+            [
+                'loan_application' => $loanApplication,
+                'installments'     => $schedule,
+            ],
+            'Loan Application documents submitted and schedule created'
+        );
+
+    } catch (\Throwable $ex) {
+        Log::error('no save the loan application ' . $ex->getMessage());
+        return ResponseHelper::error('Loan Application documents is not submitted');
     }
+}
 
     // beneficiary details
     public function beneficiary(LoanApplicationRequest $request, string $id)
