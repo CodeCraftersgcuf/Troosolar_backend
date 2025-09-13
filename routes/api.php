@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\Website\{
     LoanInstallmentController,
     MonoLoanCalculationController
 };
+use App\Http\Controllers\InstallmentController;
 use App\Http\Controllers\ReferralController;
 use Illuminate\Support\Facades\Artisan;
 
@@ -146,10 +147,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/loan-calculation-finalized/{id}', [LoanCalculationController::class, 'finalized']); //calculated ,pending,offered,finalized
     Route::get('/loan-calculation-stauts', [LoanCalculationController::class, 'status']);
     Route::get('/offered-loan-calculation', [LoanCalculationController::class, 'offeredLoanCalculation']);
-  //for admin  for offering the loan
-    Route::get('/mono-loan/{loanCalculationId}', [MonoLoanCalculationController::class, 'store']);
-    //for accepting use following route
     Route::post('/loan-application/{monoLoanCalculationId}', [LoanApplicationController::class, 'documents']);
+    Route::get('/get-currentmonth-installment', [InstallmentController::class, 'currentMonthInstallment']);
+    //for admin  for offering the loan
+    Route::get('/mono-loan/{loanCalculationId}', [MonoLoanCalculationController::class, 'store']);
+    Route::post('/loan-application-grant/{id}', [MonoLoanCalculationController::class, 'grant']);
+
+    //for accepting use following route
 
 
     //loan old routes

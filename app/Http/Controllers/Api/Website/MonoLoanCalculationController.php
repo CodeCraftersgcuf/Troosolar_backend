@@ -6,8 +6,10 @@ use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\MonoLoanCalculationRequest;
 use App\Models\InterestPercentage;
+use App\Models\LoanApplication;
 use App\Models\LoanCalculation;
 use App\Models\MonoLoanCalculation;
+use App\Models\Wallet;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
@@ -15,7 +17,7 @@ use Illuminate\Support\Facades\Log;
 
 class MonoLoanCalculationController extends Controller
 {
-    public function store( string $id)
+    public function store(string $id)
     {
         try {
 
@@ -74,6 +76,25 @@ class MonoLoanCalculationController extends Controller
 
             $monoLoanCalculation->save();
             return ResponseHelper::success($monoLoanCalculation, "Single Mono Loan Calculation");
+        } catch (Exception $ex) {
+            return ResponseHelper::error("Don't edit the mono loan calculation");
+        }
+    }
+    public function grant($id)
+    {
+        try {
+            $monoLoanCalculation = MonoLoanCalculation::where('id', $id)->firstOrFail();
+            $monoLoanCalculation->status = 'approved';
+            $monoLoanCalculation->save();
+            $loanCalculation = LoanCalculation::where('id', $monoLoanCalculation->loan_calculation_id)->first();
+            $loanCalculation->status = 'approved';
+            $loanCalculation->save();
+            $wallet = Wallet::where('user_id', $monoLoanCalculation->loanCalculation->user_id)->first();
+            $wallet->loan_balance = $wallet->loan_balance + $monoLoanCalculation->loan_amount;
+            $wallet->save();
+            $loanApplication = LoanApplication::where('user_id', $monoLoanCalculation->loanCalculation->user_id)->first();
+            $loanApplication->status = 'approved';
+            $loanApplication->save();
         } catch (Exception $ex) {
             return ResponseHelper::error("Don't edit the mono loan calculation");
         }
