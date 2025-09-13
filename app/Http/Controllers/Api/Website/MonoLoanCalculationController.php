@@ -97,6 +97,7 @@ class MonoLoanCalculationController extends Controller
             $loanApplication->status = 'approved';
             $loanApplication->save();
         } catch (Exception $ex) {
+            Log::error("not edit the mono loan" . $ex->getMessage());
             return ResponseHelper::error("Don't edit the mono loan calculation");
         }
     }
