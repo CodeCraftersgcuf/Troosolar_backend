@@ -42,20 +42,19 @@ class InstallmentController extends Controller
         });
 
     // History list (all except current month; also annotated with is_overdue)
-    $history = LoanInstallment::query()
-        ->where('user_id', $user->id)
-        ->where(function ($q) use ($now) {
-            $q->whereDate('payment_date', '<', $now->copy()->startOfMonth())
-              ->orWhereDate('payment_date', '>', $now->copy()->endOfMonth());
-        })
-        ->orderBy('payment_date', 'desc')
-        ->get()
-        ->map(function ($i) use ($now) {
-            $mapped = $this->mapInstallment($i);
-            $isOverdue = $i->status !== LoanInstallment::STATUS_PAID
-                && $i->payment_date?->lt($now->copy()->startOfDay());
-            return array_merge($mapped, ['is_overdue' => $isOverdue]);
-        });
+    // History list: ONLY previous months (strictly before the current month)
+$history = LoanInstallment::query()
+    ->where('user_id', $user->id)
+    ->whereDate('payment_date', '<', $now->copy()->startOfMonth())
+    ->orderBy('payment_date', 'desc')
+    ->get()
+    ->map(function ($i) use ($now) {
+        $mapped = $this->mapInstallment($i);
+        $isOverdue = $i->status !== LoanInstallment::STATUS_PAID
+            && $i->payment_date?->lt($now->copy()->startOfDay());
+        return array_merge($mapped, ['is_overdue' => $isOverdue]);
+    });
+
 
     // Activity/completion flags you already had
     $isActive     = LoanInstallment::where('status', LoanInstallment::STATUS_PAID)
