@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\Website\{
     LoanInstallmentController,
     MonoLoanCalculationController
 };
+use App\Http\Controllers\ReferralController;
 use Illuminate\Support\Facades\Artisan;
 
 /*
@@ -239,6 +240,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('withdraw',[WIthdrawController::class, 'store']);  //   'amount' => 'required|numeric', 'bank_name' => 'required|string', 'account_name' => 'required|string',  'account_number' => 'required|string',
     Route::get('/withdraw/get',[WIthdrawController::class, 'getWithdrawRequest']);
 
+
+    //refferal routes
+    Route::get('/get-referral-details',[ReferralController::class, 'getBalance']);
     //for admin
     Route::get('/withdraw/approve/{id}',[WIthdrawController::class, 'approveRequest']);
 });
