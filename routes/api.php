@@ -43,6 +43,7 @@ use Illuminate\Support\Facades\Artisan;
 | API Routes
 |--------------------------------------------------------------------------
 */
+
 Route::get('/optimize-app', function () {
     Artisan::call('optimize:clear'); // Clears cache, config, route, and view caches
     Artisan::call('cache:clear');    // Clears application cache
@@ -197,8 +198,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/', [OrderController::class, 'store']);
         Route::get('/{id}', [OrderController::class, 'show']);
         Route::delete('/{id}', [OrderController::class, 'destroy']);
-            Route::get('/user/{userId}', [OrderController::class, 'forUser']);
-
+        Route::get('/user/{userId}', [OrderController::class, 'forUser']);
     });
     //route for payment confirmation
 
@@ -211,25 +211,26 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [CartController::class, 'destroy']);
         Route::delete('/', [CartController::class, 'clear']);
     });
-    Route::post('order/payment-confirmation',[OrderController::class, 'paymentConfirmation']);
+    Route::post('order/payment-confirmation', [OrderController::class, 'paymentConfirmation']);
 
     // Transactions
-    
-// Transactions  ----------------------------------------------------
-Route::get('/transactions', [TransactionController::class, 'index']);                 // current user (or ALL if admin)
-Route::get('/single-trancastion', [TransactionController::class, 'singleTranscation']); 
-Route::get('/transactions/user/{userId}', [TransactionController::class, 'forUser'])
-    ->whereNumber('userId');                                                          
-Route::get('/transactions/{id}', [TransactionController::class, 'show'])
-    ->whereNumber('id');  
 
-// Admin: use /api/admin/users to show the TRANSACTIONS table (not the raw users list)
-Route::prefix('admin')->group(function () {
-    Route::get('/users', [TransactionController::class, 'index']); // ⬅ REPOINTED to transactions
-    Route::get('/users/{userId}', [TransactionController::class, 'forUser'])->whereNumber('userId'); // ⬅ REPOINTED
-});
+    // Transactions  ----------------------------------------------------
+    // current user (or ALL if admin)
+    Route::get('/single-trancastion', [TransactionController::class, 'singleTranscation']);
+    Route::get('/transactions/user/{userId}', [TransactionController::class, 'forUser'])
+        ->whereNumber('userId');
+    Route::get('/transactions/{id}', [TransactionController::class, 'show'])
+        ->whereNumber('id');
 
-
+    // Admin: use /api/admin/users to show the TRANSACTIONS table (not the raw users list)
+    Route::prefix('admin')->group(function () {
+        Route::get('/users', [TransactionController::class, 'index']); // ⬅ REPOINTED to transactions
+        Route::get('/users/{userId}', [TransactionController::class, 'forUser'])->whereNumber('userId'); // ⬅ REPOINTED
+    });
     // Banners
     Route::apiResource('admin/banners', BannerController::class);
+    //new routes for transaction
+    Route::get('/transactions', [TransactionController::class, 'index']);     // for admin
+    Route::get('/transactions-for-user', [TransactionController::class, 'getforUser']);  //for authenticated user
 });

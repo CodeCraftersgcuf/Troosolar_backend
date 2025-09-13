@@ -16,26 +16,16 @@ class TransactionController extends Controller
     {
         try {
             // Try to sync all orders into transactions (with error handling)
-            try {
-                $this->syncPaidOrdersIntoTransactionsForAll();
-            } catch (\Exception $e) {
-                Log::warning('Sync failed but continuing: ' . $e->getMessage());
-                // Continue even if sync fails
-            }
-            
-            // Always fetch and format ALL transactions
-            [$summary, $rows] = $this->fetchAndFormatAll(
-                type:   $request->query('type'),
-                status: $request->query('status'),
-                q:      $request->query('q')
-            );
+            $transactions=Transaction::with('user')->latest()->get();;
 
             return response()->json([
                 'status'       => true,
-                'summary'      => $summary,
-                'transactions' => $rows,
+                'summary'      => [],
+                'transactions' => $transactions,
                 'message'      => 'All transactions fetched successfully'
             ]);
+
+           
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             Log::error('Model not found in transactions index: '.$e->getMessage());
             return ResponseHelper::error('Transaction data not found', 404);
@@ -48,6 +38,22 @@ class TransactionController extends Controller
         } catch (\Throwable $e) {
             Log::error('Critical error in transactions index: '.$e->getMessage());
             return ResponseHelper::error('A critical error occurred while processing the request', 500);
+        }
+    }
+    public function getforUser(){
+        try{
+            $user=Auth::user();
+            $transactions=Transaction::where('user_id','=',$user->id)->latest()->get();
+            return response()->json([
+                'status'       => true,
+              
+                'transactions' => $transactions,
+                'message'      => 'All transactions fetched successfully'
+            ]);
+
+        }catch(\Exception $e){
+            Log::error('Unexpected error in transactions index: '.$e->getMessage());
+            return ResponseHelper::error('An unexpected error occurred while fetching transactions', 500);
         }
     }
 
