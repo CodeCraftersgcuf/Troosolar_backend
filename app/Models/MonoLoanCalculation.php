@@ -8,8 +8,18 @@ use Illuminate\Database\Eloquent\Model;
 class MonoLoanCalculation extends Model
 {
     use HasFactory;
-    protected $fillable = ['down_payment', 'loan_calculation_id', 
-'credit_score', 'transaction', 'loan_amount', 'repayment_duration', 'status'];
+    protected $fillable = [
+        'down_payment',
+        'loan_calculation_id',
+        'credit_score',
+        'transaction',
+        'loan_amount',
+        'repayment_duration',
+        'status',
+        'loan_application_id',
+        'interest_rate',
+        'total_amount',
+    ];
     // relations
 
     //  loan calculation
@@ -26,19 +36,18 @@ class MonoLoanCalculation extends Model
 
     // loan repayment
     public function loanRepayments()
-{
-    return $this->hasMany(LoanRepayment::class, 'mono_calculation_id');
-}
+    {
+        return $this->hasMany(LoanRepayment::class, 'mono_calculation_id');
+    }
 
-protected $appends = ['is_overdue'];
+    protected $appends = ['is_overdue'];
 
-public function getIsOverdueAttribute()
-{
-    return now()->gt($this->due_date) && $this->status !== 'paid';
-}
-public function order() {
-    return $this->hasOne(Order::class, 'mono_calculation_id');
-}
-
-
+    public function getIsOverdueAttribute()
+    {
+        return now()->gt($this->due_date) && $this->status !== 'paid';
+    }
+    public function order()
+    {
+        return $this->hasOne(Order::class, 'mono_calculation_id');
+    }
 }
