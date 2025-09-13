@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\LoanApplicationRequest;
 use App\Models\InterestPercentage;
 use App\Models\LoanApplication;
+use App\Models\LoanCalculation;
 use App\Models\LoanInstallment;
 use App\Models\LoanStatus;
 use App\Models\MonoLoanCalculation;
@@ -40,7 +41,10 @@ class LoanApplicationController extends Controller
             'user_id'             => Auth::id(),
             'mono_loan_calculation'=> $id, // **keep your name**
         ]);
-
+        $monoLoanCalculation = MonoLoanCalculation::find($id);
+        $loanCalCulation=LoanCalculation::find($monoLoanCalculation->loan_calculation_id);
+        $loanCalCulation->status='submitted';
+        $loanCalCulation->save();
         // Generate installments for this MonoLoanCalculation id ($id)
         // firstPaymentDate = null => will use LoanCalculation->repayment_date or now()->addMonth()
         $schedule = LoanInstallmentScheduler::generate((int)$id);
