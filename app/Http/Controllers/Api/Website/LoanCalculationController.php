@@ -88,6 +88,9 @@ public function store(LoanCalculationRequest $request)
     public function status(){
       $user=Auth::user();
       $loan = LoanCalculation::where('user_id', $user->id)->latest()->first();
+      if(!$loan){
+        return ResponseHelper::error("Loan is not calculated");
+      }
       $exists=false;
       if($loan){
         $exists=true;
