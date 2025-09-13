@@ -39,6 +39,7 @@ class MonoLoanCalculationController extends Controller
                 'status' => 'pending'
             ]);
             $loanCalculation->status = 'offered';
+            $loanCalculation->save();
 
             $monoLoanCalculation = MonoLoanCalculation::where('loan_calculation_id', $id)
                 ->with('loanCalculation')->first();
