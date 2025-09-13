@@ -16,7 +16,13 @@ class TransactionController extends Controller
     {
         try {
             // Try to sync all orders into transactions (with error handling)
-            $transactions=Transaction::with('user')->latest()->get();;
+            $user=Auth::user();
+            if($user->role=='admin'){
+                
+                $transactions=Transaction::with('user')->latest()->get();;
+            }{
+                $transactions=Transaction::where('user_id','=',$user->id)->latest()->get();
+            }
 
             return response()->json([
                 'status'       => true,
