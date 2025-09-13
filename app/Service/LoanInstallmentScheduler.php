@@ -78,9 +78,9 @@ class LoanInstallmentScheduler
                 LoanInstallment::create([
                     'user_id'            => $userId,
                     'status'             => 'pending',            // your existing enum/values
-                    'mono_calculation_id'=> $monoCalcId,         // **keep your name**
+                    'mono_calculation_id' => $monoCalcId,         // **keep your name**
                     'amount'             => $amount,
-                    'remaining_duration' => $duration - ($i + 1),// 0 at last month
+                    'remaining_duration' => $duration - ($i + 1), // 0 at last month
                     'payment_date'       => $dueDate,
                 ]);
                 $created++;

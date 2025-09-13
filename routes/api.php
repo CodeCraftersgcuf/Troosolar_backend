@@ -146,17 +146,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/loan-calculation-finalized/{id}', [LoanCalculationController::class, 'finalized']); //calculated ,pending,offered,finalized
     Route::get('/loan-calculation-stauts', [LoanCalculationController::class, 'status']);
     Route::get('/offered-loan-calculation', [LoanCalculationController::class, 'offeredLoanCalculation']);
-
+  //for admin  for offering the loan
+    Route::get('/mono-loan/{loanCalculationId}', [MonoLoanCalculationController::class, 'store']);
     //for accepting use following route
     Route::post('/loan-application/{monoLoanCalculationId}', [LoanApplicationController::class, 'documents']);
 
 
     //loan old routes
     Route::apiResource('/interest-percentage', InterestPercentageController::class);
-    Route::get('/mono-loan/{loanCalculationId}', [MonoLoanCalculationController::class, 'store']);
-    Route::post('/mono-loan/edit/{loanCalculationId}', [MonoLoanCalculationController::class, 'edit']);
     Route::post('/beneficiary-detail/{monoLoanCalculationId}', [LoanApplicationController::class, 'beneficiary']);
     Route::post('/loan-details/{monoLoanCalculationId}', [LoanApplicationController::class, 'loanDetail']);
+    Route::post('/mono-loan/edit/{loanCalculationId}', [MonoLoanCalculationController::class, 'edit']);
     Route::get('/loan-dashboard', [LoanWalletController::class, 'loanDashboard']);
     Route::get('/all-loan-application', [LoanApplicationController::class, 'allLoanApplication']);
     Route::get('/single-loan-application/{id}', [LoanApplicationController::class, 'singleLoanApplication']);

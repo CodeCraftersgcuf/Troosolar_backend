@@ -15,11 +15,11 @@ use Illuminate\Support\Facades\Log;
 
 class MonoLoanCalculationController extends Controller
 {
-    public function store(MonoLoanCalculationRequest $request, string $id)
+    public function store( string $id)
     {
         try {
 
-            $data = $request->validated();
+            // $data = $request->validated();
             $loanCalculation = LoanCalculation::where('id', $id)->firstOrFail();
             $downPayment = $loanCalculation->loan_amount * 0.25;
             $interestPercentage = InterestPercentage::latest()->first();
