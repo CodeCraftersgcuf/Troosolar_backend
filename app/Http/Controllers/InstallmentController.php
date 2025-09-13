@@ -7,9 +7,12 @@ use App\Models\LoanInstallment;
 use App\Models\MonoLoanCalculation;
 use App\Models\Transaction;
 use App\Models\Wallet;
+// use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class InstallmentController extends Controller
 {
@@ -88,125 +91,139 @@ $history = LoanInstallment::query()
      * - method = 'wallet' → type = 'shop' | 'loan' required → deduct from respective balance
      * - method != 'wallet' → require tx_id from FE
      */
-    public function payInstallment(Request $request, int $installmentId)
-    {
-        $request->validate([
-            'method' => 'required|string|max:50',         // e.g., wallet|bank|card|transfer
-            'type'   => 'nullable|string|in:shop,loan',   // required if method=wallet
-            'tx_id'  => 'nullable|string|max:255',        // required if method!=wallet
-            'reference' => 'nullable|string|max:255',
-            'title'     => 'nullable|string|max:255',
-            // optional override amount? normally we use installment->amount
-        ]);
+ public function payInstallment(Request $request, int $installmentId)
+{
+    // ✅ 1) Validate & return JSON errors if invalid
+    $validator = Validator::make($request->all(), [
+        'method'    => ['required','string','max:50', Rule::in(['wallet','bank','card','transfer'])],
+        'type'      => ['nullable','string', Rule::in(['shop','loan'])],                   // only for wallet
+        'tx_id'     => ['nullable','string','max:255'],                                    // required if NOT wallet
+        'reference' => ['nullable','string','max:255'],
+        'title'     => ['nullable','string','max:255'],
+    ], [
+        'method.required' => 'Payment method is required.',
+        'method.in'       => 'Method must be one of: wallet, bank, card, transfer.',
+        'type.in'         => 'Type must be one of: shop, loan.',
+    ]);
 
-        $user = Auth::user();
+    // Extra conditional rules
+    $validator->after(function ($v) use ($request) {
+        $method = $request->input('method');
 
-        return DB::transaction(function () use ($user, $request, $installmentId) {
-            // Lock installment row for safe concurrent ops
-            $inst = LoanInstallment::where('id', $installmentId)
-                ->where('user_id', $user->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            if ($inst->status === LoanInstallment::STATUS_PAID) {
-                return response()->json([
-                    'status'  => 'success',
-                    'message' => 'Installment already paid',
-                    'data'    => $this->mapInstallment($inst),
-                ]);
+        if ($method === 'wallet') {
+            if (!in_array($request->input('type'), ['shop','loan'], true)) {
+                $v->errors()->add('type', 'type is required and must be one of: shop, loan when method=wallet');
             }
-
-            $amount   = (float) $inst->amount;
-            $method   = $request->string('method')->toString();
-            $type     = $request->string('type')->toString();  // shop|loan for wallet
-            $title    = $request->string('title')->toString() ?: 'Loan installment payment';
-            $reference= $request->string('reference')->toString() ?: 'INSTALLMENT#'.$inst->id;
-
-            $txPayload = [
-                'title'         => $title,
-                'amount'        => $amount,
-                'status'        => 'success',   // or 'pending' if async
-                'type'          => 'debit',     // money going out of user
-                'method'        => $method,
-                'transacted_at' => now(),
-                'user_id'       => $user->id,
-                'tx_id'         => null,        // filled below
-                'reference'     => $reference,
-            ];
-
-            if ($method === 'wallet') {
-                // Require a type (shop or loan)
-                if (!in_array($type, ['shop','loan'], true)) {
-                    return response()->json([
-                        'status'  => 'error',
-                        'message' => 'type is required and must be one of: shop, loan when method=wallet',
-                    ], 422);
-                }
-
-                // Lock wallet row
-                $wallet = Wallet::where('user_id', $user->id)->lockForUpdate()->first();
-                if (!$wallet) {
-                    return response()->json([
-                        'status'  => 'error',
-                        'message' => 'Wallet not found',
-                    ], 404);
-                }
-
-                // Check and deduct from the chosen balance
-                if ($type === 'shop') {
-                    if ((float)$wallet->shop_balance < $amount) {
-                        return response()->json([
-                            'status'  => 'error',
-                            'message' => 'Insufficient shop balance',
-                        ], 422);
-                    }
-                    $wallet->shop_balance = (float)$wallet->shop_balance - $amount;
-                    $txPayload['tx_id']   = 'WALLET-SHOP-'.now()->timestamp.'-'.$inst->id;
-                } else { // loan
-                    if ((float)$wallet->loan_balance < $amount) {
-                        return response()->json([
-                            'status'  => 'error',
-                            'message' => 'Insufficient loan balance',
-                        ], 422);
-                    }
-                    $wallet->loan_balance = (float)$wallet->loan_balance - $amount;
-                    $txPayload['tx_id']   = 'WALLET-LOAN-'.now()->timestamp.'-'.$inst->id;
-                }
-
-                $wallet->save();
-
-            } else {
-                // Non-wallet method → need tx_id from FE
-                $txId = $request->string('tx_id')->toString();
-                if (!$txId) {
-                    return response()->json([
-                        'status'  => 'error',
-                        'message' => 'tx_id is required for non-wallet methods',
-                    ], 422);
-                }
-                $txPayload['tx_id'] = $txId;
+        } else {
+            if (!$request->filled('tx_id')) {
+                $v->errors()->add('tx_id', 'tx_id is required for non-wallet methods');
             }
+        }
+    });
 
-            // Create a Transaction and link it
-            $transaction = Transaction::create($txPayload);
+    if ($validator->fails()) {
+        return response()->json([
+            'status'  => 'error',
+            'message' => 'Validation failed.',
+            'errors'  => $validator->errors(), // <-- Laravel MessageBag, perfect for FE
+        ], 422);
+    }
 
-            // Mark installment as paid & link transaction
-            $inst->update([
-                'status'         => LoanInstallment::STATUS_PAID,
-                'paid_at'        => now(),
-                'transaction_id' => $transaction->id,
-            ]);
+    $data = $validator->validated();
+    $user = Auth::user();
 
-            // Return fresh
-            $inst->load('transaction');
+    // ✅ 2) Proceed with the payment in a single DB transaction
+    return DB::transaction(function () use ($user, $data, $installmentId) {
+        // Lock installment row
+        $inst = LoanInstallment::where('id', $installmentId)
+            ->where('user_id', $user->id)
+            ->lockForUpdate()
+            ->firstOrFail();
 
+        if ($inst->status === LoanInstallment::STATUS_PAID) {
             return response()->json([
                 'status'  => 'success',
-                'message' => 'Installment paid successfully',
+                'message' => 'Installment already paid',
                 'data'    => $this->mapInstallment($inst),
             ]);
-        });
-    }
+        }
+
+        $amount    = (float) $inst->amount;
+        $method    = $data['method'];
+        $type      = $data['type'] ?? null;  // shop|loan (wallet only)
+        $title     = $data['title'] ?? 'Loan installment payment';
+        $reference = $data['reference'] ?? ('INSTALLMENT#'.$inst->id);
+
+        $txPayload = [
+            'title'         => $title,
+            'amount'        => $amount,
+            'status'        => 'success',   // or 'pending' if you have async gateways
+            'type'          => 'debit',     // money going out of user
+            'method'        => $method,
+            'transacted_at' => now(),
+            'user_id'       => $user->id,
+            'tx_id'         => null,
+            'reference'     => $reference,
+        ];
+
+        if ($method === 'wallet') {
+            // Require & deduct from wallet (shop/loan)
+            $wallet = Wallet::where('user_id', $user->id)->lockForUpdate()->first();
+            if (!$wallet) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Wallet not found',
+                ], 404);
+            }
+
+            if ($type === 'shop') {
+                if ((float)$wallet->shop_balance < $amount) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'Insufficient shop balance',
+                        'errors'  => ['shop_balance' => ['Insufficient balance']],
+                    ], 422);
+                }
+                $wallet->shop_balance = (float)$wallet->shop_balance - $amount;
+                $txPayload['tx_id']   = 'WALLET-SHOP-'.now()->timestamp.'-'.$inst->id;
+
+            } elseif ($type === 'loan') {
+                if ((float)$wallet->loan_balance < $amount) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'Insufficient loan balance',
+                        'errors'  => ['loan_balance' => ['Insufficient balance']],
+                    ], 422);
+                }
+                $wallet->loan_balance = (float)$wallet->loan_balance - $amount;
+                $txPayload['tx_id']   = 'WALLET-LOAN-'.now()->timestamp.'-'.$inst->id;
+            }
+
+            $wallet->save();
+
+        } else {
+            // Non-wallet → must have tx_id from FE (validated above)
+            $txPayload['tx_id'] = $data['tx_id'];
+        }
+
+        // Create & link transaction
+        $transaction = Transaction::create($txPayload);
+
+        $inst->update([
+            'status'         => LoanInstallment::STATUS_PAID,
+            'paid_at'        => now(),
+            'transaction_id' => $transaction->id,
+        ]);
+
+        $inst->load('transaction');
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Installment paid successfully',
+            'data'    => $this->mapInstallment($inst),
+        ]);
+    });
+}
 
     /** Map installment for FE */
     private function mapInstallment(LoanInstallment $i): array
