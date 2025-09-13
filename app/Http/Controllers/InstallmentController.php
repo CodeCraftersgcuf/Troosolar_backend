@@ -12,40 +12,72 @@ use Illuminate\Support\Facades\DB;
 class InstallmentController extends Controller
 {
     public function historyWithCurrentMonth()
-    {
-        $user = Auth::user();
-        $now  = now();
+{
+    $user = Auth::user();
+    $now  = now();
 
-        // Current month
-        $current = LoanInstallment::query()
-            ->where('user_id', $user->id)
-            ->forMonth($now)
-            ->orderBy('payment_date', 'asc')
-            ->get()
-            ->map(fn ($i) => $this->mapInstallment($i));
+    // Define "overdue": not paid AND payment_date strictly before today (at start of day)
+    $overdueBase = LoanInstallment::query()
+        ->where('user_id', $user->id)
+        ->where('status', '!=', LoanInstallment::STATUS_PAID)
+        ->whereDate('payment_date', '<', $now->copy()->startOfDay());
 
-        // History (all except current month)
-        $history = LoanInstallment::query()
-            ->where('user_id', $user->id)
-            ->where(function ($q) use ($now) {
-                $q->whereDate('payment_date', '<', $now->copy()->startOfMonth())
-                  ->orWhereDate('payment_date', '>', $now->copy()->endOfMonth());
-            })
-            ->orderBy('payment_date', 'desc')
-            ->get()
-            ->map(fn ($i) => $this->mapInstallment($i));
-            $isActive=LoanInstallment::where('status','paid')->where('user_id', $user->id)->exists();
-            $isCompleted=LoanInstallment::where('status','!=','paid')->where('user_id', $user->id)->exists();
-        return response()->json([
-            'status' => 'success',
-            'data'   => [
-                'current_month' => $current,
-                'history'       => $history,
-                'isActive'      => $isActive,
-                'isCompleted'   => !$isCompleted
-            ],
-        ]);
-    }
+    $overdueCount  = (clone $overdueBase)->count();
+    $overdueAmount = (clone $overdueBase)->sum('amount'); // adjust if you track partial payments
+
+    // Current month list (annotated with is_overdue)
+    $current = LoanInstallment::query()
+        ->where('user_id', $user->id)
+        ->forMonth($now)
+        ->orderBy('payment_date', 'asc')
+        ->get()
+        ->map(function ($i) use ($now) {
+            $mapped = $this->mapInstallment($i);
+            $isOverdue = $i->status !== LoanInstallment::STATUS_PAID
+                && $i->payment_date?->lt($now->copy()->startOfDay());
+            // Add is_overdue without touching your styling/shape from mapInstallment
+            return array_merge($mapped, ['is_overdue' => $isOverdue]);
+        });
+
+    // History list (all except current month; also annotated with is_overdue)
+    $history = LoanInstallment::query()
+        ->where('user_id', $user->id)
+        ->where(function ($q) use ($now) {
+            $q->whereDate('payment_date', '<', $now->copy()->startOfMonth())
+              ->orWhereDate('payment_date', '>', $now->copy()->endOfMonth());
+        })
+        ->orderBy('payment_date', 'desc')
+        ->get()
+        ->map(function ($i) use ($now) {
+            $mapped = $this->mapInstallment($i);
+            $isOverdue = $i->status !== LoanInstallment::STATUS_PAID
+                && $i->payment_date?->lt($now->copy()->startOfDay());
+            return array_merge($mapped, ['is_overdue' => $isOverdue]);
+        });
+
+    // Activity/completion flags you already had
+    $isActive     = LoanInstallment::where('status', LoanInstallment::STATUS_PAID)
+        ->where('user_id', $user->id)
+        ->exists();
+
+    $hasUnpaid    = LoanInstallment::where('status', '!=', LoanInstallment::STATUS_PAID)
+        ->where('user_id', $user->id)
+        ->exists();
+
+    return response()->json([
+        'status' => 'success',
+        'data'   => [
+            'current_month'  => $current,
+            'history'        => $history,
+            'isActive'       => $isActive,
+            'isCompleted'    => !$hasUnpaid,
+            'hasOverdue'     => $overdueCount > 0,
+            'overdueCount'   => $overdueCount,
+            'overdueAmount'  => (float) $overdueAmount, // cast for clean JSON
+        ],
+    ]);
+}
+
 
     /**
      * Pay a single installment.
