@@ -71,4 +71,7 @@ class LoanInstallment extends Model
         }
         return self::STATUS_PENDING;
     }
+    public function transaction(){
+        return $this->belongsTo(Transaction::class);
+    }
 }
