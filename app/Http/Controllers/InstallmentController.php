@@ -34,12 +34,15 @@ class InstallmentController extends Controller
             ->orderBy('payment_date', 'desc')
             ->get()
             ->map(fn ($i) => $this->mapInstallment($i));
-
+            $isActive=LoanInstallment::where('status','paid')->where('user_id', $user->id)->exists();
+            $isCompleted=LoanInstallment::where('status','!=','pending')->where('user_id', $user->id)->exists();
         return response()->json([
             'status' => 'success',
             'data'   => [
                 'current_month' => $current,
                 'history'       => $history,
+                'isActive'      => $isActive,
+                'isCompleted'   => $isCompleted
             ],
         ]);
     }
