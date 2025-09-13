@@ -97,6 +97,7 @@ class MonoLoanCalculationController extends Controller
             $loanApplication = LoanApplication::where('user_id', $userId)->first();
             $loanApplication->status = 'approved';
             $loanApplication->save();
+            return ResponseHelper::success($monoLoanCalculation, "Single Mono Loan Calculation");
         } catch (Exception $ex) {
             Log::error("not edit the mono loan" . $ex->getMessage());
             return ResponseHelper::error("Don't edit the mono loan calculation");
