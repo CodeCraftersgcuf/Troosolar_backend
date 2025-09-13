@@ -12,9 +12,13 @@ use App\Models\Bundles;
 use App\Models\LoanApplication;
 use App\Models\LoanCalculation;
 use App\Helpers\ResponseHelper;
+use App\Models\CartItem;
+use App\Models\DeliveryAddress;
 use App\Models\Transaction;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class OrderController extends Controller
 {
@@ -101,108 +105,153 @@ class OrderController extends Controller
      * Creates an order for the authenticated user.
      */
     public function store(StoreOrderRequest $request)
-    {
-        try {
-            $data = $request->validated();
+{
+    $userId = auth()->id();
+    $data   = $request->validated();
 
-            $order = Order::create([
-                'user_id'             => auth()->id(),
-                'delivery_address_id' => $data['delivery_address_id'] ?? null,
-                'order_number'        => strtoupper(Str::random(10)),
-                'payment_method'      => $data['payment_method'] ?? 'cash',
-                'payment_status'      => 'paid',
-                'order_status'        => 'pending',
-                'note'                => $data['note'] ?? null,
-                'total_price'         => 0,
+    return DB::transaction(function () use ($userId, $data) {
+        // 1) Load cart
+        $cartItems = CartItem::query()
+            ->where('user_id', $userId)
+            ->with('itemable') // Product|Bundles
+            ->orderBy('id')
+            ->get();
+
+        if ($cartItems->isEmpty()) {
+            throw ValidationException::withMessages([
+                'cart' => ['Your cart is empty. Add items before placing an order.'],
             ]);
-
-            $total = 0;
-            $primaryProductId = null;
-            $primaryBundleId  = null;
-
-            foreach ($data['items'] as $item) {
-                $isProduct = ($item['itemable_type'] === 'product');
-                $model = $isProduct
-                    ? Product::findOrFail($item['itemable_id'])
-                    : Bundles::findOrFail($item['itemable_id']);
-
-                $price    = $model->discount_price ?? $model->price ?? $model->total_price;
-                $subtotal = $price * $item['quantity'];
-
-                OrderItem::create([
-                    'order_id'      => $order->id,
-                    'itemable_type' => $isProduct ? Product::class : Bundles::class, // FQCN for morphTo
-                    'itemable_id'   => $item['itemable_id'],
-                    'quantity'      => $item['quantity'],
-                    'unit_price'    => $price,
-                    'subtotal'      => $subtotal,
-                ]);
-
-                if ($isProduct && !$primaryProductId) {
-                    $primaryProductId = $item['itemable_id'];
-                } elseif (!$isProduct && !$primaryBundleId) {
-                    $primaryBundleId = $item['itemable_id'];
-                }
-
-                $total += $subtotal;
-            }
-
-            // Save totals + primary product/bundle IDs
-            $order->update([
-                'total_price' => $total,
-                'product_id'  => $primaryProductId,
-                'bundle_id'   => $primaryBundleId,
-            ]);
-
-            // Reload for response
-            $order->load(['items.itemable', 'deliveryAddress']);
-
-            // Non-persisted extras for response
-            $extras = [];
-            if ($order->payment_method === 'direct') {
-                $extras['installation'] = [
-                    'technician_name'   => 'John Doe',
-                    'installation_date' => now()->addDays(3)->toDateString(),
-                    'installation_fee'  => 2000,
-                ];
-            } elseif ($order->payment_method === 'loan') {
-                $loan = LoanCalculation::where('user_id', auth()->id())->latest()->first();
-                $application = LoanApplication::where('user_id', auth()->id())
-                    ->where('mono_loan_calculation', $loan?->id)
-                    ->latest()
-                    ->first();
-
-                $installments = [];
-                if ($loan?->monthly_payment && $loan?->repayment_date) {
-                    $installments[] = [
-                        'installment_number' => 1,
-                        'amount'             => $loan->monthly_payment,
-                        'status'             => 'pending',
-                        'due_date'           => $loan->repayment_date,
-                    ];
-                }
-
-                $extras['loan_details'] = [
-                    'loan_amount'         => $loan?->loan_amount,
-                    'product_amount'      => $loan?->product_amount,
-                    'repayment_duration'  => $loan?->repayment_duration,
-                    'monthly_payment'     => $loan?->monthly_payment,
-                    'interest_percentage' => $loan?->interest_percentage,
-                    'repayment_date'      => $loan?->repayment_date,
-                    'application'         => $application,
-                    'installments'        => $installments,
-                ];
-            }
-
-            $response = $this->formatOrder($order, $extras);
-
-            return ResponseHelper::success($response, 'Order placed successfully');
-        } catch (\Throwable $e) {
-            Log::error("Order Store Error: {$e->getMessage()}");
-            return ResponseHelper::error('Failed to place order', 500);
         }
-    }
 
+        // 2) Optional: verify delivery address belongs to user
+        $deliveryAddressId = $data['delivery_address_id'] ?? null;
+        if ($deliveryAddressId) {
+            $owned = DeliveryAddress::where('id', $deliveryAddressId)
+                ->where('user_id', $userId)
+                ->exists();
+            if (! $owned) {
+                throw ValidationException::withMessages([
+                    'delivery_address_id' => ['Invalid delivery address.'],
+                ]);
+            }
+        }
+
+        // 3) Create order shell
+        $order = Order::create([
+            'user_id'             => $userId,
+            'delivery_address_id' => $deliveryAddressId,
+            'order_number'        => strtoupper(Str::random(10)),
+            'payment_method'      => $data['payment_method'] ?? 'cash',
+            'payment_status'      => 'paid',
+            'order_status'        => 'pending',
+            'note'                => $data['note'] ?? null,
+            'total_price'         => 0, // set later
+        ]);
+
+        // 4) Create order items from cart rows
+        $total            = 0;
+        $primaryProductId = null;
+        $primaryBundleId  = null;
+
+        foreach ($cartItems as $ci) {
+            $itemable = $ci->itemable; // Product|Bundles|null
+            if (! $itemable) {
+                // skip broken cart rows
+                continue;
+            }
+
+            $fqcn = $itemable instanceof Product ? Product::class : Bundles::class;
+
+            // Prefer stored values; fallback to model price
+            $unit = (int) $ci->unit_price;
+            if ($unit <= 0) {
+                $unit = (int) ($itemable->discount_price ?? $itemable->price ?? $itemable->total_price ?? 0);
+            }
+            $qty      = max(1, (int) $ci->quantity);
+            $subtotal = (int) ($ci->subtotal ?? ($unit * $qty));
+
+            OrderItem::create([
+                'order_id'      => $order->id,
+                'itemable_type' => $fqcn,
+                'itemable_id'   => $ci->itemable_id,
+                'quantity'      => $qty,
+                'unit_price'    => $unit,
+                'subtotal'      => $subtotal,
+            ]);
+
+            // track first product/bundle for convenience fields
+            if ($fqcn === Product::class && ! $primaryProductId) {
+                $primaryProductId = $ci->itemable_id;
+            }
+            if ($fqcn === Bundles::class && ! $primaryBundleId) {
+                $primaryBundleId = $ci->itemable_id;
+            }
+
+            $total += $subtotal;
+        }
+
+        // Edge: if every row was invalid
+        if ($total <= 0) {
+            throw ValidationException::withMessages([
+                'cart' => ['Your cart items are invalid. Please re-add them.'],
+            ]);
+        }
+
+        // 5) Persist totals + convenience ids
+        $order->update([
+            'total_price' => $total,
+            'product_id'  => $primaryProductId,
+            'bundle_id'   => $primaryBundleId,
+        ]);
+
+        // 6) Clear cart
+        CartItem::where('user_id', $userId)->delete();
+
+        // 7) Load for response
+        $order->load(['items.itemable', 'deliveryAddress', 'user:id,first_name,sur_name,email,phone']);
+
+        // 8) Optional extras like installation/loan (your prior logic can stay)
+        $extras = [];
+        if ($order->payment_method === 'direct') {
+            $extras['installation'] = [
+                'technician_name'   => 'John Doe',
+                'installation_date' => now()->addDays(3)->toDateString(),
+                'installation_fee'  => 2000,
+            ];
+        } elseif ($order->payment_method === 'loan') {
+            $loan = LoanCalculation::where('user_id', $userId)->latest()->first();
+            $application = LoanApplication::where('user_id', $userId)
+                ->where('mono_loan_calculation', $loan?->id)
+                ->latest()
+                ->first();
+
+            $installments = [];
+            if ($loan?->monthly_payment && $loan?->repayment_date) {
+                $installments[] = [
+                    'installment_number' => 1,
+                    'amount'             => $loan->monthly_payment,
+                    'status'             => 'pending',
+                    'due_date'           => $loan->repayment_date,
+                ];
+            }
+
+            $extras['loan_details'] = [
+                'loan_amount'         => $loan?->loan_amount,
+                'product_amount'      => $loan?->product_amount,
+                'repayment_duration'  => $loan?->repayment_duration,
+                'monthly_payment'     => $loan?->monthly_payment,
+                'interest_percentage' => $loan?->interest_percentage,
+                'repayment_date'      => $loan?->repayment_date,
+                'application'         => $application,
+                'installments'        => $installments,
+            ];
+        }
+
+        $response = $this->formatOrder($order, array_merge($extras, ['include_user_info' => true]));
+
+        return ResponseHelper::success($response, 'Order placed successfully');
+    });
+}
     /**
      * GET /api/orders/{id}
      * Returns a single order for the authenticated user.
