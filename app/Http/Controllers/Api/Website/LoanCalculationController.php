@@ -26,10 +26,20 @@ public function store(LoanCalculationRequest $request)
     try {
         $data = $request->validated();
 
-        // 1️⃣ Check for pending loan
+        // 0) Ensure we have an interest row
+        $interestPercentage = InterestPercentage::latest()->first();
+        if (!$interestPercentage) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Interest rate configuration not found.'
+            ], 422);
+        }
+
+        // 1) Check for pending loan
         $pendingLoan = LoanCalculation::where('user_id', Auth::id())
             ->where('status', 'pending')
             ->first();
+
         if ($pendingLoan) {
             return response()->json([
                 'status'  => 'error',
@@ -37,54 +47,66 @@ public function store(LoanCalculationRequest $request)
             ], 422);
         }
 
-        // 2️⃣ Check for calculated loan
+        // 2) Check for calculated loan
         $calculatedLoan = LoanCalculation::where('user_id', Auth::id())
             ->where('status', 'calculated')
             ->first();
 
-        $repaymentDate         = Carbon::now()->addMonth();
-        $interestPercentage    = InterestPercentage::latest()->first();
-        $interestPercentageRate = $interestPercentage->interest_percentage;
-        $monthlyPayment        = round($data['loan_amount'] / $data['repayment_duration'], 2);
+        $repaymentDate           = Carbon::now()->addMonth();
+        $interestPercentageRate  = (float) $interestPercentage->interest_percentage; // e.g. 12.5
+        $repaymentDuration       = (int) $data['repayment_duration'];
+        $loanAmount              = (float) $data['loan_amount'];
 
-        // 3️⃣ Update or create
+        // Your current approach ignores interest for monthly_payment:
+        $monthlyPayment          = round($loanAmount / max($repaymentDuration, 1), 2);
+
         if ($calculatedLoan) {
             $calculatedLoan->update([
-                'product_amount'        => $data['product_amount'],
-                'loan_amount'           => $data['loan_amount'],
-                'repayment_duration'    => $data['repayment_duration'],
-                'interest_percentage_id'=> $interestPercentage->id,
-                'repayment_date'        => $repaymentDate,
-                'interest_percentage'   => $interestPercentageRate,
-                'monthly_payment'       => $monthlyPayment,
-                'status'                => 'calculated',
+                'product_amount'         => $data['product_amount'],
+                'loan_amount'            => $loanAmount,
+                'repayment_duration'     => $repaymentDuration,
+                'interest_percentage_id' => $interestPercentage->id,
+                'repayment_date'         => $repaymentDate,
+                'interest_percentage'    => $interestPercentageRate,
+                'monthly_payment'        => $monthlyPayment,
+                'status'                 => 'calculated',
             ]);
             $loan = $calculatedLoan;
         } else {
             $loan = LoanCalculation::create([
-                'product_amount'        => $data['product_amount'],
-                'loan_amount'           => $data['loan_amount'],
-                'repayment_duration'    => $data['repayment_duration'],
-                'user_id'               => Auth::id(),
-                'interest_percentage_id'=> $interestPercentage->id,
-                'repayment_date'        => $repaymentDate,
-                'interest_percentage'   => $interestPercentageRate,
-                'monthly_payment'       => $monthlyPayment,
-                'status'                => 'calculated',
+                'product_amount'         => $data['product_amount'],
+                'loan_amount'            => $loanAmount,
+                'repayment_duration'     => $repaymentDuration,
+                'user_id'                => Auth::id(),
+                'interest_percentage_id' => $interestPercentage->id,
+                'repayment_date'         => $repaymentDate,
+                'interest_percentage'    => $interestPercentageRate,
+                'monthly_payment'        => $monthlyPayment,
+                'status'                 => 'calculated',
             ]);
         }
+
+        // --- Extra fields for the response ---
+        $downPayment = round($monthlyPayment * 0.25, 2);                       // as requested: payment * 0.25
+        $totalAmount = round($monthlyPayment * $repaymentDuration, 2);         // equals principal with your formula
 
         return response()->json([
             'status'         => 'success',
             'message'        => 'Loan calculated successfully',
             'repayment_date' => $repaymentDate,
-            'data'           => $loan,
+            'data'           => array_merge($loan->toArray(), [
+                'interest_rate' => $interestPercentageRate,
+                'down_payment'  => $downPayment,
+                'total_amount'  => $totalAmount,
+            ]),
         ]);
-    } catch (Exception $e) {
+
+    } catch (\Throwable $e) {
         Log::error('Loan calculation save failed: '.$e->getMessage());
         return ResponseHelper::error('Loan Calculation could not be saved');
     }
 }
+
 
     public function status(){
       $user=Auth::user();
