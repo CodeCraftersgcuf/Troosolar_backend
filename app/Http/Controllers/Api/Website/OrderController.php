@@ -121,7 +121,7 @@ class OrderController extends Controller
             $primaryBundleId  = null;
 
             foreach ($data['items'] as $item) {
-                $isProduct = ($item['itemable_type'] === 'product');
+                $isProduct = ($item['itemable_type'] === 'App\Models\Product');
                 $model = $isProduct
                     ? Product::findOrFail($item['itemable_id'])
                     : Bundles::findOrFail($item['itemable_id']);
