@@ -38,6 +38,7 @@ use App\Http\Controllers\Api\Website\{
     MonoLoanCalculationController
 };
 use App\Http\Controllers\InstallmentController;
+use App\Http\Controllers\KycController;
 use App\Http\Controllers\ReferralController;
 use Illuminate\Support\Facades\Artisan;
 
@@ -156,7 +157,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/loan-application-grant/{id}', [MonoLoanCalculationController::class, 'grant']);
 
     //for accepting use following route
+//kyc
 
+
+  // User
+    Route::post('/kyc', [KycController::class, 'store']);
+    Route::get('/kyc/status', [KycController::class, 'myStatus']);
+    Route::post('/kyc/{kyc}/replace-file', [KycController::class, 'replaceFile'])->whereNumber('kyc');
+
+    // Admin (manual role check inside controller)
+    Route::get('/admin/kyc', [KycController::class, 'index']);
+    Route::post('/admin/kyc/{kyc}/review', [KycController::class, 'review'])->whereNumber('kyc');
 
     //loan old routes
     Route::apiResource('/interest-percentage', InterestPercentageController::class);
