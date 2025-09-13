@@ -96,7 +96,7 @@ $history = LoanInstallment::query()
     // ✅ 1) Validate & return JSON errors if invalid
     $validator = Validator::make($request->all(), [
         'method'    => ['required','string','max:50', Rule::in(['wallet','bank','card','transfer'])],
-        'type'      => ['nullable','string', Rule::in(['shop','loan'])],                   // only for wallet
+        'type'      => ['nullable','string'],                   // only for wallet
         'tx_id'     => ['nullable','string','max:255'],                                    // required if NOT wallet
         'reference' => ['nullable','string','max:255'],
         'title'     => ['nullable','string','max:255'],
