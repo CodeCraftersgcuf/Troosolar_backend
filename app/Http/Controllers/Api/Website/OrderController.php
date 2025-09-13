@@ -30,7 +30,7 @@ class OrderController extends Controller
     {
         try {
             $user = auth()->user();
-            $isAdmin = $user ;
+            $isAdmin = $user->role=='admin' ;
 
             // Build query based on user role
             $query = Order::with(['items.itemable', 'deliveryAddress', 'user:id,first_name,sur_name,email,phone']);
