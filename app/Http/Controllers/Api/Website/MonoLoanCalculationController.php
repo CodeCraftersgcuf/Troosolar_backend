@@ -90,10 +90,11 @@ class MonoLoanCalculationController extends Controller
             $loanCalculation = LoanCalculation::where('id', $monoLoanCalculation->loan_calculation_id)->first();
             $loanCalculation->status = 'approved';
             $loanCalculation->save();
-            $wallet = Wallet::where('user_id', $monoLoanCalculation->loanCalculation->user_id)->first();
+            $userId=$loanCalculation->user_id;
+            $wallet = Wallet::where('user_id', $userId)->first();
             $wallet->loan_balance = $wallet->loan_balance + $monoLoanCalculation->loan_amount;
             $wallet->save();
-            $loanApplication = LoanApplication::where('user_id', $monoLoanCalculation->loanCalculation->user_id)->first();
+            $loanApplication = LoanApplication::where('user_id', $userId)->first();
             $loanApplication->status = 'approved';
             $loanApplication->save();
         } catch (Exception $ex) {
