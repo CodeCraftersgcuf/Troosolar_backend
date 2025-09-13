@@ -120,6 +120,9 @@ public function store(LoanCalculationRequest $request)
       try{
         $user=Auth::user();
         $loanCalculatedByUser=LoanCalculation::where('user_id', $user->id)->latest()->first();
+        if($loanCalculatedByUser->status!='offered'){
+          return ResponseHelper::error("Loan is not offered");
+        }
         $monoLoanCalculation=MonoLoanCalculation::where('loan_calculation_id', $loanCalculatedByUser->id)->latest()->first();
         return ResponseHelper::success($monoLoanCalculation, "Store Mono Loan Calculation");
       }catch(Exception $ex){
