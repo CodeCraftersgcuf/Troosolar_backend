@@ -26,7 +26,7 @@ class StoreOrderRequest extends FormRequest
         'payment_method'          => 'required|in:direct,card,bank_transfer,loan,withdrawal',
         'note'                    => 'nullable|string|max:1000',
         'items'                   => 'required|array|min:1',
-        'items.*.itemable_type'   => 'required|in:product,bundle',
+        'items.*.itemable_type'   => 'required|in:Product,Bundle',
         'items.*.itemable_id'     => 'required|integer',
         'items.*.quantity'        => 'required|integer|min:1',
         'installation_price'      => 'nullable|numeric',
