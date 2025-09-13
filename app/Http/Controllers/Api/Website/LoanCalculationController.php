@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use SebastianBergmann\Type\FalseType;
 
 class LoanCalculationController extends Controller
 {
@@ -89,7 +90,14 @@ public function store(LoanCalculationRequest $request)
       $user=Auth::user();
       $loan = LoanCalculation::where('user_id', $user->id)->latest()->first();
       if(!$loan){
-        return ResponseHelper::error("Loan is not calculated");
+        return ResponseHelper::success([
+        'status' => 'not_exists',
+        'exists' => false,
+        'message' => 'You have not applied for any loan',
+        'data' => [],
+        // 'monoLoanCalculation' => $monoLoanCalculation
+        ]);
+      //  / return ResponseHelper::error("Loan is not calculated");
       }
       $exists=false;
       if($loan){
