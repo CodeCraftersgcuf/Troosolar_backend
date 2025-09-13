@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\LoanCalculation;
 use App\Models\LoanInstallment;
+use App\Models\MonoLoanCalculation;
 use App\Models\Transaction;
 use App\Models\Wallet;
 use Illuminate\Http\Request;
@@ -63,6 +65,8 @@ class InstallmentController extends Controller
     $hasUnpaid    = LoanInstallment::where('status', '!=', LoanInstallment::STATUS_PAID)
         ->where('user_id', $user->id)
         ->exists();
+        $loanCalculation = LoanCalculation::where('user_id', $user->id)->latest()->first();
+        $monoLoanCalculation=MonoLoanCalculation::where('loan_calculation_id', $loanCalculation->id)->latest()->first();
 
     return response()->json([
         'status' => 'success',
@@ -74,6 +78,7 @@ class InstallmentController extends Controller
             'hasOverdue'     => $overdueCount > 0,
             'overdueCount'   => $overdueCount,
             'overdueAmount'  => (float) $overdueAmount, // cast for clean JSON
+            'loan'=>$monoLoanCalculation
         ],
     ]);
 }
