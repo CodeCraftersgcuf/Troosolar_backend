@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\WIthdrawController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\Admin\{
     TermController,
@@ -233,4 +234,11 @@ Route::middleware('auth:sanctum')->group(function () {
     //new routes for transaction
     Route::get('/transactions', [TransactionController::class, 'index']);     // for admin
     Route::get('/transactions-for-user', [TransactionController::class, 'getforUser']);  //for authenticated user
+    //withdraw routes
+
+    Route::post('withdraw',[WIthdrawController::class, 'store']);  //   'amount' => 'required|numeric', 'bank_name' => 'required|string', 'account_name' => 'required|string',  'account_number' => 'required|string',
+    Route::get('/withdraw/get',[WIthdrawController::class, 'getWithdrawRequest']);
+
+    //for admin
+    Route::get('/withdraw/approve/{id}',[WIthdrawController::class, 'approveRequest']);
 });
