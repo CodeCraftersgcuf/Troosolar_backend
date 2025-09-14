@@ -419,7 +419,9 @@ class OrderController extends Controller
             $wallet->loan_balance=$wallet->loan_balance-$amount;
             $wallet->save();
             $tx_id=date('ymdhis').rand(1000,9999);
-            
+
+        }else{
+            return ResponseHelper::error("you don't have that much loan");
         }
     }
     $order=Order::where('id',$orderId)->first();
