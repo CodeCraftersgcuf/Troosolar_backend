@@ -240,7 +240,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/', [CartController::class, 'clear']);
     });
     Route::post('order/payment-confirmation', [OrderController::class, 'paymentConfirmation']);
-
+    Route::post('order/pay-by-loan', [OrderController::class, 'payByLoan']);
     // Transactions
 
     // Transactions  ----------------------------------------------------

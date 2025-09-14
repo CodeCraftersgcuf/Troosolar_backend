@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Website;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreOrderRequest;
+use App\Models\Wallet;
 use Illuminate\Http\Request;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -15,6 +16,7 @@ use App\Helpers\ResponseHelper;
 use App\Models\CartItem;
 use App\Models\DeliveryAddress;
 use App\Models\Transaction;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -408,6 +410,18 @@ class OrderController extends Controller
     $amount=$request->amount;
     $tx_id=$request->txId;
     $orderId=$request->orderId;
+    $type=$request->type;
+    if($type=="wallet"){
+        //check does user have that much loan
+        $wallet=Wallet::where('user_id',Auth::user()->id)->first();
+        if($amount < $wallet->loan_balance){
+            //process the payment
+            $wallet->loan_balance=$wallet->loan_balance-$amount;
+            $wallet->save();
+            $tx_id=date('ymdhis').rand(1000,9999);
+            
+        }
+    }
     $order=Order::where('id',$orderId)->first();
     if(!$order){
         return ResponseHelper::error("order does not found");
