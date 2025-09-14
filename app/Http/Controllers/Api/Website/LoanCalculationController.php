@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Website;
 use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoanCalculationRequest;
+use App\Http\Requests\ToolCalculatorRequest;
 use App\Models\InterestPercentage;
 use App\Models\LoanCalculation;
 use App\Models\LoanCalculationProduct;
@@ -107,9 +108,56 @@ public function store(LoanCalculationRequest $request)
     }
 }
 
-public function tool(){
-  
+public function tool(ToolCalculatorRequest $request)
+{
+    try {
+        $data = $request->validated();
+
+        // 0) Ensure we have an interest row
+        $interestPercentage = InterestPercentage::latest()->first();
+        if (!$interestPercentage) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Interest rate configuration not found.'
+            ], 422);
+        }
+
+        // Extract key values
+        $repaymentDate          = Carbon::now()->addMonth();
+        $interestPercentageRate = (float) $interestPercentage->interest_percentage; // e.g. 12.5
+        $repaymentDuration      = (int) $data['repayment_duration'];
+        $loanAmount             = (float) $data['loan_amount'];
+
+        // Same monthly payment formula (no interest added in your current logic)
+        $monthlyPayment         = round($loanAmount / max($repaymentDuration, 1), 2);
+
+        // Derived fields
+        $downPayment = round($monthlyPayment * 0.25, 2);
+        $totalAmount = round($monthlyPayment * $repaymentDuration, 2);
+
+        // ✅ Return the same structure as `store`, but without saving anything
+        return response()->json([
+            'status'         => 'success',
+            'message'        => 'Loan calculated successfully (no record created)',
+            'repayment_date' => $repaymentDate,
+            'data'           => [
+                'product_amount'      => $data['product_amount'],
+                'loan_amount'         => $loanAmount,
+                'repayment_duration'  => $repaymentDuration,
+                'interest_percentage' => $interestPercentageRate,
+                'monthly_payment'     => $monthlyPayment,
+                'interest_rate'       => $interestPercentageRate,
+                'down_payment'        => $downPayment,
+                'total_amount'        => $totalAmount,
+            ],
+        ]);
+
+    } catch (\Throwable $e) {
+        Log::error('Tool loan calculation failed: ' . $e->getMessage());
+        return ResponseHelper::error('Loan Calculation could not be generated');
+    }
 }
+
 
     public function status(){
       $user=Auth::user();
