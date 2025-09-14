@@ -107,6 +107,9 @@ public function store(LoanCalculationRequest $request)
     }
 }
 
+public function tool(){
+  
+}
 
     public function status(){
       $user=Auth::user();

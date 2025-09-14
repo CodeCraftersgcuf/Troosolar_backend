@@ -159,7 +159,8 @@ Route::middleware('auth:sanctum')->group(function () {
     //for accepting use following route
 //kyc
 
-
+    //tools 
+    Route::get('/loan-calculator-tool', [LoanCalculationController::class, 'tool']);
   // User
     Route::post('/kyc', [KycController::class, 'store']);
     Route::get('/kyc/status', [KycController::class, 'myStatus']);
@@ -169,6 +170,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/admin/kyc', [KycController::class, 'index']);
     Route::post('/admin/kyc/{kyc}/review', [KycController::class, 'review'])->whereNumber('kyc');
 
+    
     //loan old routes
     Route::apiResource('/interest-percentage', InterestPercentageController::class);
     Route::post('/beneficiary-detail/{monoLoanCalculationId}', [LoanApplicationController::class, 'beneficiary']);
