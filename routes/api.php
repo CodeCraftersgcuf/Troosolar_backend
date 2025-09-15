@@ -265,7 +265,12 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     Route::get('admin/analytics', [AnalyticController::class, 'index']);
    Route::get('/all-users', [UserController::class, 'allUsers']);
-   Route::post('/add-user', [UserController::class, 'addUser']);
+
+   //new user creations
+
+   
+
+
     Route::get('admin/users/with-loans', [UserController::class, 'usersWithLoans']);
     Route::get('/total-users', [UserController::class, 'totalUser']);
     Route::post('/update-user', [UserController::class, 'updateUser']);
@@ -278,4 +283,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/get-referral-details',[ReferralController::class, 'getBalance']);
     //for admin
     Route::get('/withdraw/approve/{id}',[WIthdrawController::class, 'approveRequest']);
+
+
+
+       Route::post('/add-user', [UserController::class, 'addUser']);
+
 });
