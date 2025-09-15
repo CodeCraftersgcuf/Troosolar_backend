@@ -11,6 +11,7 @@ use App\Models\LoanCalculation;
 use App\Models\LoanInstallment;
 use App\Models\LoanStatus;
 use App\Models\MonoLoanCalculation;
+use App\Models\User;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -34,14 +35,15 @@ class LoanApplicationController extends Controller
                 $img->move(public_path('/loan_applications'), $imageName);
                 $data['upload_document'] = 'loan_applications/' . $imageName;
             }
+            $monoLoanCalculation = MonoLoanCalculation::find($id);
 
             $loanApplication = LoanApplication::create([
                 'title_document'      => $data['title_document'],
                 'upload_document'     => $data['upload_document'],
                 'user_id'             => Auth::id(),
                 'mono_loan_calculation' => $id, // **keep your name**
+                'loan_amount'         => $monoLoanCalculation->loan_amount,
             ]);
-            $monoLoanCalculation = MonoLoanCalculation::find($id);
             $loanCalCulation = LoanCalculation::find($monoLoanCalculation->loan_calculation_id);
             $loanCalCulation->status = 'submitted';
             $loanCalCulation->save();
@@ -130,6 +132,20 @@ class LoanApplicationController extends Controller
             ]);
         } catch (Exception $ex) {
             Log::error('nor add loan detail' . $ex->getMessage());
+            return ResponseHelper::error('Loan application not add the loan details');
+        }
+    }
+    public function loanKycDetails($userId){
+        try {
+            $loanApplication= LoanApplication::where('user_id', $userId)->first();
+            $user=User::where('id',$userId)->first();
+            
+            return ResponseHelper::success([
+                'loan_application' => $loanApplication,
+                'user' => $user
+            ], 'Loan application is added');
+            
+        }catch(Exception $ex){
             return ResponseHelper::error('Loan application not add the loan details');
         }
     }
