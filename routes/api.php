@@ -129,8 +129,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // User
     Route::post('/logout', [UserController::class, 'logout']);
  
-    Route::delete('/delete-user/{user_id}', [UserController::class, 'deleteUser']);
-    Route::get('/single-user/{user_id}', [UserController::class, 'singleUser']);
 
     //wallet routes
     Route::post('/fund-wallet', [LoanWalletController::class, 'fundWallet']);
@@ -271,6 +269,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/total-users', [UserController::class, 'totalUser']);
     Route::post('/update-user', [UserController::class, 'updateUser']);
     Route::get('/send-otp', [UserController::class, 'sendOtp']);
+
+    Route::delete('/delete-user/{user_id}', [UserController::class, 'deleteUser']);
+    Route::get('/single-user/{user_id}', [UserController::class, 'singleUser']);
 
     //refferal routes
     Route::get('/get-referral-details',[ReferralController::class, 'getBalance']);
