@@ -66,6 +66,32 @@ public function index()
     }
 }
 
+public function addUser(UserRequest $request){
+    try{
+        $data=$request->validated();
+
+        if (User::where('email', $data['email'])->exists()) {
+            return ResponseHelper::error('Email is already registered', 409);
+        }
+            if (isset($data['profile_picture']) && $data['profile_picture']->isValid()) {
+            $img = $data['profile_picture'];
+            $ext = $img->getClientOriginalExtension();
+            $imageName = time() . '.' . $ext;
+            $img->move(public_path('/users'), $imageName);
+            $data['profile_picture'] = 'users/' . $imageName;
+
+        }
+
+        $data['user_code'] = Str::lower($data['first_name']) . rand(100, 999);
+        //no need of otp
+        $user = User::create($data);
+        $this->createWallet($user);
+        return ResponseHelper::success($user, 'User registered successfully', 201);
+
+    }catch(Exception $ex){
+        return ResponseHelper::error('User is not registered', 500);
+    }
+}
 // verify OTP
 public function verifyOtp(Request $request, $user_id)
 {

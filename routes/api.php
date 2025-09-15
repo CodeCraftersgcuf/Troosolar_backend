@@ -265,6 +265,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     Route::get('admin/analytics', [AnalyticController::class, 'index']);
    Route::get('/all-users', [UserController::class, 'allUsers']);
+   Route::post('/add-user', [UserController::class, 'addUser']);
     Route::get('admin/users/with-loans', [UserController::class, 'usersWithLoans']);
     Route::get('/total-users', [UserController::class, 'totalUser']);
     Route::post('/update-user', [UserController::class, 'updateUser']);
