@@ -68,7 +68,7 @@ public function fullLoanDetails(string $id)
 
         // Get all loan applications for this user with their loan status
         $loanApplications = LoanApplication::where('user_id', $id)
-            ->with(['loanStatus', 'user'])
+            ->with(['loanStatus', 'user','mono'])
             ->get();
         
         if ($loanApplications->isEmpty()) {
@@ -82,6 +82,7 @@ public function fullLoanDetails(string $id)
             $loanDetails = [
                 'loan_application_id' => $loanApp->id,
                 'user_id' => $loanApp->user_id,
+                'amount' => $loanApp->mono->amount,
                 'user_name' => $loanApp->user->first_name . ' ' . $loanApp->user->sur_name,
                 'beneficiary_name' => $loanApp->beneficiary_name,
                 'beneficiary_email' => $loanApp->beneficiary_email,
