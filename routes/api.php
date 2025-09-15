@@ -47,7 +47,7 @@ use Illuminate\Support\Facades\Artisan;
 | API Routes
 |--------------------------------------------------------------------------
 */
-require __DIR__.'/user.php';    
+require __DIR__.'/new.php';    
 
 Route::get('/optimize-app', function () {
     Artisan::call('optimize:clear'); // Clears cache, config, route, and view caches
@@ -281,9 +281,7 @@ Route::middleware('auth:sanctum')->group(function () {
     //for admin
     Route::get('/withdraw/approve/{id}', [WIthdrawController::class, 'approveRequest']);
 
-    Route::post('/add-user', [UserController::class, 'addUser']);
 
     Route::get('/full-loan-detail/{loanStatusId}', [LoanStatusController::class, 'fullLoanDetails']);
     //use the following for the single loan detail modal
-    Route::get('/single-loan-detail/{id}', [LoanStatusController::class, 'singleLoanDetail']);
 });
