@@ -160,7 +160,7 @@ Route::middleware('auth:sanctum')->group(function () {
 //kyc
 
     //tools 
-    Route::get('/loan-calculator-tool', [LoanCalculationController::class, 'tool']);
+    Route::post('/loan-calculator-tool', [LoanCalculationController::class, 'tool']);
   // User
     Route::post('/kyc', [KycController::class, 'store']);
     Route::get('/kyc/status', [KycController::class, 'myStatus']);
