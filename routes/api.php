@@ -284,8 +284,6 @@ Route::middleware('auth:sanctum')->group(function () {
     //for admin
     Route::get('/withdraw/approve/{id}',[WIthdrawController::class, 'approveRequest']);
 
-
-
        Route::post('/add-user', [UserController::class, 'addUser']);
 
 });
