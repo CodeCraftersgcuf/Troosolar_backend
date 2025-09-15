@@ -174,8 +174,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/all-loan-application', [LoanApplicationController::class, 'allLoanApplication']);
     Route::get('/single-loan-application/{id}', [LoanApplicationController::class, 'singleLoanApplication']);
     Route::delete('/delete-loan-application/{loanApplicationId}', [LoanApplicationController::class, 'destory']);
+    
     Route::get('/all-loan-status', [LoanStatusController::class, 'allLoansStatus']);
-    Route::get('/full-loan-detail/{loanStatusId}', [LoanStatusController::class, 'fullLoanDetails']);
+
+
+
     Route::post('/send-to-partner/{userId}', [PartnerController::class, 'sendToPartner']);
     Route::post('/loan-distributed/{loanCalculationId}', [LoanDistributedController::class, 'store']);
     Route::get('/all-loan-distributed', [LoanDistributedController::class, 'allLoansDistributed']);
@@ -284,6 +287,11 @@ Route::middleware('auth:sanctum')->group(function () {
     //for admin
     Route::get('/withdraw/approve/{id}',[WIthdrawController::class, 'approveRequest']);
 
-       Route::post('/add-user', [UserController::class, 'addUser']);
+    Route::post('/add-user', [UserController::class, 'addUser']);
+
+
+        Route::get('/full-loan-detail/{loanStatusId}', [LoanStatusController::class, 'fullLoanDetails']);
+        Route::get('/single-loan-detail/{id}', [LoanStatusController::class, 'singleLoanDetail']);
+
 
 });
