@@ -22,46 +22,50 @@ use App\Services\LoanInstallmentScheduler;
 class LoanApplicationController extends Controller
 {
     // upload documnets 
-   public function documents(LoanApplicationRequest $request, string $id)
-{
-    try {
-        $data = $request->validated();
+    public function documents(LoanApplicationRequest $request, string $id)
+    {
+        try {
+            $data = $request->validated();
 
-        if (isset($data['upload_document']) && $data['upload_document']->isValid()) {
-            $img = $data['upload_document'];
-            $ext = $img->getClientOriginalExtension();
-            $imageName = time() . '.' . $ext;
-            $img->move(public_path('/loan_applications'), $imageName);
-            $data['upload_document'] = 'loan_applications/' . $imageName;
+            if (isset($data['upload_document']) && $data['upload_document']->isValid()) {
+                $img = $data['upload_document'];
+                $ext = $img->getClientOriginalExtension();
+                $imageName = time() . '.' . $ext;
+                $img->move(public_path('/loan_applications'), $imageName);
+                $data['upload_document'] = 'loan_applications/' . $imageName;
+            }
+
+            $loanApplication = LoanApplication::create([
+                'title_document'      => $data['title_document'],
+                'upload_document'     => $data['upload_document'],
+                'user_id'             => Auth::id(),
+                'mono_loan_calculation' => $id, // **keep your name**
+            ]);
+            $monoLoanCalculation = MonoLoanCalculation::find($id);
+            $loanCalCulation = LoanCalculation::find($monoLoanCalculation->loan_calculation_id);
+            $loanCalCulation->status = 'submitted';
+            $loanCalCulation->save();
+            // Generate installments for this MonoLoanCalculation id ($id)
+            // firstPaymentDate = null => will use LoanCalculation->repayment_date or now()->addMonth()
+            $schedule = LoanInstallmentScheduler::generate((int)$id);
+            $loanStatus = LoanStatus::create([
+                'loan_application_id' => $loanApplication->id,
+                'send_status' => 'pending',
+                'approval_status' => 'pending',
+                'disbursement_status' => 'pending'
+            ]);
+            return ResponseHelper::success(
+                [
+                    'loan_application' => $loanApplication,
+                    'installments'     => $schedule,
+                ],
+                'Loan Application documents submitted and schedule created'
+            );
+        } catch (\Throwable $ex) {
+            Log::error('no save the loan application ' . $ex->getMessage());
+            return ResponseHelper::error('Loan Application documents is not submitted');
         }
-
-        $loanApplication = LoanApplication::create([
-            'title_document'      => $data['title_document'],
-            'upload_document'     => $data['upload_document'],
-            'user_id'             => Auth::id(),
-            'mono_loan_calculation'=> $id, // **keep your name**
-        ]);
-        $monoLoanCalculation = MonoLoanCalculation::find($id);
-        $loanCalCulation=LoanCalculation::find($monoLoanCalculation->loan_calculation_id);
-        $loanCalCulation->status='submitted';
-        $loanCalCulation->save();
-        // Generate installments for this MonoLoanCalculation id ($id)
-        // firstPaymentDate = null => will use LoanCalculation->repayment_date or now()->addMonth()
-        $schedule = LoanInstallmentScheduler::generate((int)$id);
-
-        return ResponseHelper::success(
-            [
-                'loan_application' => $loanApplication,
-                'installments'     => $schedule,
-            ],
-            'Loan Application documents submitted and schedule created'
-        );
-
-    } catch (\Throwable $ex) {
-        Log::error('no save the loan application ' . $ex->getMessage());
-        return ResponseHelper::error('Loan Application documents is not submitted');
     }
-}
 
     // beneficiary details
     public function beneficiary(LoanApplicationRequest $request, string $id)
@@ -84,8 +88,7 @@ class LoanApplicationController extends Controller
     // loan details
     public function loanDetail(LoanApplicationRequest $request, string $id)
     {
-        try
-         {
+        try {
             $data = $request->validated();
             $loanApplicationId = LoanApplication::where('mono_loan_calculation', $id)->first();
             $loanDetail = LoanApplication::where('mono_loan_calculation', $id)
@@ -134,8 +137,7 @@ class LoanApplicationController extends Controller
     // delete loan application
     public function destory(string $id)
     {
-        try 
-        {
+        try {
             $applicationId = LoanApplication::where('id', $id)->delete();
             return ResponseHelper::success($applicationId, 'Loan application is deleted successfully');
         } catch (Exception $ex) {
@@ -146,8 +148,7 @@ class LoanApplicationController extends Controller
     // all loan application
     public function allLoanApplication()
     {
-        try 
-        {
+        try {
             $allLoanApplication = LoanApplication::all();
             return ResponseHelper::success($allLoanApplication, "all the Loan Applications");
         } catch (Exception $ex) {
@@ -175,7 +176,7 @@ class LoanApplicationController extends Controller
 
             // dd($singleDocument);
             $data = [
-                
+
                 'title_document' => $singleDocument->title_document,
                 'upload_document' => $singleDocument->upload_document
             ];
@@ -194,7 +195,7 @@ class LoanApplicationController extends Controller
 
             // dd($singleDocument);
             $data = [
-                
+
                 'Beneficiary name' => $singleDocument->beneficiary_name,
                 'Beneficiary email' => $singleDocument->beneficiary_email,
                 'Beneficiary phone' => $singleDocument->beneficiary_phone,
@@ -214,7 +215,7 @@ class LoanApplicationController extends Controller
 
             // dd($singleDocument);
             $data = [
-                
+
                 'Loan Amount' => $singleDocument->loan_amount,
                 'Repayment duration' => $singleDocument->repayment_duration
             ];
