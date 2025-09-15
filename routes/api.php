@@ -128,11 +128,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // User
     Route::post('/logout', [UserController::class, 'logout']);
-    Route::get('/all-users', [UserController::class, 'allUsers']);
-    Route::get('admin/users/with-loans', [UserController::class, 'usersWithLoans']);
-    Route::get('/total-users', [UserController::class, 'totalUser']);
-    Route::post('/update-user', [UserController::class, 'updateUser']);
-    Route::get('/send-otp', [UserController::class, 'sendOtp']);
+ 
     Route::delete('/delete-user/{user_id}', [UserController::class, 'deleteUser']);
     Route::get('/single-user/{user_id}', [UserController::class, 'singleUser']);
 
@@ -150,7 +146,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/offered-loan-calculation', [LoanCalculationController::class, 'offeredLoanCalculation']);
     Route::post('/loan-application/{monoLoanCalculationId}', [LoanApplicationController::class, 'documents']);
     // Route::get('/get-currentmonth-installment', [InstallmentController::class, 'currentMonthInstallment'])
-      Route::get('/installments/with-history', [InstallmentController::class, 'historyWithCurrentMonth']);
+    Route::get('/installments/with-history', [InstallmentController::class, 'historyWithCurrentMonth']);
     Route::post('/installments/{installmentId}/pay',    [InstallmentController::class, 'payInstallment']);;
     //for admin  for offering the loan
     Route::post('/mono-loan/{loanCalculationId}', [MonoLoanCalculationController::class, 'store']);
@@ -230,8 +226,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ->whereNumber('userId');
     Route::get('/transactions/{id}', [TransactionController::class, 'show'])
         ->whereNumber('id');
-
-         Route::post('withdraw',[WIthdrawController::class, 'store']); 
+    Route::post('withdraw',[WIthdrawController::class, 'store']); 
     Route::get('/withdraw/get',[WIthdrawController::class, 'getWithdrawRequest']);
     // Admin: use /api/admin/users to show the TRANSACTIONS table (not the raw users list)
    
@@ -258,11 +253,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('admin/all-partners', [PartnerController::class, 'all_partners']);
     Route::post('admin/update-partner/{partner_id}', [PartnerController::class, 'update_partner']);
     Route::get('admin/delete_partner/{partner_id}', [PartnerController::class, 'delete_partner']);
-
     // Notifications
     Route::apiResource('admin/notifications', NotificationController::class);
-
-        Route::prefix('admin')->group(function () {
+    Route::prefix('admin')->group(function () {
         Route::apiResource('tickets', AdminTicketController::class)->names([
             'index'   => 'admin.tickets.index',
             'store'   => 'admin.tickets.store',
@@ -270,10 +263,14 @@ Route::middleware('auth:sanctum')->group(function () {
             'update'  => 'admin.tickets.update',
             'destroy' => 'admin.tickets.destroy',
         ]);
-        Route::post('tickets/{ticket}/reply', [AdminTicketController::class, 'reply'])->name('admin.tickets.reply');
+     Route::post('tickets/{ticket}/reply', [AdminTicketController::class, 'reply'])->name('admin.tickets.reply');
     });
     Route::get('admin/analytics', [AnalyticController::class, 'index']);
-
+   Route::get('/all-users', [UserController::class, 'allUsers']);
+    Route::get('admin/users/with-loans', [UserController::class, 'usersWithLoans']);
+    Route::get('/total-users', [UserController::class, 'totalUser']);
+    Route::post('/update-user', [UserController::class, 'updateUser']);
+    Route::get('/send-otp', [UserController::class, 'sendOtp']);
 
     //refferal routes
     Route::get('/get-referral-details',[ReferralController::class, 'getBalance']);
