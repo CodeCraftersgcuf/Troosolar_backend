@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use App\Http\Requests\NotificationRequest;
@@ -22,6 +23,17 @@ class NotificationController extends Controller
                 'status'  => 'error',
                 'message' => $e->getMessage()
             ], 500);
+        }
+    }
+    public function userNotifications(){
+        try{
+            $systemNotifications=Notification::where('type','system')->get();
+            $userNotifications=Notification::where('user_id',auth()->user()->id)->get();
+            $notifications=array_merge($systemNotifications->toArray(),$userNotifications->toArray());
+            return ResponseHelper::success($notifications);
+
+        }catch(\Exception $e){
+            return ResponseHelper::error($e->getMessage());
         }
     }
 
