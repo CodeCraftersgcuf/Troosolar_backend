@@ -189,38 +189,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/loan-installment/{monoLoanCalculationId}', [LoanInstallmentController::class, 'loanInstallment']);
     Route::post('/loan-repayment/{monoLoanCalculationId}', [LoanRepaymentController::class, 'store']);
     Route::get('/show-loan-installment/{monoCalculationId}', [LoanInstallmentController::class, 'show']);
-    Route::get('/all-balances', [BalanceController::class, 'index']);
     Route::get('/single-document/{mono_loan_calculation_id}', [LoanApplicationController::class, 'singleDocument']);
     Route::get('/single-beneficiary/{mono_loan_calculation_id}', [LoanApplicationController::class, 'singleBeneficiary']);
     Route::get('/single-loan-detail/{mono_loan_calculation_id}', [LoanApplicationController::class, 'singleLoanDetail']);
 
     // Terms
-    Route::apiResource('/terms', TermController::class);
-
-    // Partners
-    Route::post('/add-partner', [PartnerController::class, 'add_partner']);
-    Route::get('/all-partners', [PartnerController::class, 'all_partners']);
-    Route::post('/update-partner/{partner_id}', [PartnerController::class, 'update_partner']);
-    Route::get('/delete_partner/{partner_id}', [PartnerController::class, 'delete_partner']);
-
-    // Notifications
-    Route::apiResource('admin/notifications', NotificationController::class);
 
     // Website Tickets
     Route::apiResource('website/tickets', TicketController::class)->names('website.tickets');
 
     // Admin Tickets
-    Route::prefix('admin')->group(function () {
-        Route::apiResource('tickets', AdminTicketController::class)->names([
-            'index'   => 'admin.tickets.index',
-            'store'   => 'admin.tickets.store',
-            'show'    => 'admin.tickets.show',
-            'update'  => 'admin.tickets.update',
-            'destroy' => 'admin.tickets.destroy',
-        ]);
-        Route::post('tickets/{ticket}/reply', [AdminTicketController::class, 'reply'])->name('admin.tickets.reply');
-    });
-    Route::get('admin/analytics', [AnalyticController::class, 'index']);
 
     // Orders
     Route::prefix('orders')->group(function () {
@@ -245,7 +223,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('order/pay-by-loan', [OrderController::class, 'payByLoan']);
     // Transactions
 
-    // Transactions  ----------------------------------------------------
+    // Transactions  -----------------------------------x-----------------
     // current user (or ALL if admin)
     Route::get('/single-trancastion', [TransactionController::class, 'singleTranscation']);
     Route::get('/transactions/user/{userId}', [TransactionController::class, 'forUser'])
@@ -253,20 +231,48 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/transactions/{id}', [TransactionController::class, 'show'])
         ->whereNumber('id');
 
+         Route::post('withdraw',[WIthdrawController::class, 'store']); 
+    Route::get('/withdraw/get',[WIthdrawController::class, 'getWithdrawRequest']);
     // Admin: use /api/admin/users to show the TRANSACTIONS table (not the raw users list)
-    Route::prefix('admin')->group(function () {
+   
+    // Banners
+    
+    //common routes
+
+    Route::get('/transactions', [TransactionController::class, 'index']);     
+
+    //admin routes
+    Route::get('/transactions-for-user', [TransactionController::class, 'getforUser']);  
+    Route::get('/all-balances', [BalanceController::class, 'index']);
+    Route::apiResource('admin/banners', BannerController::class);
+     Route::prefix('admin')->group(function () {
         Route::get('/users', [TransactionController::class, 'index']); // ⬅ REPOINTED to transactions
         Route::get('/users/{userId}', [TransactionController::class, 'forUser'])->whereNumber('userId'); // ⬅ REPOINTED
     });
-    // Banners
-    Route::apiResource('admin/banners', BannerController::class);
-    //new routes for transaction
-    Route::get('/transactions', [TransactionController::class, 'index']);     // for admin
-    Route::get('/transactions-for-user', [TransactionController::class, 'getforUser']);  //for authenticated user
-    //withdraw routes
+   
 
-    Route::post('withdraw',[WIthdrawController::class, 'store']);  //   'amount' => 'required|numeric', 'bank_name' => 'required|string', 'account_name' => 'required|string',  'account_number' => 'required|string',
-    Route::get('/withdraw/get',[WIthdrawController::class, 'getWithdrawRequest']);
+    Route::apiResource('/terms', TermController::class);
+
+    // Partners
+    Route::post('admin/add-partner', [PartnerController::class, 'add_partner']);
+    Route::get('admin/all-partners', [PartnerController::class, 'all_partners']);
+    Route::post('admin/update-partner/{partner_id}', [PartnerController::class, 'update_partner']);
+    Route::get('admin/delete_partner/{partner_id}', [PartnerController::class, 'delete_partner']);
+
+    // Notifications
+    Route::apiResource('admin/notifications', NotificationController::class);
+
+        Route::prefix('admin')->group(function () {
+        Route::apiResource('tickets', AdminTicketController::class)->names([
+            'index'   => 'admin.tickets.index',
+            'store'   => 'admin.tickets.store',
+            'show'    => 'admin.tickets.show',
+            'update'  => 'admin.tickets.update',
+            'destroy' => 'admin.tickets.destroy',
+        ]);
+        Route::post('tickets/{ticket}/reply', [AdminTicketController::class, 'reply'])->name('admin.tickets.reply');
+    });
+    Route::get('admin/analytics', [AnalyticController::class, 'index']);
 
 
     //refferal routes
