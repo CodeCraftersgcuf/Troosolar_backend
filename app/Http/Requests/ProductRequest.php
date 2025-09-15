@@ -20,15 +20,15 @@ class ProductRequest extends FormRequest
             'brand_id' => 'nullable|exists:brands,id',
             'discount_price' => 'nullable|numeric|min:0',
             'discount_end_date' => 'nullable|date',
-            'stock' => 'nullable|string|max:255',
+            'stock' => 'nullable|string',
             'installation_price' => 'nullable|numeric|min:0',
             'top_deal' => 'boolean',
             'installation_compulsory' => 'boolean',
-            'featured_image' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'featured_image' => 'nullable|image|mimes:jpg,jpeg,png',
             'images' => 'nullable|array',
-            'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:2048',
+            'images.*' => 'image|mimes:jpg,jpeg,png,webp',
             'product_details' => 'nullable|array',
-            'product_details.*' => 'required|string|max:255',
+            'product_details.*' => 'required|string',
         ];
 
         if ($this->isMethod('post')) {

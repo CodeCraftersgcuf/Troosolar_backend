@@ -47,6 +47,7 @@ use Illuminate\Support\Facades\Artisan;
 | API Routes
 |--------------------------------------------------------------------------
 */
+require __DIR__.'/user.php';    
 
 Route::get('/optimize-app', function () {
     Artisan::call('optimize:clear'); // Clears cache, config, route, and view caches
@@ -128,7 +129,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // User
     Route::post('/logout', [UserController::class, 'logout']);
- 
+
 
     //wallet routes
     Route::post('/fund-wallet', [LoanWalletController::class, 'fundWallet']);
@@ -151,11 +152,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/loan-application-grant/{id}', [MonoLoanCalculationController::class, 'grant']);
 
     //for accepting use following route
-//kyc
+    //kyc
 
     //tools 
     Route::post('/loan-calculator-tool', [LoanCalculationController::class, 'tool']);
-  // User
+    // User
     Route::post('/kyc', [KycController::class, 'store']);
     Route::get('/kyc/status', [KycController::class, 'myStatus']);
     Route::post('/kyc/{kyc}/replace-file', [KycController::class, 'replaceFile'])->whereNumber('kyc');
@@ -164,7 +165,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/admin/kyc', [KycController::class, 'index']);
     Route::post('/admin/kyc/{kyc}/review', [KycController::class, 'review'])->whereNumber('kyc');
 
-    
+
     //loan old routes
     Route::apiResource('/interest-percentage', InterestPercentageController::class);
     Route::post('/beneficiary-detail/{monoLoanCalculationId}', [LoanApplicationController::class, 'beneficiary']);
@@ -174,7 +175,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/all-loan-application', [LoanApplicationController::class, 'allLoanApplication']);
     Route::get('/single-loan-application/{id}', [LoanApplicationController::class, 'singleLoanApplication']);
     Route::delete('/delete-loan-application/{loanApplicationId}', [LoanApplicationController::class, 'destory']);
-    
+
     Route::get('/all-loan-status', [LoanStatusController::class, 'allLoansStatus']);
 
 
@@ -227,25 +228,22 @@ Route::middleware('auth:sanctum')->group(function () {
         ->whereNumber('userId');
     Route::get('/transactions/{id}', [TransactionController::class, 'show'])
         ->whereNumber('id');
-    Route::post('withdraw',[WIthdrawController::class, 'store']); 
-    Route::get('/withdraw/get',[WIthdrawController::class, 'getWithdrawRequest']);
+    Route::post('withdraw', [WIthdrawController::class, 'store']);
+    Route::get('/withdraw/get', [WIthdrawController::class, 'getWithdrawRequest']);
     // Admin: use /api/admin/users to show the TRANSACTIONS table (not the raw users list)
-   
     // Banners
-    
     //common routes
-
-    Route::get('/transactions', [TransactionController::class, 'index']);     
+    Route::get('/transactions', [TransactionController::class, 'index']);
 
     //admin routes
-    Route::get('/transactions-for-user', [TransactionController::class, 'getforUser']);  
+    Route::get('/transactions-for-user', [TransactionController::class, 'getforUser']);
     Route::get('/all-balances', [BalanceController::class, 'index']);
     Route::apiResource('admin/banners', BannerController::class);
-     Route::prefix('admin')->group(function () {
+    Route::prefix('admin')->group(function () {
         Route::get('/users', [TransactionController::class, 'index']); // ⬅ REPOINTED to transactions
         Route::get('/users/{userId}', [TransactionController::class, 'forUser'])->whereNumber('userId'); // ⬅ REPOINTED
     });
-   
+
 
     Route::apiResource('/terms', TermController::class);
 
@@ -264,15 +262,12 @@ Route::middleware('auth:sanctum')->group(function () {
             'update'  => 'admin.tickets.update',
             'destroy' => 'admin.tickets.destroy',
         ]);
-     Route::post('tickets/{ticket}/reply', [AdminTicketController::class, 'reply'])->name('admin.tickets.reply');
+        Route::post('tickets/{ticket}/reply', [AdminTicketController::class, 'reply'])->name('admin.tickets.reply');
     });
     Route::get('admin/analytics', [AnalyticController::class, 'index']);
-   Route::get('/all-users', [UserController::class, 'allUsers']);
+    Route::get('/all-users', [UserController::class, 'allUsers']);
 
-   //new user creations
-
-   
-
+    //new user creations
 
     Route::get('admin/users/with-loans', [UserController::class, 'usersWithLoans']);
     Route::get('/total-users', [UserController::class, 'totalUser']);
@@ -281,17 +276,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::delete('/delete-user/{user_id}', [UserController::class, 'deleteUser']);
     Route::get('/single-user/{user_id}', [UserController::class, 'singleUser']);
-
     //refferal routes
-    Route::get('/get-referral-details',[ReferralController::class, 'getBalance']);
+    Route::get('/get-referral-details', [ReferralController::class, 'getBalance']);
     //for admin
-    Route::get('/withdraw/approve/{id}',[WIthdrawController::class, 'approveRequest']);
+    Route::get('/withdraw/approve/{id}', [WIthdrawController::class, 'approveRequest']);
 
     Route::post('/add-user', [UserController::class, 'addUser']);
 
-
-        Route::get('/full-loan-detail/{loanStatusId}', [LoanStatusController::class, 'fullLoanDetails']);
-        Route::get('/single-loan-detail/{id}', [LoanStatusController::class, 'singleLoanDetail']);
-
-
+    Route::get('/full-loan-detail/{loanStatusId}', [LoanStatusController::class, 'fullLoanDetails']);
+    //use the following for the single loan detail modal
+    Route::get('/single-loan-detail/{id}', [LoanStatusController::class, 'singleLoanDetail']);
 });
