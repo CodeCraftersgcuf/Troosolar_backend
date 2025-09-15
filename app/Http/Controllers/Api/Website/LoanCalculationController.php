@@ -154,7 +154,7 @@ public function tool(ToolCalculatorRequest $request)
 
     } catch (\Throwable $e) {
         Log::error('Tool loan calculation failed: ' . $e->getMessage());
-        return ResponseHelper::error('Loan Calculation could not be generated');
+        return ResponseHelper::error('Loan Calculation could not be generated'.$e->getMessage() ,);
     }
 }
 
