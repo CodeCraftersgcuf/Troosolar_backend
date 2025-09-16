@@ -109,30 +109,29 @@ class PartnerController extends Controller
     }
 
     // send to partner user details
-    public function sendToPartner(Request $request, string $userId)
-    {
-        try
-        {
-            $user = User::where('id', $userId)->first();
-            $loanApplication = LoanApplication::where('user_id', $userId)->latest()->first();
-            $linkAccount = LinkAccount::where('user_id', $userId)->latest()->first();
-            $partner_id = $request->partner_id;
-            $partner = Partner::where('id', $partner_id)->first();
-            // dd($linkAccount);
-                // Mail::to($partner->email)->send(new SendUserLoanInfoToPartner($user, $loanApplication, $linkAccount, $partner));
-                 dispatch(new SendUserLoanInfoToPartnerJob($user, $loanApplication, $partner, $linkAccount));
-                 $loanSatatus = LoanStatus::where('loan_application_id', $loanApplication->id)->update([
-                    'send_status' => 'active',
-                    'send_date' => now(),
-                 ]);
-            return ResponseHelper::success('the email is send to partner');
-        }
-         catch(Exception $ex)
-        {
-            Log::error('Error sending email to partner: ' . $ex->getMessage());
-            return ResponseHelper::error('the email is not send to partner');
-        }
+  public function sendToPartner(Request $request, string $userId)
+{
+    try {
+        $user            = User::findOrFail($userId);
+        $loanApplication = LoanApplication::where('user_id', $userId)->latest()->first();
+        $linkAccount     = LinkAccount::where('user_id', $userId)->latest()->first();
+        $partner         = Partner::findOrFail($request->partner_id);
 
+        // Send mail instantly
+        Mail::to($partner->email)->send(
+            new SendUserLoanInfoToPartner($user, $loanApplication, $partner, $linkAccount)
+        );
+
+        LoanStatus::where('loan_application_id', $loanApplication->id)->update([
+            'send_status' => 'active',
+            'send_date'   => now(),
+        ]);
+
+        return ResponseHelper::success('The email has been sent to the partner.');
+    } catch (Exception $ex) {
+        Log::error('Error sending email to partner: ' . $ex->getMessage());
+        return ResponseHelper::error('The email could not be sent to the partner.');
     }
+}
 
 }
