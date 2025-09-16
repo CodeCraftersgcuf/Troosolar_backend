@@ -137,7 +137,7 @@ class LoanApplicationController extends Controller
     }
     public function loanKycDetails($userId){
         try {
-            $loanApplication= LoanApplication::where('user_id', $userId)->first();
+            $loanApplication= LoanApplication::where('user_id', $userId)->latest()->first();
             $user=User::where('id',$userId)->first();
             
             return ResponseHelper::success([

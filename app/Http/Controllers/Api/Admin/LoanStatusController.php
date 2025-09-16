@@ -40,6 +40,7 @@ class LoanStatusController extends Controller
 
                 $data[] = [
                     'id' => $loan->id,
+                    'user_id' => $loan->loan_application->user_id,
                     'name' => $loan->loan_application->beneficiary_name,
                     'amount' => $loan->loan_application->loan_amount,
                     'date' => $loan->loan_application->created_at->format('Y-m-d'),
