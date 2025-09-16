@@ -135,10 +135,10 @@ class LoanApplicationController extends Controller
             return ResponseHelper::error('Loan application not add the loan details');
         }
     }
-    public function loanKycDetails($userId){
+    public function loanKycDetails($loan_application_id){
         try {
-            $loanApplication= LoanApplication::where('user_id', $userId)->latest()->first();
-            $user=User::where('id',$userId)->first();
+            $loanApplication= LoanApplication::where('id', $loan_application_id)->latest()->first();
+            $user=User::where('id', $loanApplication->user_id)->first();
             
             return ResponseHelper::success([
                 'loan_application' => $loanApplication,

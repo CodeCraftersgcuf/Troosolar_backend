@@ -40,6 +40,7 @@ class LoanStatusController extends Controller
 
                 $data[] = [
                     'id' => $loan->id,
+                    'loan_application_id'=> $loan->loan_application_id,
                     'user_id' => $loan->loan_application->user_id,
                     'name' => $loan->loan_application->beneficiary_name,
                     'amount' => $loan->loan_application->loan_amount,
