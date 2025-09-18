@@ -240,7 +240,6 @@ public function tool(ToolCalculatorRequest $request)
                     'product_amount' => $loan->product_amount,
                     'monthly_payment' => $loan->monthly_payment,
                     'interest_percentage' => $loan->interest_percentage,
-                    
                     // Flatten user fields
                     'user_first_name' => $loan->user?->first_name,
                     'user_sur_name' => $loan->user?->sur_name,
