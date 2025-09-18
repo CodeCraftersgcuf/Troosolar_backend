@@ -131,7 +131,7 @@ class PartnerController extends Controller
         return ResponseHelper::success('The email has been sent to the partner.');
     } catch (Exception $ex) {
         Log::error('Error sending email to partner: ' . $ex->getMessage());
-        return ResponseHelper::error('The email could not be sent to the partner.');
+        return ResponseHelper::error('The email could not be sent to the partner.'.$ex->getMessage());
     }
 }
 
