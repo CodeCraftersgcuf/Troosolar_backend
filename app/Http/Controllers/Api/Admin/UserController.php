@@ -283,7 +283,7 @@ public function updateUserByAdmin(UpdateRequest $request,$userId)
             $data['password'] = Hash::make($data['password']);
         }
 
-        User::where('id', Auth::id())->update($data);
+        User::where('id', $userId)->update($data);
         return ResponseHelper::success($data, 'User profile updated successfully');
     } catch (Exception $e) {
         throw new Exception('User profile update failed: ' . $e->getMessage());
