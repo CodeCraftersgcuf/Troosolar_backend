@@ -106,8 +106,7 @@ class MonoLoanCalculationController extends Controller
                 "type"=>"incoming",
                 "status"=>"paid",
                 "method"=>"Direct",
-                "transacted_at"=>now(),
-                
+                "transacted_at"=>now()   
             ]);
             return ResponseHelper::success($monoLoanCalculation, "Single Mono Loan Calculation");
         } catch (Exception $ex) {
