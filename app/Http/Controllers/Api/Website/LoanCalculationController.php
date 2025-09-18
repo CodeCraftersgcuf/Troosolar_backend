@@ -214,26 +214,59 @@ public function tool(ToolCalculatorRequest $request)
         return ResponseHelper::error("Don't store the mono loan calculation");
       }
     }    
-    public function monoLoanCalculations(){
-        try{
-            $totalCalculations=LoanCalculation::count();
-            $approvedCalculations=LoanCalculation::where('status','approved')->count();
-            $offeredCalculations=LoanCalculation::where('status','offered')->count();
-            $pendingCalculations=LoanCalculation::where('status','pending')->count();
-            $loanCalculations=LoanCalculation::where('status','pending')->with('user')->latest()->get();
-            $summary=[
-                'total_calculations'=>$totalCalculations,
-                'approved_calculations'=>$approvedCalculations,
-                'offered_calculations'=>$offeredCalculations,
-                'pending_calculations'=>$pendingCalculations
-            ];
-            return ResponseHelper::success([
-                'loan_calculations'=>$loanCalculations,
-                'summary'=>$summary
-            ], "Store Mono Loan Calculation");
-        }catch(Exception $ex){
-            Log::error("not store the mono loan". $ex->getMessage());
-            return ResponseHelper::error("Don't store the mono loan calculation");
-        }
+   public function monoLoanCalculations()
+{
+    try {
+        $totalCalculations = LoanCalculation::count();
+        $approvedCalculations = LoanCalculation::where('status', 'approved')->count();
+        $offeredCalculations = LoanCalculation::where('status', 'offered')->count();
+        $pendingCalculations = LoanCalculation::where('status', 'pending')->count();
+
+        // Get pending loan calculations with users
+        $loanCalculations = LoanCalculation::where('status', 'pending')
+            ->with('user')
+            ->latest()
+            ->get()
+            ->map(function ($loan) {
+                return [
+                    'id' => $loan->id,
+                    'loan_amount' => $loan->loan_amount,
+                    'repayment_duration' => $loan->repayment_duration,
+                    'status' => $loan->status,
+                    'user_id' => $loan->user_id,
+                    'created_at' => $loan->created_at,
+                    'updated_at' => $loan->updated_at,
+                    'repayment_date' => $loan->repayment_date,
+                    'product_amount' => $loan->product_amount,
+                    'monthly_payment' => $loan->monthly_payment,
+                    'interest_percentage' => $loan->interest_percentage,
+                    
+                    // Flatten user fields
+                    'user_first_name' => $loan->user?->first_name,
+                    'user_sur_name' => $loan->user?->sur_name,
+                    'user_email' => $loan->user?->email,
+                    'user_phone' => $loan->user?->phone,
+                    'user_code' => $loan->user?->user_code,
+                    'user_role' => $loan->user?->role,
+                ];
+            });
+
+        $summary = [
+            'total_calculations' => $totalCalculations,
+            'approved_calculations' => $approvedCalculations,
+            'offered_calculations' => $offeredCalculations,
+            'pending_calculations' => $pendingCalculations,
+        ];
+
+        return ResponseHelper::success([
+            'loan_calculations' => $loanCalculations,
+            'summary' => $summary,
+        ], "Store Mono Loan Calculation");
+
+    } catch (Exception $ex) {
+        Log::error("not store the mono loan" . $ex->getMessage());
+        return ResponseHelper::error("Don't store the mono loan calculation");
     }
+}
+
 }
