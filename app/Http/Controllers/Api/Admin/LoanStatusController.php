@@ -8,6 +8,7 @@ use App\Models\InterestPercentage;
 use App\Models\LoanApplication;
 use App\Models\LoanDistribute;
 use App\Models\LoanStatus;
+use App\Models\MonoLoanCalculation;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -18,12 +19,12 @@ class LoanStatusController extends Controller
     public function allLoansStatus()
     {
         try {
-            $allLoans = LoanStatus::with('loan_application')->get();
+            $allLoans = LoanStatus::with('loan_application.mono.loanCalculation')->get();
 
             $totalLoans = LoanApplication::count();
             $loanSend = LoanStatus::where('send_status', 'active')->count();
             $loanApproved = LoanStatus::where('approval_status', 'active')->count();
-
+            $monoLoan = MonoLoanCalculation::where('lo');
             $loans = [
                 'total loans' => $totalLoans,
                 'loan send' => $loanSend,
@@ -41,6 +42,7 @@ class LoanStatusController extends Controller
                 $data[] = [
                     'id' => $loan->id,
                     'loan_application_id'=> $loan->loan_application_id,
+                    'loan_calculation_id' => $loan->loan_application->mono->loanCalculation->id,
                     'user_id' => $loan->loan_application->user_id,
                     'name' => $loan->loan_application->beneficiary_name,
                     'amount' => $loan->loan_application->loan_amount,
