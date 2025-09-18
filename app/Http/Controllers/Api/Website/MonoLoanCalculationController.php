@@ -18,38 +18,54 @@ use Illuminate\Support\Facades\Log;
 
 class MonoLoanCalculationController extends Controller
 {
-    public function store(string $id)
-    {
-        try {
+public function store(string $id, Request $request)
+{
+    try {
+        // Fetch the original calculation
+        $loanCalculation = LoanCalculation::findOrFail($id);
 
-            // $data = $request->validated();
-            $loanCalculation = LoanCalculation::where('id', $id)->firstOrFail();
-            $downPayment = $loanCalculation->loan_amount * 0.25;
-            $interestPercentage = InterestPercentage::latest()->first();
-            $percentage = $interestPercentage->interest_percentage;
-            $interest = $loanCalculation->loan_amount * $percentage;
-            $totalAmount = $loanCalculation->loan_amount + $interest;
-            // $loanCalculation = LoanCalculation::findorfail($id);
-            $monoLoan = MonoLoanCalculation::create([
-                'down_payment' => $downPayment,
-                'loan_calculation_id' => $id,
-                'loan_amount' => $loanCalculation->loan_amount,
-                'repayment_duration' => $loanCalculation->repayment_duration,
-                'total_amount' => $totalAmount,
-                'interest_rate' => $percentage,
-                'status' => 'pending'
-            ]);
-            $loanCalculation->status = 'offered';
-            $loanCalculation->save();
+        // Use request amount/duration if provided, otherwise fall back
+        $loanAmount = $request->filled('amount')
+            ? (float) $request->input('amount')
+            : $loanCalculation->loan_amount;
 
-            $monoLoanCalculation = MonoLoanCalculation::where('loan_calculation_id', $id)
-                ->with('loanCalculation')->first();
-            return ResponseHelper::success($monoLoanCalculation, "Store Mono Loan Calculation");
-        } catch (Exception $ex) {
-            Log::error("not store the mono loan" . $ex->getMessage());
-            return ResponseHelper::error("Don't store the mono loan calculation");
-        }
+        $repaymentDuration = $request->filled('duration')
+            ? (int) $request->input('duration')
+            : $loanCalculation->repayment_duration;
+
+        // Calculate down-payment and interest
+        $downPayment = $loanAmount * 0.25;
+        $percentage  = InterestPercentage::latest()->value('interest_percentage') ?? 0;
+        $interest    = $loanAmount * $percentage;
+        $totalAmount = $loanAmount + $interest;
+
+        // Create mono loan record
+        $monoLoan = MonoLoanCalculation::create([
+            'down_payment'         => $downPayment,
+            'loan_calculation_id'  => $id,
+            'loan_amount'          => $loanAmount,
+            'repayment_duration'   => $repaymentDuration,
+            'total_amount'         => $totalAmount,
+            'interest_rate'        => $percentage,
+            'status'               => 'pending',
+        ]);
+
+        // Update original calculation status
+        $loanCalculation->status = 'offered';
+        $loanCalculation->save();
+
+        // Return fresh data with relation
+        $monoLoanCalculation = MonoLoanCalculation::where('loan_calculation_id', $id)
+            ->with('loanCalculation')
+            ->first();
+
+        return ResponseHelper::success($monoLoanCalculation, 'Store Mono Loan Calculation');
+    } catch (\Exception $ex) {
+        Log::error('Mono loan not stored: ' . $ex->getMessage());
+        return ResponseHelper::error("Don't store the mono loan calculation");
     }
+}
+
 
     public function edit(Request $request, string $id)
     {
