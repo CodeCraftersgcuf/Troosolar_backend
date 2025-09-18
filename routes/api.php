@@ -262,6 +262,7 @@ Route::middleware('auth:sanctum')->group(function () {
             'update'  => 'admin.tickets.update',
             'destroy' => 'admin.tickets.destroy',
         ]);
+        Route::post('tickets/{ticketId}/status', [AdminTicketController::class, 'status'])->name('admin.tickets.status');
         Route::post('tickets/{ticket}/reply', [AdminTicketController::class, 'reply'])->name('admin.tickets.reply');
     });
     Route::get('admin/analytics', [AnalyticController::class, 'index']);

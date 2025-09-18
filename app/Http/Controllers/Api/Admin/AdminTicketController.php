@@ -8,6 +8,7 @@ use App\Http\Requests\AdminReplyTicketRequest;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 class AdminTicketController extends Controller
 {
@@ -96,6 +97,20 @@ class AdminTicketController extends Controller
             ], 'Reply sent successfully');
         } catch (\Exception $e) {
             return ResponseHelper::error('Failed to send reply: ' . $e->getMessage(), 500);
+        }
+    }
+    public function status(Request $request, $ticketId)
+    {
+        try {
+            $ticket = Ticket::findOrFail($ticketId);
+            $ticket->update(['status' => $request->status]);
+            return ResponseHelper::success([
+                'ticket_id' => $ticket->id,
+                'status'    => $ticket->status,
+                'date'      => now()->format('Y-m-d H:i:s'),
+            ], 'Ticket status updated successfully');
+        } catch (\Exception $e) {
+            return ResponseHelper::error('Failed to update ticket status: ' . $e->getMessage(), 500);
         }
     }
 }
