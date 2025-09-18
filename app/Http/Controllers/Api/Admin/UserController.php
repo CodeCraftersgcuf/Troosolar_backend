@@ -133,6 +133,7 @@ public function login(LoginRequest $request)
             return ResponseHelper::error('Invalid credentials', 401);
         }
     } catch (Exception $e) {
+        Log::error('Login failed', ['error' => $e->getMessage()]);
         return ResponseHelper::error('Login failed', 500);
     }
 }
