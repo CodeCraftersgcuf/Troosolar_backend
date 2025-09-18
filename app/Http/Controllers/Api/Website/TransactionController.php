@@ -23,10 +23,16 @@ class TransactionController extends Controller
             }{
                 $transactions=Transaction::where('user_id','=',$user->id)->latest()->get();
             }
-
+            $totalTransactions=Transaction::count();
+            $totalUsersWithTransactions=$transactions->pluck('user_id')->unique()->count();
+            $totalAmount=$transactions->sum('amount');
             return response()->json([
                 'status'       => true,
-                'summary'      => [],
+                'summary'      => [
+                    'total_transactions' => $totalTransactions,
+                    'total_users_with_transactions' => $totalUsersWithTransactions,
+                    'total_amount' => $totalAmount
+                ],
                 'transactions' => $transactions,
                 'message'      => 'All transactions fetched successfully'
             ]);
