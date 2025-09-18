@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Helpers\ActivityHelper;
 use App\Http\Requests\ForgetPasswordRequest;
 use Exception;
 use App\Models\User;
@@ -120,7 +121,7 @@ public function login(LoginRequest $request)
         if (Auth::attempt($user)) {
             $authUser = Auth::user();
             $token = $authUser->createToken("API Token")->plainTextToken;
-
+            $activity=ActivityHelper::saveActivity($authUser->id,'User Logged In');
             return response()->json([
                 'status' => true,
                 'message' => 'Login Successfully',
