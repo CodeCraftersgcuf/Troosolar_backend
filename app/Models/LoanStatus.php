@@ -16,6 +16,7 @@ class LoanStatus extends Model
         'disbursement_status',
         'disbursement_date',
         'loan_application_id',
+        'partner_id'
     ];
 
 public function loan_application()
@@ -23,6 +24,9 @@ public function loan_application()
     return $this->belongsTo(LoanApplication::class, 'loan_application_id');
 }
 
+public function partner()
+{
+    return $this->belongsTo(Partner::class, 'partner_id');
 
-
+}
 }

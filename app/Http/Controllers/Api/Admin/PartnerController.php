@@ -125,6 +125,7 @@ class PartnerController extends Controller
         LoanStatus::where('loan_application_id', $loanApplication->id)->update([
             'send_status' => 'active',
             'send_date'   => now(),
+            'partner_id'  => $partner->id
         ]);
 
         return ResponseHelper::success('The email has been sent to the partner.');
