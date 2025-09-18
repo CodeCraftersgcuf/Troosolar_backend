@@ -18,7 +18,7 @@ Route::get('user-notifications', [NotificationController::class, 'userNotificati
     Route::get('loan-kyc-details/{userId}', [LoanApplicationController::class, 'loanKycDetails']);
     Route::post('/admin/send-to-partner/{userId}',[PartnerController::class, 'sendToPartner']);
     Route::post('admin/user/edit-user/{userId}',[UserController::class, 'updateUserByAdmin']);
-    Route::post('/mono-loan-calculations', [LoanCalculationController::class, 'monoLoanCalculations']);
+    Route::get('/mono-loan-calculations', [LoanCalculationController::class, 'monoLoanCalculations']);
     Route::get('/checking',function(){
         return "hello";
     });
