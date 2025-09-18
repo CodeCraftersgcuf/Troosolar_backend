@@ -36,6 +36,7 @@ class UserRequest extends FormRequest
         'is_verified'      => 'nullable|boolean',
         'is_active'        => 'nullable|boolean',
         'otp'              => 'nullable|string',
+        'bvn'              => 'nullable|string',
     ];
     }
     

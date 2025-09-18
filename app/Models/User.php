@@ -30,6 +30,7 @@ class User extends Authenticatable
         'is_verified',
         'is_active',
         'otp',
+        'bvn'
     ];
 
     public function wallet()
