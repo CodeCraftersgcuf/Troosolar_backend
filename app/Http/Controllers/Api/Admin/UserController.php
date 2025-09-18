@@ -255,6 +255,40 @@ public function updateUser(UpdateRequest $request)
         throw new Exception('User profile update failed: ' . $e->getMessage());
     }
 }
+public function updateUserByAdmin(UpdateRequest $request,$userId)
+{
+    try {
+        $data = $request->validated();
+        // dd($data);
+        $user = User::find($userId);
+        if (!$user) {
+            throw new Exception("User not found");
+        }
+
+        if (isset($data['profile_picture']) && is_object($data['profile_picture']) && is_file($data['profile_picture']->getPathname())) {
+            $img = $data['profile_picture'];
+            $oldImagePath = public_path('users/' . $user->profile_picture);
+
+            if (file_exists($oldImagePath)) {
+                @unlink($oldImagePath);
+            }
+
+            $ext = $img->getClientOriginalExtension();
+            $imageName = time() . '.' . $ext;
+            $img->move(public_path('users'), $imageName);
+            $data['profile_picture'] = $imageName;
+        }
+
+        if (!empty($data['password'])) {
+            $data['password'] = Hash::make($data['password']);
+        }
+
+        User::where('id', Auth::id())->update($data);
+        return ResponseHelper::success($data, 'User profile updated successfully');
+    } catch (Exception $e) {
+        throw new Exception('User profile update failed: ' . $e->getMessage());
+    }
+}
 
 // send otp
 public function sendotp()
