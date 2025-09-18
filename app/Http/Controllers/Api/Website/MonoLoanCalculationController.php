@@ -9,6 +9,7 @@ use App\Models\InterestPercentage;
 use App\Models\LoanApplication;
 use App\Models\LoanCalculation;
 use App\Models\MonoLoanCalculation;
+use App\Models\Transaction;
 use App\Models\Wallet;
 use Carbon\Carbon;
 use Exception;
@@ -97,6 +98,17 @@ class MonoLoanCalculationController extends Controller
             $loanApplication = LoanApplication::where('user_id', $userId)->first();
             $loanApplication->status = 'approved';
             $loanApplication->save();
+            $transaction=new Transaction([
+                'user_id'=>$userId,
+                'amount'=>$monoLoanCalculation->loan_amount,
+                'tx_id'=>date('ymdhis').rand(1000,9999),
+                "title"=>"Loan Granted",
+                "type"=>"incoming",
+                "status"=>"paid",
+                "method"=>"Direct",
+                "transacted_at"=>now(),
+                
+            ]);
             return ResponseHelper::success($monoLoanCalculation, "Single Mono Loan Calculation");
         } catch (Exception $ex) {
             Log::error("not edit the mono loan" . $ex->getMessage());
