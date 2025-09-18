@@ -216,8 +216,21 @@ public function tool(ToolCalculatorRequest $request)
     }    
     public function monoLoanCalculations(){
         try{
+            $totalCalculations=LoanCalculation::count();
+            $approvedCalculations=LoanCalculation::where('status','approved')->count();
+            $offeredCalculations=LoanCalculation::where('status','offered')->count();
+            $pendingCalculations=LoanCalculation::where('status','pending')->count();
             $loanCalculations=LoanCalculation::where('status','pending')->with('user')->latest()->get();
-            return ResponseHelper::success($loanCalculations, "Store Mono Loan Calculation");
+            $summary=[
+                'total_calculations'=>$totalCalculations,
+                'approved_calculations'=>$approvedCalculations,
+                'offered_calculations'=>$offeredCalculations,
+                'pending_calculations'=>$pendingCalculations
+            ];
+            return ResponseHelper::success([
+                'loan_calculations'=>$loanCalculations,
+                'summary'=>$summary
+            ], "Store Mono Loan Calculation");
         }catch(Exception $ex){
             Log::error("not store the mono loan". $ex->getMessage());
             return ResponseHelper::error("Don't store the mono loan calculation");
