@@ -63,6 +63,10 @@ public function wallets()
 {
 return $this->hasOne(Wallet::class);
 }
+public function activitys()
+{
+    return $this->hasMany(UserActivity::class);
+}
 
 // loan applications
 public function loanApplications()

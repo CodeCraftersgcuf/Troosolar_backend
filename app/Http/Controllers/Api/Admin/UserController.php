@@ -316,6 +316,7 @@ public function singleUser($userId)
             Log::warning('User not found', ['user_id' => $userId]);
             return ResponseHelper::error('User not found', 404);
         }
+        $user->load('wallet','activitys');
         return ResponseHelper::success($user, 'User retrieved successfully');
     } catch (Exception $e) {
         Log::error('Error retrieving user', ['user_id' => $userId, 'message' => $e->getMessage()]);
