@@ -139,7 +139,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Loan new routes
 
     //loan calculation on click of proeec call the finalized and than eveyertime user open call the status and check if status is offered than go to next page and call the offeredloancalculation
-    Route::post('/loan-calculation', [LoanCalculationController::class, 'store']);
+    Route::post('/loan-calculation', action: [LoanCalculationController::class, 'store']);
     Route::post('/loan-calculation-finalized/{id}', [LoanCalculationController::class, 'finalized']); //calculated ,pending,offered,finalized
     Route::get('/loan-calculation-stauts', [LoanCalculationController::class, 'status']);
     Route::get('/offered-loan-calculation', [LoanCalculationController::class, 'offeredLoanCalculation']);

@@ -214,4 +214,13 @@ public function tool(ToolCalculatorRequest $request)
         return ResponseHelper::error("Don't store the mono loan calculation");
       }
     }    
+    public function monoLoanCalculations(){
+        try{
+            $loanCalculations=LoanCalculation::where('status','pending')->with('user')->latest()->get();
+            return ResponseHelper::success($loanCalculations, "Store Mono Loan Calculation");
+        }catch(Exception $ex){
+            Log::error("not store the mono loan". $ex->getMessage());
+            return ResponseHelper::error("Don't store the mono loan calculation");
+        }
+    }
 }
