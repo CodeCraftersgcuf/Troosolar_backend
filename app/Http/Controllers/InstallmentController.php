@@ -84,6 +84,74 @@ $history = LoanInstallment::query()
         ],
     ]);
 }
+    public function historyWithCurrentMonthforAdmin($userId)
+{
+    $user = \App\Models\User::find($userId);
+    $now  = now();
+
+    // Define "overdue": not paid AND payment_date strictly before today (at start of day)
+    $overdueBase = LoanInstallment::query()
+        ->where('user_id', $user->id)
+        ->where('status', '!=', LoanInstallment::STATUS_PAID)
+        ->whereDate('payment_date', '<', $now->copy()->startOfDay());
+
+    $overdueCount  = (clone $overdueBase)->count();
+    $overdueAmount = (clone $overdueBase)->sum('amount'); // adjust if you track partial payments
+
+    // Current month list (annotated with is_overdue)
+    $current = LoanInstallment::query()
+        ->where('user_id', $user->id)
+        ->forMonth($now)
+        ->orderBy('payment_date', 'asc')
+        ->get()
+        ->map(function ($i) use ($now) {
+            $mapped = $this->mapInstallment($i);
+            $isOverdue = $i->status !== LoanInstallment::STATUS_PAID
+                && $i->payment_date?->lt($now->copy()->startOfDay());
+            // Add is_overdue without touching your styling/shape from mapInstallment
+            return array_merge($mapped, ['is_overdue' => $isOverdue]);
+        });
+
+    // History list (all except current month; also annotated with is_overdue)
+    // History list: ONLY previous months (strictly before the current month)
+$history = LoanInstallment::query()
+    ->where('user_id', $user->id)
+    ->whereDate('payment_date', '<', $now->copy()->startOfMonth())
+    ->orderBy('payment_date', 'desc')
+    ->get()
+    ->map(function ($i) use ($now) {
+        $mapped = $this->mapInstallment($i);
+        $isOverdue = $i->status !== LoanInstallment::STATUS_PAID
+            && $i->payment_date?->lt($now->copy()->startOfDay());
+        return array_merge($mapped, ['is_overdue' => $isOverdue]);
+    });
+
+
+    // Activity/completion flags you already had
+    $isActive     = LoanInstallment::where('status', LoanInstallment::STATUS_PAID)
+        ->where('user_id', $user->id)
+        ->exists();
+
+    $hasUnpaid    = LoanInstallment::where('status', '!=', LoanInstallment::STATUS_PAID)
+        ->where('user_id', $user->id)
+        ->exists();
+        $loanCalculation = LoanCalculation::where('user_id', $user->id)->latest()->first();
+        $monoLoanCalculation=MonoLoanCalculation::where('loan_calculation_id', $loanCalculation->id)->latest()->first();
+
+    return response()->json([
+        'status' => 'success',
+        'data'   => [
+            'current_month'  => $current,
+            'history'        => $history,
+            'isActive'       => $isActive,
+            'isCompleted'    => !$hasUnpaid,
+            'hasOverdue'     => $overdueCount > 0,
+            'overdueCount'   => $overdueCount,
+            'overdueAmount'  => (float) $overdueAmount, // cast for clean JSON
+            'loan'=>$monoLoanCalculation
+        ],
+    ]);
+}
 
 
     /**

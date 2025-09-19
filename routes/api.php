@@ -145,7 +145,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/offered-loan-calculation', [LoanCalculationController::class, 'offeredLoanCalculation']);
     Route::post('/loan-application/{monoLoanCalculationId}', [LoanApplicationController::class, 'documents']);
     // Route::get('/get-currentmonth-installment', [InstallmentController::class, 'currentMonthInstallment'])
-    Route::get('/installments/with-history', [InstallmentController::class, 'historyWithCurrentMonth']);
+    Route::get('/installments/with-history', action: [InstallmentController::class, 'historyWithCurrentMonth']);
     Route::post('/installments/{installmentId}/pay',    [InstallmentController::class, 'payInstallment']);;
     //for admin  for offering the loan
     Route::post('/mono-loan/{loanCalculationId}', [MonoLoanCalculationController::class, 'store']);
