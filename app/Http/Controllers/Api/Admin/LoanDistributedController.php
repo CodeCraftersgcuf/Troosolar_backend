@@ -68,7 +68,7 @@ class LoanDistributedController extends Controller
     public function allLoansDistributed()
 {
     try {
-        $allLoans = LoanStatus::with('loan_application')->get();
+        $allLoans = LoanStatus::with('loan_application.mono')->get();
 
         $totalLoans = LoanApplication::count();
         $loanDistributed = LoanDistribute::count();
@@ -91,6 +91,7 @@ class LoanDistributedController extends Controller
                 'id' => $loan->id,
                 'loan_application_id'=> $loan->loan_application_id,
                 'name' => $loan->loan_application->beneficiary_name,
+                'mono_id' => $loan->loan_application->mono->id,
                 'Duration' => $loan->loan_application->repayment_duration.' months',
                 'date' => $loan->loan_application->created_at->format('Y-m-d'),
                 'disbursement status' => $loan->disbursement_status,
