@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Admin\PartnerController;
 use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\Website\LoanApplicationController;
 use App\Http\Controllers\Api\Website\LoanCalculationController;
+use App\Http\Controllers\Api\Website\OrderController;
 use App\Http\Controllers\InstallmentController;
 use Illuminate\Support\Facades\Route;
 
@@ -21,6 +22,8 @@ Route::get('user-notifications', [NotificationController::class, 'userNotificati
     Route::post('admin/user/edit-user/{userId}',[UserController::class, 'updateUserByAdmin']);
     Route::get('/mono-loan-calculations', [LoanCalculationController::class, 'monoLoanCalculations']);
         Route::get('admin/installments/with-history/{userId}', action: [InstallmentController::class, 'historyWithCurrentMonthforAdmin']);
+
+        Route::post('admin/order-update-status/{orderId}',[OrderController::class, 'updateStatus']);
 
     Route::get('/checking',function(){
         return "hello";

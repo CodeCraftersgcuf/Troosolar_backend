@@ -28,6 +28,17 @@ class OrderController extends Controller
      * GET /api/orders
      * Returns orders for the authenticated user.
      */
+    public function updateStatus($orderId, Request $request){
+        try {
+            $order = Order::findOrFail($orderId);
+            $order->order_status = $request->order_status;
+            $order->save();
+            return ResponseHelper::success('Order status updated successfully', 200);
+        } catch (\Throwable $e) {
+            Log::error("Order Update Status Error: {$e->getMessage()}");
+            return ResponseHelper::error('Failed to update order status', 500);
+        }
+    }
     public function index(Request $request)
     {
         try {
