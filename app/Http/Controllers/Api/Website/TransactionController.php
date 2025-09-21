@@ -23,7 +23,8 @@ class TransactionController extends Controller
             if($user->role=='admin'){
                 $calling=$user->role;
                 $transactions=Transaction::with('user')->latest()->get();;
-            }{
+            }else
+            {
                 $calling=$user->role;
                 $transactions=Transaction::where('user_id','=',$user->id)->latest()->get();
             }
