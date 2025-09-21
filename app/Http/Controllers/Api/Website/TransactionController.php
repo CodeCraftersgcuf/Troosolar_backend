@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Website;
 use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Transaction;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -17,6 +18,7 @@ class TransactionController extends Controller
         try {
             // Try to sync all orders into transactions (with error handling)
             $user=Auth::user();
+            $user=User::find($user->id);
             if($user->role=='admin'){
                 
                 $transactions=Transaction::with('user')->latest()->get();;
