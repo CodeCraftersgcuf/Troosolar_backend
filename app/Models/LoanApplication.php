@@ -17,7 +17,8 @@ class LoanApplication extends Model
     'beneficiary_phone',
     'status',
     'user_id',
-    'mono_loan_calculation'
+    'mono_loan_calculation',
+    'loan_amount',
 ];
 
 // loan history

@@ -8,6 +8,7 @@ use App\Http\Requests\MonoLoanCalculationRequest;
 use App\Models\InterestPercentage;
 use App\Models\LoanApplication;
 use App\Models\LoanCalculation;
+use App\Models\LoanStatus;
 use App\Models\MonoLoanCalculation;
 use App\Models\Transaction;
 use App\Models\Wallet;
@@ -114,6 +115,14 @@ public function store(string $id, Request $request)
             $loanApplication = LoanApplication::where('user_id', $userId)->first();
             $loanApplication->status = 'approved';
             $loanApplication->save();
+            $loanStatus=LoanStatus::where('loan_application_id', $loanApplication->id)->first();
+            $loanStatus->approval_status = 'approved';
+            $loanStatus->approval_date = now();
+            $loanStatus->disbursement_status = 'disbursed';
+            $loanStatus->disbursement_date = now();
+            $loanStatus->save();
+
+            $loanStatus->save();
             $transaction=new Transaction([
                 'user_id'=>$userId,
                 'amount'=>$monoLoanCalculation->loan_amount,
