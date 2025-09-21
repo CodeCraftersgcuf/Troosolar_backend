@@ -27,6 +27,7 @@ class LoanWalletController extends Controller
           };
           $data = [
             'Loan balance' => $loanWallet->loan_balance,
+            'shop_balance' => $loanWallet->shop_balance ?? 0,
           ];
             return ResponseHelper::success($data, 'Your loan Wallet');
 
