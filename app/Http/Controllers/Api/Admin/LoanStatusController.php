@@ -47,7 +47,7 @@ class LoanStatusController extends Controller
                     'loan_calculation_id' => $loan->loan_application->mono->loanCalculation->id,
                     'user_id' => $loan->loan_application->user_id,
                     'name' => $loan->loan_application->beneficiary_name,
-                    'amount' => $loan->loan_application->loan_amount,
+                    'amount' => $loan->loan_application->mono->loan_amount,
                     'date' => $loan->loan_application->created_at->format('Y-m-d'),
                     'send_status' => $loan->send_status,
                     'approval_status' => $loan->approval_status
