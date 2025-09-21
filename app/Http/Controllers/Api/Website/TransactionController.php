@@ -19,10 +19,12 @@ class TransactionController extends Controller
             // Try to sync all orders into transactions (with error handling)
             $user=Auth::user();
             $user=User::find($user->id);
+            $calling="";
             if($user->role=='admin'){
-                
+                $calling="admin";
                 $transactions=Transaction::with('user')->latest()->get();;
             }{
+                $calling="user";
                 $transactions=Transaction::where('user_id','=',$user->id)->latest()->get();
             }
             $totalTransactions=Transaction::count();
@@ -30,6 +32,7 @@ class TransactionController extends Controller
             $totalAmount=$transactions->sum('amount');
             return response()->json([
                 'status'       => true,
+                'calling'      => $calling,
                 'summary'      => [
                     'total_transactions' => $totalTransactions,
                     'total_users_with_transactions' => $totalUsersWithTransactions,
