@@ -21,10 +21,10 @@ class TransactionController extends Controller
             $user=User::find($user->id);
             $calling="";
             if($user->role=='admin'){
-                $calling="admin";
+                $calling=$user->role;
                 $transactions=Transaction::with('user')->latest()->get();;
             }{
-                $calling="user";
+                $calling=$user->role;
                 $transactions=Transaction::where('user_id','=',$user->id)->latest()->get();
             }
             $totalTransactions=Transaction::count();
