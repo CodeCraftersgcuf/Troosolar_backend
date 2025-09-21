@@ -25,6 +25,15 @@ class ProductController extends Controller
             return ResponseHelper::error('Failed to fetch products.', 500, $e->getMessage());
         }
     }
+    public function topProducts()
+    {
+        try {
+            $products =Product::where('top_deal', true)->with(['details', 'images','reviews'])->get();
+            return ResponseHelper::success($products, 'Top products fetched successfully.');
+        } catch (Exception $e) {
+            return ResponseHelper::error('Failed to fetch top products.', 500, $e->getMessage());
+        }
+    }
 
   public function show($id)
 {
