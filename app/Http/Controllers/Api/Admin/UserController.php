@@ -137,6 +137,34 @@ public function login(LoginRequest $request)
         return ResponseHelper::error('Login failed', 500);
     }
 }
+public function adminLogin(LoginRequest $request)
+{
+    try {
+        $user = $request->validated();
+        Log::info('Login attempt', ['email' => $user['email']]);
+
+        if (Auth::attempt($user)) {
+            $authUser = Auth::user();
+            if($authUser->role != 'admin' && $authUser->role != 'super_admin'){
+                return ResponseHelper::error('Unauthorized access', 403);
+            }
+            $token = $authUser->createToken("API Token")->plainTextToken;
+            $activity=ActivityHelper::saveActivity($authUser->id,'User Logged In');
+            return response()->json([
+                'status' => true,
+                'message' => 'Login Successfully',
+                'token_type' => 'bearer',
+                'token' => $token,
+                'user' => $authUser,
+            ], 200);
+        } else {
+            return ResponseHelper::error('Invalid credentials', 401);
+        }
+    } catch (Exception $e) {
+        Log::error('Login failed', ['error' => $e->getMessage()]);
+        return ResponseHelper::error('Login failed', 500);
+    }
+}
 
 // logout user
 public function logout(Request $request)

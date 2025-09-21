@@ -74,6 +74,7 @@ Route::get('/migrate/rollback', function () {
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/verify-otp/{user_id}', [UserController::class, 'verifyOtp']);
 Route::post('/login', [UserController::class, 'login']);
+Route::post('/admin-login', [UserController::class, 'adminLogin']);
 Route::post('/forget-password', [UserController::class, 'forgetPassword']);  //requirec. email
 Route::post('/verify-reset-password-otp', [UserController::class, 'verifyResetPasswordOtp']);
 Route::post('/reset-password', [UserController::class, 'resetPassword']);
