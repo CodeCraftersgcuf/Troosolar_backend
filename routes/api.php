@@ -102,6 +102,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // categories/{categoryId}/brands/{brandIds}/product/{productId}
     Route::apiResource('brands', BrandController::class);
     Route::apiResource('products', ProductController::class);
+    // Route::get('/products/top-products')
     Route::apiResource('bundles', BundleController::class);
 
     // Delivery address

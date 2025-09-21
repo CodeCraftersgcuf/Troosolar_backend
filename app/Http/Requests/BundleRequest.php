@@ -29,6 +29,9 @@ class BundleRequest extends FormRequest
             'custom_services' => 'nullable|array',
             'custom_services.*.title' => 'required|string|max:255',
             'custom_services.*.service_amount' => 'required|numeric|min:0',
+            'total_load' => 'nullable|string',
+            'inver_rating' => 'nullable|string',
+            'total_output' => 'nullable|string',
         ];
     }
      protected function failedValidation(Validator $validator)

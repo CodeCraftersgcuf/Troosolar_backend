@@ -10,6 +10,7 @@ class Bundles extends Model
 {
     protected $fillable = [
         'title','total_price','discount_price','discount_end_date','featured_image','bundle_type',
+        'total_load','inver_rating','total_output'
     ];
 
     protected $appends = ['featured_image_url'];
