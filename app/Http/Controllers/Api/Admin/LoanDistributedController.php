@@ -93,7 +93,8 @@ class LoanDistributedController extends Controller
                 'name' => $loan->loan_application->beneficiary_name,
                 'user_id' => $loan->loan_application->user_id,
                 'mono_id' => $loan->loan_application->mono->id,
-                'Duration' => $loan->loan_application->repayment_duration.' months',
+                'amount' => $loan->loan_application->mono->loan_amount,
+                'Duration' => $loan->loan_application->mono->repayment_duration.' months',
                 'date' => $loan->loan_application->created_at->format('Y-m-d'),
                 'disbursement status' => $loan->disbursement_status,
                 'approval status' => $loan->approval_status
