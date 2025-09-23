@@ -102,6 +102,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // categories/{categoryId}/brands/{brandIds}/product/{productId}
     Route::apiResource('brands', BrandController::class);
     Route::apiResource('products', ProductController::class);
+    Route::post('products/{product}/update', [ProductController::class, 'update'])
+     ->name('products.update.post');
+
     // Route::get('/products/top-products')
     Route::apiResource('bundles', BundleController::class);
     // Accept POST /bundles/{bundle}/update as an alternative to PUT
