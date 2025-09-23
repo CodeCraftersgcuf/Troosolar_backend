@@ -12,20 +12,61 @@ use App\Helpers\ResponseHelper;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Exception;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class BundleController extends Controller
 {
-    public function index()
-    {
-        try {
+
+
+public function index(Request $request)
+{
+    try {
+        $query = $request->query('q'); // accept ?q=1080 or any number
+
+        // If no query parameter => return all bundles
+        if (empty($query)) {
             $bundles = Bundles::with(['bundleItems.product', 'customServices'])->get();
             return ResponseHelper::success($bundles, 'Bundles fetched.');
-        } catch (Exception $e) {
-            Log::error('Error fetching bundles: ' . $e->getMessage());
-            return ResponseHelper::error('Failed to fetch bundles.', 500, $e->getMessage());
         }
+
+        // Ensure query is a number
+        if (!is_numeric($query)) {
+            return ResponseHelper::error('Query parameter q must be numeric.', 422);
+        }
+
+        $q = (float) $query;
+
+        // Fetch all bundles with relations
+        $bundles = Bundles::with(['bundleItems.product', 'customServices'])->get();
+
+        if ($bundles->isEmpty()) {
+            return ResponseHelper::error('No bundles found.', 404);
+        }
+
+        // Find bundle with closest total_output to $q
+        $closestBundle = $bundles->sortBy(function ($bundle) use ($q) {
+            return abs($bundle->total_output - $q);
+        })->first();
+
+        // If there’s a bundle with total_output >= $q and closest to it
+        $closerOrAbove = $bundles
+            ->where('total_output', '>=', $q)
+            ->sortBy(function ($bundle) use ($q) {
+                return abs($bundle->total_output - $q);
+            })
+            ->first();
+
+        return ResponseHelper::success(
+            $closerOrAbove ?? $closestBundle,
+            'Closest bundle fetched.'
+        );
+    } catch (Exception $e) {
+        Log::error('Error fetching bundles: ' . $e->getMessage());
+        return ResponseHelper::error('Failed to fetch bundles.', 500, $e->getMessage());
     }
+}
+
 
     public function store(BundleRequest $request)
     {
