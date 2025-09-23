@@ -104,6 +104,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('products', ProductController::class);
     // Route::get('/products/top-products')
     Route::apiResource('bundles', BundleController::class);
+    // Accept POST /bundles/{bundle}/update as an alternative to PUT
+Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
+     ->name('bundles.update.post');
+
 
     // Delivery address
     Route::prefix('delivery-address')->group(function () {
