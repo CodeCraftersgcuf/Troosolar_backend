@@ -121,7 +121,17 @@ public function login(LoginRequest $request)
         if (Auth::attempt($user)) {
             $authUser = Auth::user();
             $token = $authUser->createToken("API Token")->plainTextToken;
-            $activity=ActivityHelper::saveActivity($authUser->id,'User Logged In');
+            
+            // Save activity, but don't fail login if activity saving fails
+            try {
+                ActivityHelper::saveActivity($authUser->id,'User Logged In');
+            } catch (Exception $activityException) {
+                Log::warning('Failed to save login activity', [
+                    'user_id' => $authUser->id,
+                    'error' => $activityException->getMessage()
+                ]);
+            }
+            
             return response()->json([
                 'status' => true,
                 'message' => 'Login Successfully',
@@ -133,8 +143,13 @@ public function login(LoginRequest $request)
             return ResponseHelper::error('Invalid credentials', 401);
         }
     } catch (Exception $e) {
-        Log::error('Login failed', ['error' => $e->getMessage()]);
-        return ResponseHelper::error('Login failed', 500);
+        Log::error('Login failed', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine()
+        ]);
+        return ResponseHelper::error('Login failed: ' . $e->getMessage(), 500);
     }
 }
 public function adminLogin(LoginRequest $request)
@@ -149,7 +164,17 @@ public function adminLogin(LoginRequest $request)
                 return ResponseHelper::error('Unauthorized access', 403);
             }
             $token = $authUser->createToken("API Token")->plainTextToken;
-            $activity=ActivityHelper::saveActivity($authUser->id,'User Logged In');
+            
+            // Save activity, but don't fail login if activity saving fails
+            try {
+                ActivityHelper::saveActivity($authUser->id,'User Logged In');
+            } catch (Exception $activityException) {
+                Log::warning('Failed to save login activity', [
+                    'user_id' => $authUser->id,
+                    'error' => $activityException->getMessage()
+                ]);
+            }
+            
             return response()->json([
                 'status' => true,
                 'message' => 'Login Successfully',
@@ -161,8 +186,13 @@ public function adminLogin(LoginRequest $request)
             return ResponseHelper::error('Invalid credentials', 401);
         }
     } catch (Exception $e) {
-        Log::error('Login failed', ['error' => $e->getMessage()]);
-        return ResponseHelper::error('Login failed', 500);
+        Log::error('Login failed', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine()
+        ]);
+        return ResponseHelper::error('Login failed: ' . $e->getMessage(), 500);
     }
 }
 

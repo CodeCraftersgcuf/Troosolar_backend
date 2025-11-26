@@ -12,6 +12,7 @@ class Category extends Model
     protected $fillable = [
         'title',
         'icon',
+        'has_method_selection',
     ];
 
     // Optional: Define relationship with brands

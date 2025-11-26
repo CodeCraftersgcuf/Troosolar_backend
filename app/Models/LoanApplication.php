@@ -19,6 +19,23 @@ class LoanApplication extends Model
     'user_id',
     'mono_loan_calculation',
     'loan_amount',
+    'repayment_duration',
+    'customer_type',
+    'product_category',
+    'audit_type',
+    'property_state',
+    'property_address',
+    'property_landmark',
+    'property_floors',
+    'property_rooms',
+    'is_gated_estate',
+    'estate_name',
+    'estate_address',
+    'credit_check_method',
+    'bank_statement_path',
+    'live_photo_path',
+    'social_media_handle',
+    'guarantor_id',
 ];
 
 // loan history
@@ -48,5 +65,9 @@ public function loanStatus()
      return $this->belongsTo(User::class);
  }
 
+ public function guarantor()
+ {
+     return $this->hasOne(Guarantor::class, 'loan_application_id');
+ }
 
 }

@@ -35,7 +35,10 @@ use App\Http\Controllers\Api\Website\{
     LoanApplicationController,
     LoanCalculationController,
     LoanInstallmentController,
-    MonoLoanCalculationController
+    MonoLoanCalculationController,
+    ConfigurationController,
+    BNPLController,
+    CalendarController
 };
 use App\Http\Controllers\InstallmentController;
 use App\Http\Controllers\KycController;
@@ -78,6 +81,11 @@ Route::post('/admin-login', [UserController::class, 'adminLogin']);
 Route::post('/forget-password', [UserController::class, 'forgetPassword']);  //requirec. email
 Route::post('/verify-reset-password-otp', [UserController::class, 'verifyResetPasswordOtp']);
 Route::post('/reset-password', [UserController::class, 'resetPassword']);
+
+// Configuration endpoints (public)
+Route::get('/config/customer-types', [ConfigurationController::class, 'getCustomerTypes']);
+Route::get('/config/audit-types', [ConfigurationController::class, 'getAuditTypes']);
+Route::get('/config/states', [ConfigurationController::class, 'getStates']);
 
 // ================= PROTECTED ROUTES =================
 Route::middleware('auth:sanctum')->group(function () {
@@ -154,6 +162,19 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     Route::get('/loan-calculation-stauts', [LoanCalculationController::class, 'status']);
     Route::get('/offered-loan-calculation', [LoanCalculationController::class, 'offeredLoanCalculation']);
     Route::post('/loan-application/{monoLoanCalculationId}', [LoanApplicationController::class, 'documents']);
+    
+    // BNPL Flow endpoints
+    Route::post('/bnpl/apply', [BNPLController::class, 'apply']);
+    Route::get('/bnpl/status/{application_id}', [BNPLController::class, 'getStatus']);
+    Route::post('/bnpl/guarantor/invite', [BNPLController::class, 'inviteGuarantor']);
+    Route::post('/bnpl/guarantor/upload', [BNPLController::class, 'uploadGuarantorForm']);
+    Route::post('/bnpl/counteroffer/accept', [BNPLController::class, 'acceptCounterOffer']);
+    
+    // Buy Now Flow endpoints
+    Route::post('/orders/checkout', [OrderController::class, 'checkout']);
+    
+    // Calendar/Scheduling endpoints
+    Route::get('/calendar/slots', [CalendarController::class, 'getSlots']);
     // Route::get('/get-currentmonth-installment', [InstallmentController::class, 'currentMonthInstallment'])
     Route::get('/installments/with-history', action: [InstallmentController::class, 'historyWithCurrentMonth']);
     Route::post('/installments/{installmentId}/pay',    [InstallmentController::class, 'payInstallment']);;

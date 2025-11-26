@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Exception;
 
 class OrderController extends Controller
 {
@@ -456,4 +457,141 @@ class OrderController extends Controller
     return ResponseHelper::success($transaction,"payment confirmed");
 
 
-}}
+}
+
+    /**
+     * POST /api/orders/checkout
+     * Buy Now checkout - Calculate invoice with optional fees
+     */
+    public function checkout(Request $request)
+    {
+        try {
+            $data = $request->validate([
+                'product_id' => 'nullable|exists:products,id',
+                'bundle_id' => 'nullable|exists:bundles,id',
+                'amount' => 'nullable|numeric|min:0',
+                'customer_type' => 'nullable|in:residential,sme,commercial',
+                'product_category' => 'nullable|string',
+                'installer_choice' => 'required|in:troosolar,own',
+                'include_insurance' => 'nullable|boolean',
+                'include_inspection' => 'nullable|boolean',
+                'state_id' => 'nullable|exists:states,id',
+                'delivery_location_id' => 'nullable|exists:delivery_locations,id',
+                'add_ons' => 'nullable|array',
+                'add_ons.*' => 'exists:add_ons,id',
+            ]);
+
+            $productPrice = 0;
+            $product = null;
+            $bundle = null;
+
+            // Get product price from product_id, bundle_id, or amount
+            $productId = isset($data['product_id']) && !empty($data['product_id']) ? $data['product_id'] : null;
+            $bundleId = isset($data['bundle_id']) && !empty($data['bundle_id']) ? $data['bundle_id'] : null;
+            $amount = isset($data['amount']) && !empty($data['amount']) ? (float) $data['amount'] : null;
+            
+            if ($productId) {
+                $product = Product::findOrFail($productId);
+                $productPrice = $product->discount_price ?? $product->price ?? 0;
+            } elseif ($bundleId) {
+                $bundle = Bundles::findOrFail($bundleId);
+                $productPrice = $bundle->total_price ?? 0;
+            } elseif ($amount) {
+                // If amount is provided directly, use it
+                $productPrice = $amount;
+            } else {
+                return ResponseHelper::error('Either product_id, bundle_id, or amount is required. Please provide one of them in your request.', 422);
+            }
+
+            // Get delivery and installation fees from state/delivery location or use defaults
+            $deliveryFee = 25000; // Default
+            $installationFee = 50000; // Default
+            
+            if (isset($data['delivery_location_id']) && $data['delivery_location_id']) {
+                $deliveryLocation = \App\Models\DeliveryLocation::find($data['delivery_location_id']);
+                if ($deliveryLocation) {
+                    $deliveryFee = $deliveryLocation->delivery_fee ?? $deliveryFee;
+                    $installationFee = $deliveryLocation->installation_fee ?? $installationFee;
+                }
+            } elseif (isset($data['state_id']) && $data['state_id']) {
+                $state = \App\Models\State::find($data['state_id']);
+                if ($state) {
+                    $deliveryFee = $state->default_delivery_fee ?? $deliveryFee;
+                    $installationFee = $state->default_installation_fee ?? $installationFee;
+                }
+            }
+
+            // Calculate fees
+            $materialCost = 0;
+            $inspectionFee = 0;
+            $insuranceFee = 0;
+            $addOnsTotal = 0;
+            $addOns = [];
+
+            // Installation fee (only if using Troosolar installer)
+            if ($data['installer_choice'] === 'troosolar') {
+                $materialCost = 30000; // Material cost (cables, breakers, etc.)
+                
+                // Inspection fee (optional for Buy Now)
+                if ($data['include_inspection'] ?? false) {
+                    $inspectionFee = 15000;
+                }
+            } else {
+                // If using own installer, no installation fee or material cost
+                $installationFee = 0;
+            }
+
+            // Insurance fee (optional for Buy Now, compulsory for BNPL)
+            if ($data['include_insurance'] ?? false) {
+                $insuranceFee = round($productPrice * 0.005, 2); // 0.5% of product price
+            }
+
+            // Calculate add-ons total
+            if (isset($data['add_ons']) && is_array($data['add_ons']) && count($data['add_ons']) > 0) {
+                $addOnsList = \App\Models\AddOn::whereIn('id', $data['add_ons'])
+                    ->where('is_active', true)
+                    ->get();
+                
+                foreach ($addOnsList as $addOn) {
+                    $addOnPrice = $addOn->price;
+                    // If price is 0, it might be calculated (like insurance)
+                    if ($addOnPrice == 0 && strtolower($addOn->title) == 'insurance') {
+                        $addOnPrice = round($productPrice * 0.005, 2);
+                    }
+                    $addOnsTotal += $addOnPrice;
+                    $addOns[] = [
+                        'id' => $addOn->id,
+                        'title' => $addOn->title,
+                        'price' => $addOnPrice,
+                        'quantity' => 1
+                    ];
+                }
+            }
+
+            $total = $productPrice + $installationFee + $materialCost + $deliveryFee + $inspectionFee + $insuranceFee + $addOnsTotal;
+
+            $invoice = [
+                'product_price' => $productPrice,
+                'installation_fee' => $installationFee,
+                'material_cost' => $materialCost,
+                'delivery_fee' => $deliveryFee,
+                'inspection_fee' => $inspectionFee,
+                'insurance_fee' => $insuranceFee,
+                'add_ons_total' => $addOnsTotal,
+                'add_ons' => $addOns,
+                'total' => $total,
+                'order_type' => 'buy_now',
+                'installer_choice' => $data['installer_choice'],
+                'note' => $data['installer_choice'] === 'troosolar' 
+                    ? 'Installation fees may change after site inspection. Any difference will be updated and shared with you for a one-off payment before installation.'
+                    : null,
+            ];
+
+            return ResponseHelper::success($invoice, 'Invoice calculated successfully');
+
+        } catch (Exception $e) {
+            Log::error('Checkout Error: ' . $e->getMessage());
+            return ResponseHelper::error('Failed to calculate invoice: ' . $e->getMessage(), 500);
+        }
+    }
+}

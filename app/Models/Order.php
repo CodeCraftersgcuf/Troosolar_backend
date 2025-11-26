@@ -21,6 +21,11 @@ class Order extends Model
         'mono_calculation_id',
         'product_id',   // ⬅️ new
         'bundle_id',    // ⬅️ new
+        'material_cost',
+        'delivery_fee',
+        'inspection_fee',
+        'insurance_fee',
+        'order_type',
     ];
     public function product()
     {
