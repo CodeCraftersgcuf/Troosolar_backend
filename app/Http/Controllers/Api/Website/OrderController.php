@@ -895,38 +895,44 @@ class OrderController extends Controller
         ];
 
         if ($bundle) {
-            // Get bundle items with products
-            $bundleItems = $bundle->bundleItems()->with('product.category')->get();
-            
-            $inverterTotal = 0;
-            $panelsTotal = 0;
-            $batteriesTotal = 0;
-            $inverterCount = 0;
-            $panelsCount = 0;
-            $batteriesCount = 0;
-            $inverterDesc = '';
-            $panelsDesc = '';
-            $batteriesDesc = '';
+            try {
+                // Get bundle items with products
+                $bundleItems = $bundle->bundleItems()->with('product.category')->get();
+                
+                $inverterTotal = 0;
+                $panelsTotal = 0;
+                $batteriesTotal = 0;
+                $inverterCount = 0;
+                $panelsCount = 0;
+                $batteriesCount = 0;
+                $inverterDesc = '';
+                $panelsDesc = '';
+                $batteriesDesc = '';
 
-            foreach ($bundleItems as $item) {
-                if ($item->product) {
-                    $categoryName = strtolower($item->product->category->title ?? '');
-                    $productPrice = $item->product->discount_price ?? $item->product->price ?? 0;
-                    
-                    if (strpos($categoryName, 'inverter') !== false) {
-                        $inverterTotal += $productPrice;
-                        $inverterCount++;
-                        $inverterDesc = $item->product->title;
-                    } elseif (strpos($categoryName, 'panel') !== false || strpos($categoryName, 'solar panel') !== false) {
-                        $panelsTotal += $productPrice;
-                        $panelsCount++;
-                        $panelsDesc = $item->product->title;
-                    } elseif (strpos($categoryName, 'battery') !== false || strpos($categoryName, 'batteries') !== false) {
-                        $batteriesTotal += $productPrice;
-                        $batteriesCount++;
-                        $batteriesDesc = $item->product->title;
+                foreach ($bundleItems as $item) {
+                    if ($item && $item->product) {
+                        $category = $item->product->category;
+                        $categoryName = $category ? strtolower($category->title ?? '') : '';
+                        $productPrice = $item->product->discount_price ?? $item->product->price ?? 0;
+                        
+                        if (strpos($categoryName, 'inverter') !== false) {
+                            $inverterTotal += $productPrice;
+                            $inverterCount++;
+                            $inverterDesc = $item->product->title ?? 'Solar Inverter';
+                        } elseif (strpos($categoryName, 'panel') !== false || strpos($categoryName, 'solar panel') !== false) {
+                            $panelsTotal += $productPrice;
+                            $panelsCount++;
+                            $panelsDesc = $item->product->title ?? 'Solar Panels';
+                        } elseif (strpos($categoryName, 'battery') !== false || strpos($categoryName, 'batteries') !== false) {
+                            $batteriesTotal += $productPrice;
+                            $batteriesCount++;
+                            $batteriesDesc = $item->product->title ?? 'Batteries';
+                        }
                     }
                 }
+            } catch (\Exception $e) {
+                Log::warning('Error processing bundle items: ' . $e->getMessage());
+                // Fall through to default breakdown
             }
 
             $breakdown['solar_inverter'] = [
@@ -945,34 +951,43 @@ class OrderController extends Controller
                 'description' => $batteriesDesc ?: 'Batteries'
             ];
         } elseif ($product) {
-            // Single product - estimate breakdown based on category
-            $categoryName = strtolower($product->category->title ?? '');
-            
-            if (strpos($categoryName, 'inverter') !== false) {
-                $breakdown['solar_inverter'] = [
-                    'quantity' => 1,
-                    'price' => round($totalPrice, 2),
-                    'description' => $product->title
-                ];
-            } elseif (strpos($categoryName, 'panel') !== false) {
-                $breakdown['solar_panels'] = [
-                    'quantity' => 1,
-                    'price' => round($totalPrice, 2),
-                    'description' => $product->title
-                ];
-            } elseif (strpos($categoryName, 'battery') !== false) {
-                $breakdown['batteries'] = [
-                    'quantity' => 1,
-                    'price' => round($totalPrice, 2),
-                    'description' => $product->title
-                ];
-            } else {
-                // Default breakdown percentages if category unknown
-                $breakdown['solar_inverter'] = ['quantity' => 1, 'price' => round($totalPrice * 0.40, 2), 'description' => 'Solar Inverter'];
-                $breakdown['solar_panels'] = ['quantity' => 1, 'price' => round($totalPrice * 0.35, 2), 'description' => 'Solar Panels'];
-                $breakdown['batteries'] = ['quantity' => 1, 'price' => round($totalPrice * 0.25, 2), 'description' => 'Batteries'];
+            try {
+                // Single product - estimate breakdown based on category
+                $category = $product->category;
+                $categoryName = $category ? strtolower($category->title ?? '') : '';
+                
+                if (strpos($categoryName, 'inverter') !== false) {
+                    $breakdown['solar_inverter'] = [
+                        'quantity' => 1,
+                        'price' => round($totalPrice, 2),
+                        'description' => $product->title ?? 'Solar Inverter'
+                    ];
+                } elseif (strpos($categoryName, 'panel') !== false) {
+                    $breakdown['solar_panels'] = [
+                        'quantity' => 1,
+                        'price' => round($totalPrice, 2),
+                        'description' => $product->title ?? 'Solar Panels'
+                    ];
+                } elseif (strpos($categoryName, 'battery') !== false) {
+                    $breakdown['batteries'] = [
+                        'quantity' => 1,
+                        'price' => round($totalPrice, 2),
+                        'description' => $product->title ?? 'Batteries'
+                    ];
+                } else {
+                    // Default breakdown percentages if category unknown
+                    $breakdown['solar_inverter'] = ['quantity' => 1, 'price' => round($totalPrice * 0.40, 2), 'description' => 'Solar Inverter'];
+                    $breakdown['solar_panels'] = ['quantity' => 1, 'price' => round($totalPrice * 0.35, 2), 'description' => 'Solar Panels'];
+                    $breakdown['batteries'] = ['quantity' => 1, 'price' => round($totalPrice * 0.25, 2), 'description' => 'Batteries'];
+                }
+            } catch (\Exception $e) {
+                Log::warning('Error processing product: ' . $e->getMessage());
+                // Fall through to default breakdown
             }
-        } else {
+        }
+        
+        // If breakdown is still empty or has zeros, use default percentages
+        if (($breakdown['solar_inverter']['price'] == 0 && $breakdown['solar_panels']['price'] == 0 && $breakdown['batteries']['price'] == 0) || (!$bundle && !$product)) {
             // If no product/bundle, use default percentages
             $breakdown['solar_inverter'] = ['quantity' => 1, 'price' => round($totalPrice * 0.40, 2), 'description' => 'Solar Inverter'];
             $breakdown['solar_panels'] = ['quantity' => 1, 'price' => round($totalPrice * 0.35, 2), 'description' => 'Solar Panels'];
@@ -1112,12 +1127,28 @@ class OrderController extends Controller
             $order = Order::with(['product.category', 'bundle.bundleItems.product.category'])
                 ->where('id', $id)
                 ->where('user_id', Auth::id())
-                ->firstOrFail();
+                ->first();
+
+            if (!$order) {
+                return ResponseHelper::error('Order not found', 404);
+            }
+
+            // Get product and bundle with proper null checks
+            $product = $order->product;
+            $bundle = $order->bundle;
+            
+            // Calculate total price for breakdown
+            $totalPrice = 0;
+            if (Schema::hasColumn('orders', 'product_price') && $order->product_price) {
+                $totalPrice = $order->product_price;
+            } else {
+                $totalPrice = $order->total_price ?? 0;
+            }
 
             $productBreakdown = $this->calculateProductBreakdown(
-                $order->product,
-                $order->bundle,
-                $order->product_price ?? $order->total_price
+                $product,
+                $bundle,
+                $totalPrice
             );
 
             return ResponseHelper::success([
@@ -1127,19 +1158,22 @@ class OrderController extends Controller
                     'solar_inverter' => $productBreakdown['solar_inverter'],
                     'solar_panels' => $productBreakdown['solar_panels'],
                     'batteries' => $productBreakdown['batteries'],
-                    'material_cost' => $order->material_cost ?? 0,
+                    'material_cost' => (Schema::hasColumn('orders', 'material_cost') ? ($order->material_cost ?? 0) : 0),
                     'installation_fee' => $order->installation_price ?? 0,
-                    'delivery_fee' => $order->delivery_fee ?? 0,
-                    'inspection_fee' => $order->inspection_fee ?? 0,
-                    'insurance_fee' => $order->insurance_fee ?? 0,
-                    'subtotal' => $order->product_price ?? 0,
-                    'total' => $order->total_price,
+                    'delivery_fee' => (Schema::hasColumn('orders', 'delivery_fee') ? ($order->delivery_fee ?? 0) : 0),
+                    'inspection_fee' => (Schema::hasColumn('orders', 'inspection_fee') ? ($order->inspection_fee ?? 0) : 0),
+                    'insurance_fee' => (Schema::hasColumn('orders', 'insurance_fee') ? ($order->insurance_fee ?? 0) : 0),
+                    'subtotal' => $totalPrice,
+                    'total' => $order->total_price ?? 0,
                 ],
             ], 'Invoice details retrieved successfully');
 
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            Log::error('Invoice Details Error - Order not found: ' . $e->getMessage());
+            return ResponseHelper::error('Order not found', 404);
         } catch (\Exception $e) {
-            Log::error('Invoice Details Error: ' . $e->getMessage());
-            return ResponseHelper::error('Failed to retrieve invoice details', 500);
+            Log::error('Invoice Details Error: ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString());
+            return ResponseHelper::error('Failed to retrieve invoice details: ' . $e->getMessage(), 500);
         }
     }
 }
