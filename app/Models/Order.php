@@ -26,6 +26,7 @@ class Order extends Model
         'inspection_fee',
         'insurance_fee',
         'order_type',
+        'audit_request_id',
     ];
     public function product()
     {
@@ -55,4 +56,9 @@ class Order extends Model
     public function monoCalculation() {
     return $this->belongsTo(MonoLoanCalculation::class, 'mono_calculation_id');
 }
+
+    public function auditRequest()
+    {
+        return $this->belongsTo(AuditRequest::class);
+    }
 }

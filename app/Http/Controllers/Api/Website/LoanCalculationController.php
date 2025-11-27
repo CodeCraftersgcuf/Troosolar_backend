@@ -102,15 +102,31 @@ public function store(LoanCalculationRequest $request)
         $downPayment = round($monthlyPayment * 0.25, 2);                       // as requested: payment * 0.25
         $totalAmount = round($monthlyPayment * $repaymentDuration, 2);         // equals principal with your formula
 
+        // Calculate additional fields for BNPL
+        $depositAmount = round($loanAmount * 0.30, 2); // 30% default deposit
+        $principal = $loanAmount - $depositAmount;
+        $totalInterest = round($principal * ($interestPercentageRate / 100) * $repaymentDuration, 2);
+        $monthlyRepayment = round(($principal + $totalInterest) / $repaymentDuration, 2);
+        $totalRepayment = round($principal + $totalInterest, 2);
+
+        $responseData = array_merge($loan->toArray(), [
+            'interest_rate' => $interestPercentageRate,
+            'down_payment'  => $downPayment,
+            'total_amount'  => $totalAmount,
+            'deposit_amount' => $depositAmount,
+            'principal' => $principal,
+            'total_interest' => $totalInterest,
+            'monthly_repayment' => $monthlyRepayment,
+            'total_repayment' => $totalRepayment,
+        ]);
+
+        // Return response with ID accessible at both levels for frontend compatibility
         return response()->json([
             'status'         => 'success',
-            'message'        => 'Loan calculated successfully',
+            'message'        => 'Loan calculation created successfully',
             'repayment_date' => $repaymentDate,
-            'data'           => array_merge($loan->toArray(), [
-                'interest_rate' => $interestPercentageRate,
-                'down_payment'  => $downPayment,
-                'total_amount'  => $totalAmount,
-            ]),
+            'id'             => $loan->id, // Direct access for frontend
+            'data'           => $responseData,
         ]);
 
     } catch (\Throwable $e) {

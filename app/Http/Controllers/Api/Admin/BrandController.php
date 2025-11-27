@@ -128,13 +128,19 @@ class BrandController extends Controller
     public function getByCategory($categoryId)
 {
     try {
-        $brands = Brand::where('category_id', $categoryId)->get();
-
-        if ($brands->isEmpty()) {
-            return ResponseHelper::error('No brands found for this category.', 404);
+        // Verify category exists
+        $category = \App\Models\Category::find($categoryId);
+        if (!$category) {
+            return ResponseHelper::error('Category not found.', 404);
         }
 
-        return ResponseHelper::success($brands, 'Brands fetched by category.');
+        $brands = Brand::where('category_id', $categoryId)->get();
+
+        // Return empty array instead of error if no brands found
+        return ResponseHelper::success($brands, $brands->isEmpty() 
+            ? 'No brands found for this category.' 
+            : 'Brands fetched by category.');
+
     } catch (Exception $e) {
         \Log::error('Error fetching brands by category: ' . $e->getMessage());
         return ResponseHelper::error('Failed to fetch brands by category.', 500);

@@ -19,7 +19,8 @@ use App\Http\Controllers\Api\Admin\{
     NotificationController,
     LoanDistributedController,
     InterestPercentageController,
-    AnalyticController
+    AnalyticController,
+    BNPLAdminController
 };
 use App\Http\Controllers\Api\Website\{
     CartController,
@@ -35,10 +36,11 @@ use App\Http\Controllers\Api\Website\{
     LoanApplicationController,
     LoanCalculationController,
     LoanInstallmentController,
-  MonoLoanCalculationController,
+    MonoLoanCalculationController,
     ConfigurationController,
     BNPLController,
-    CalendarController
+    CalendarController,
+    AuditController
 };
 use App\Http\Controllers\InstallmentController;
 use App\Http\Controllers\KycController;
@@ -86,6 +88,12 @@ Route::post('/reset-password', [UserController::class, 'resetPassword']);
 Route::get('/config/customer-types', [ConfigurationController::class, 'getCustomerTypes']);
 Route::get('/config/audit-types', [ConfigurationController::class, 'getAuditTypes']);
 Route::get('/config/states', [ConfigurationController::class, 'getStates']);
+Route::get('/config/loan-configuration', [ConfigurationController::class, 'getLoanConfiguration']);
+Route::get('/config/add-ons', [ConfigurationController::class, 'getAddOns']);
+Route::get('/config/delivery-locations', [ConfigurationController::class, 'getDeliveryLocations']);
+
+// Public bundles endpoint (for Buy Now flow)
+Route::get('/bundles', [\App\Http\Controllers\Api\Website\BundleController::class, 'index']);
 
 // ================= PROTECTED ROUTES =================
 Route::middleware('auth:sanctum')->group(function () {
@@ -170,8 +178,15 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     Route::post('/bnpl/guarantor/upload', [BNPLController::class, 'uploadGuarantorForm']);
     Route::post('/bnpl/counteroffer/accept', [BNPLController::class, 'acceptCounterOffer']);
     
+    // Audit Request endpoints
+    Route::post('/audit/request', [AuditController::class, 'submit']);
+    Route::get('/audit/request/{id}', [AuditController::class, 'getStatus']);
+    Route::get('/audit/requests', [AuditController::class, 'index']);
+    
     // Buy Now Flow endpoints
     Route::post('/orders/checkout', [OrderController::class, 'checkout']);
+    Route::get('/orders/{id}/summary', [OrderController::class, 'getOrderSummary']);
+    Route::get('/orders/{id}/invoice-details', [OrderController::class, 'getInvoiceDetails']);
     
     // Calendar/Scheduling endpoints
     Route::get('/calendar/slots', [CalendarController::class, 'getSlots']);
@@ -316,4 +331,29 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
 
     Route::get('/full-loan-detail/{loanStatusId}', [LoanStatusController::class, 'fullLoanDetails']);
     //use the following for the single loan detail modal
+
+    // ================= BNPL ADMIN ROUTES =================
+    Route::prefix('admin/bnpl')->group(function () {
+        Route::get('/applications', [BNPLAdminController::class, 'index']);
+        Route::get('/applications/{id}', [BNPLAdminController::class, 'show']);
+        Route::put('/applications/{id}/status', [BNPLAdminController::class, 'updateStatus']);
+        Route::get('/guarantors', [BNPLAdminController::class, 'getGuarantors']);
+        Route::put('/guarantors/{id}/status', [BNPLAdminController::class, 'updateGuarantorStatus']);
+    });
+
+    // ================= AUDIT ADMIN ROUTES =================
+    Route::prefix('admin/audit')->group(function () {
+        Route::get('/requests', [\App\Http\Controllers\Api\Admin\AuditAdminController::class, 'index']);
+        Route::get('/requests/{id}', [\App\Http\Controllers\Api\Admin\AuditAdminController::class, 'show']);
+        Route::put('/requests/{id}/status', [\App\Http\Controllers\Api\Admin\AuditAdminController::class, 'updateStatus']);
+    });
+
+    // ================= BUY NOW ADMIN ROUTES =================
+    Route::prefix('admin/orders')->group(function () {
+        Route::get('/buy-now', [OrderController::class, 'getBuyNowOrders']);
+        Route::get('/buy-now/{id}', [OrderController::class, 'getBuyNowOrder']);
+        Route::put('/buy-now/{id}/status', [OrderController::class, 'updateBuyNowOrderStatus']);
+        Route::get('/bnpl', [OrderController::class, 'getBnplOrders']);
+        Route::get('/bnpl/{id}', [OrderController::class, 'getBnplOrder']);
+    });
 });
