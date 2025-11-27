@@ -19,6 +19,7 @@ use App\Models\Transaction;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Exception;
@@ -556,16 +557,25 @@ class OrderController extends Controller
                 // Calculate audit fee based on property details
                 $auditFee = $this->calculateAuditFee($auditRequest, $data);
                 
-                // Create audit order
-                $order = Order::create([
+                // Prepare audit order data - check if columns exist
+                $auditOrderData = [
                     'user_id' => Auth::id(),
-                    'order_type' => 'audit_only',
                     'total_price' => $auditFee,
                     'payment_status' => 'pending',
                     'order_status' => 'pending',
                     'payment_method' => 'direct',
-                    'audit_request_id' => $auditRequestId,
-                ]);
+                ];
+
+                // Add optional columns only if they exist
+                if (\Illuminate\Support\Facades\Schema::hasColumn('orders', 'order_type')) {
+                    $auditOrderData['order_type'] = 'audit_only';
+                }
+                if (\Illuminate\Support\Facades\Schema::hasColumn('orders', 'audit_request_id') && $auditRequestId) {
+                    $auditOrderData['audit_request_id'] = $auditRequestId;
+                }
+
+                // Create audit order
+                $order = Order::create($auditOrderData);
                 
                 // Link order to audit request
                 if ($auditRequestId) {
@@ -676,23 +686,36 @@ class OrderController extends Controller
             // Calculate product breakdown (inverter, panels, batteries)
             $productBreakdown = $this->calculateProductBreakdown($product, $bundle, $productPrice);
 
-            // Create order record for Buy Now
-            $order = Order::create([
+            // Prepare order data - check if columns exist before including them
+            $orderData = [
                 'user_id' => Auth::id(),
-                'order_type' => 'buy_now',
                 'product_id' => $productId,
                 'bundle_id' => $bundleId,
                 'total_price' => $total,
+                'payment_status' => 'pending',
+                'order_status' => 'pending',
+                'payment_method' => 'direct',
+            ];
+
+            // Add optional columns only if they exist in the database
+            $columnsToCheck = [
+                'order_type' => 'buy_now',
                 'product_price' => $productPrice,
                 'installation_price' => $installationFee,
                 'material_cost' => $materialCost,
                 'delivery_fee' => $deliveryFee,
                 'inspection_fee' => $inspectionFee,
                 'insurance_fee' => $insuranceFee,
-                'payment_status' => 'pending',
-                'order_status' => 'pending',
-                'payment_method' => 'direct',
-            ]);
+            ];
+
+            foreach ($columnsToCheck as $column => $value) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('orders', $column)) {
+                    $orderData[$column] = $value;
+                }
+            }
+
+            // Create order record for Buy Now
+            $order = Order::create($orderData);
 
             $invoice = [
                 'order_id' => $order->id,
