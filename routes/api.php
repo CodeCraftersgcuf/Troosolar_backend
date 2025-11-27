@@ -35,7 +35,7 @@ use App\Http\Controllers\Api\Website\{
     LoanApplicationController,
     LoanCalculationController,
     LoanInstallmentController,
-    MonoLoanCalculationController,
+  MonoLoanCalculationController,
     ConfigurationController,
     BNPLController,
     CalendarController
