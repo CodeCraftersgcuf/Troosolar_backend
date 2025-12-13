@@ -41,29 +41,99 @@ public function index()
     try {
         $data = $request->validated();
 
-         if (User::where('email', $data['email'])->exists()) {
+        // Validate required fields
+        if (empty($data['email'])) {
+            return ResponseHelper::error('Email is required', 422);
+        }
+
+        if (empty($data['password'])) {
+            return ResponseHelper::error('Password is required', 422);
+        }
+
+        if (empty($data['first_name'])) {
+            return ResponseHelper::error('First name is required', 422);
+        }
+
+        // Check if email already exists
+        if (User::where('email', $data['email'])->exists()) {
             return ResponseHelper::error('Email is already registered', 409);
         }
 
+        // Handle profile picture upload
         if (isset($data['profile_picture']) && $data['profile_picture']->isValid()) {
-            $img = $data['profile_picture'];
-            $ext = $img->getClientOriginalExtension();
-            $imageName = time() . '.' . $ext;
-            $img->move(public_path('/users'), $imageName);
-            $data['profile_picture'] = 'users/' . $imageName;
+            try {
+                $uploadPath = public_path('/users');
+                // Create directory if it doesn't exist
+                if (!file_exists($uploadPath)) {
+                    mkdir($uploadPath, 0755, true);
+                }
 
+                $img = $data['profile_picture'];
+                $ext = $img->getClientOriginalExtension();
+                $imageName = time() . '_' . Str::random(10) . '.' . $ext;
+                $img->move($uploadPath, $imageName);
+                $data['profile_picture'] = 'users/' . $imageName;
+            } catch (\Exception $e) {
+                Log::warning('Profile picture upload failed: ' . $e->getMessage());
+                // Continue without profile picture
+                unset($data['profile_picture']);
+            }
         }
 
+        // Note: Password is auto-hashed by User model's 'hashed' cast
+        // So we don't need to manually hash it here
+
+        // Generate user code and OTP
         $data['user_code'] = Str::lower($data['first_name']) . rand(100, 999);
         $data['otp'] = rand(10000, 99999);
+        
+        // Set default values
+        $data['role'] = $data['role'] ?? 'user'; // Default to 'user' if role not provided
+        $data['is_active'] = $data['is_active'] ?? true;
+        $data['is_verified'] = $data['is_verified'] ?? false;
+
+        // Create user
         $user = User::create($data);
 
-        $this->createWallet($user);
-        Mail::to($user->email)->send(new SendOtpMail($user->otp, $user));
+        if (!$user) {
+            Log::error('User creation failed', ['data' => $data]);
+            return ResponseHelper::error('Failed to create user account', 500);
+        }
+
+        // Create wallet for user
+        try {
+            $this->createWallet($user);
+        } catch (\Exception $e) {
+            Log::error('Wallet creation failed for user: ' . $user->id, ['error' => $e->getMessage()]);
+            // Continue even if wallet creation fails - user is already created
+        }
+
+        // Send OTP email
+        try {
+            Mail::to($user->email)->send(new SendOtpMail($user->otp, $user));
+        } catch (\Exception $e) {
+            Log::warning('OTP email sending failed for user: ' . $user->id, ['error' => $e->getMessage()]);
+            // Continue even if email fails - user is registered
+        }
+
+        // Hide sensitive data from response
+        $user->makeHidden(['password', 'otp']);
 
         return ResponseHelper::success($user, 'User registered successfully', 201);
-    } catch (Exception $ex) {
-        return ResponseHelper::error('User is not registered', 500);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        Log::error('Registration validation error', ['errors' => $e->errors()]);
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Validation failed',
+            'errors' => $e->errors()
+        ], 422);
+    } catch (\Exception $ex) {
+        Log::error('Registration error: ' . $ex->getMessage(), [
+            'trace' => $ex->getTraceAsString(),
+            'file' => $ex->getFile(),
+            'line' => $ex->getLine()
+        ]);
+        return ResponseHelper::error('Registration failed: ' . $ex->getMessage(), 500);
     }
 }
 

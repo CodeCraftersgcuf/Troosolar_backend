@@ -23,20 +23,24 @@ class UserRequest extends FormRequest
      */
     public function rules(): array
     {
-         return [
-        'first_name'       => 'nullable|string',
-        'sur_name'         => 'nullable|string',
-        'email'            => 'nullable|email',
-        'password'         => 'nullable|string|min:6', // Adjust min length as needed
-        'phone'            => 'nullable|string',
+        // Check if this is a registration request (POST to /register)
+        $path = $this->path();
+        $isRegistration = $this->isMethod('post') && (str_contains($path, 'register'));
+        
+        return [
+        'first_name'       => $isRegistration ? 'required|string|max:255' : 'nullable|string|max:255',
+        'sur_name'         => 'nullable|string|max:255',
+        'email'            => $isRegistration ? 'required|email|unique:users,email|max:255' : 'nullable|email|max:255',
+        'password'         => $isRegistration ? 'required|string|min:6|max:255' : 'nullable|string|min:6|max:255',
+        'phone'            => 'nullable|string|max:20',
         'profile_picture'  => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-        'refferal_code'    => 'nullable|string',
-        'user_code'        => 'nullable|string',
-        'role'             => 'nullable', // Adjust allowed roles
+        'refferal_code'    => 'nullable|string|max:255',
+        'user_code'        => 'nullable|string|max:255',
+        'role'             => 'nullable|string|max:255',
         'is_verified'      => 'nullable|boolean',
         'is_active'        => 'nullable|boolean',
-        'otp'              => 'nullable|string',
-        'bvn'              => 'nullable|string',
+        'otp'              => 'nullable|string|max:10',
+        'bvn'              => 'nullable|string|max:20',
     ];
     }
     
