@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Api\Website;
 use App\Http\Controllers\Controller;
 use App\Helpers\ResponseHelper;
 use App\Models\AuditRequest;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class AuditController extends Controller
@@ -39,27 +42,53 @@ class AuditController extends Controller
                 return ResponseHelper::error('User not authenticated', 401);
             }
 
+            // Verify user exists in database (foreign key constraint)
+            $user = User::find($userId);
+            if (!$user) {
+                Log::error('User not found for audit request', ['user_id' => $userId]);
+                return ResponseHelper::error('User account not found', 404);
+            }
+
+            // Check if audit_requests table exists
+            if (!Schema::hasTable('audit_requests')) {
+                Log::error('audit_requests table does not exist');
+                return ResponseHelper::error('Database table not found. Please run migrations.', 500);
+            }
+
             // Set status to pending for all audit types initially
             $status = 'pending';
 
-            // Prepare data for creation
+            // Prepare data for creation - ensure proper types
             $auditData = [
-                'user_id' => $userId,
-                'audit_type' => $data['audit_type'],
-                'customer_type' => $data['customer_type'] ?? null,
-                'property_state' => $data['property_state'] ?? null,
-                'property_address' => $data['property_address'] ?? null,
-                'property_landmark' => $data['property_landmark'] ?? null,
-                'property_floors' => $data['property_floors'] ?? null,
-                'property_rooms' => $data['property_rooms'] ?? null,
-                'is_gated_estate' => $data['is_gated_estate'] ?? false,
-                'estate_name' => $data['estate_name'] ?? null,
-                'estate_address' => $data['estate_address'] ?? null,
-                'status' => $status,
+                'user_id' => (int) $userId,
+                'audit_type' => (string) $data['audit_type'],
+                'status' => (string) $status,
+                'customer_type' => !empty($data['customer_type']) ? (string) $data['customer_type'] : null,
+                'property_state' => !empty($data['property_state']) ? (string) $data['property_state'] : null,
+                'property_address' => !empty($data['property_address']) ? (string) $data['property_address'] : null,
+                'property_landmark' => !empty($data['property_landmark']) ? (string) $data['property_landmark'] : null,
+                'property_floors' => isset($data['property_floors']) && $data['property_floors'] !== '' ? (int) $data['property_floors'] : null,
+                'property_rooms' => isset($data['property_rooms']) && $data['property_rooms'] !== '' ? (int) $data['property_rooms'] : null,
+                'is_gated_estate' => filter_var($data['is_gated_estate'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'estate_name' => !empty($data['estate_name']) ? (string) $data['estate_name'] : null,
+                'estate_address' => !empty($data['estate_address']) ? (string) $data['estate_address'] : null,
             ];
 
-            // Create audit request
-            $auditRequest = AuditRequest::create($auditData);
+            // Log the data being inserted for debugging
+            Log::info('Creating audit request', [
+                'user_id' => $userId,
+                'audit_data' => $auditData
+            ]);
+
+            // Create audit request using DB transaction for safety
+            try {
+                DB::beginTransaction();
+                $auditRequest = AuditRequest::create($auditData);
+                DB::commit();
+            } catch (\Exception $createException) {
+                DB::rollBack();
+                throw $createException; // Re-throw to be caught by outer catch
+            }
 
             if (!$auditRequest) {
                 Log::error('Audit request creation returned null', ['data' => $auditData]);
@@ -86,14 +115,33 @@ class AuditController extends Controller
                 'errors' => $e->errors()
             ], 422);
         } catch (\Illuminate\Database\QueryException $e) {
-            Log::error('Database error submitting audit request: ' . $e->getMessage(), [
+            $errorCode = $e->getCode();
+            $errorMessage = $e->getMessage();
+            
+            Log::error('Database error submitting audit request: ' . $errorMessage, [
+                'error_code' => $errorCode,
                 'trace' => $e->getTraceAsString(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
                 'sql' => $e->getSql() ?? 'N/A',
                 'bindings' => $e->getBindings() ?? []
             ]);
-            return ResponseHelper::error('Database error: Failed to submit audit request', 500);
+            
+            // Provide more specific error messages
+            if (strpos($errorMessage, 'foreign key constraint') !== false) {
+                if (strpos($errorMessage, 'user_id') !== false) {
+                    return ResponseHelper::error('Invalid user account. Please log in again.', 400);
+                } elseif (strpos($errorMessage, 'order_id') !== false) {
+                    return ResponseHelper::error('Invalid order reference.', 400);
+                }
+                return ResponseHelper::error('Database constraint violation. Please check your data.', 400);
+            }
+            
+            if (strpos($errorMessage, "doesn't exist") !== false || strpos($errorMessage, 'Unknown column') !== false) {
+                return ResponseHelper::error('Database schema error. Please contact support.', 500);
+            }
+            
+            return ResponseHelper::error('Database error: ' . $errorMessage, 500);
         } catch (\Exception $e) {
             Log::error('Error submitting audit request: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
