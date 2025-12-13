@@ -95,6 +95,9 @@ Route::get('/config/delivery-locations', [ConfigurationController::class, 'getDe
 // Public bundles endpoint (for Buy Now flow)
 Route::get('/bundles', [\App\Http\Controllers\Api\Website\BundleController::class, 'index']);
 
+// Public cart access via token (from email links - allows access before login)
+Route::get('/cart/access/{token}', [\App\Http\Controllers\Api\Website\CartController::class, 'accessCartViaToken']);
+
 // ================= PROTECTED ROUTES =================
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -314,6 +317,14 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     Route::get('admin/analytics', [AnalyticController::class, 'index']);
     Route::get('/all-users', [UserController::class, 'allUsers']);
 
+    // ================= REFERRAL ADMIN ROUTES =================
+    Route::prefix('admin/referral')->group(function () {
+        Route::get('settings', [\App\Http\Controllers\Api\Admin\ReferralAdminController::class, 'getSettings']);
+        Route::put('settings', [\App\Http\Controllers\Api\Admin\ReferralAdminController::class, 'updateSettings']);
+        Route::get('list', [\App\Http\Controllers\Api\Admin\ReferralAdminController::class, 'getReferralList']);
+        Route::get('user/{userId}', [\App\Http\Controllers\Api\Admin\ReferralAdminController::class, 'getUserReferralDetails']);
+    });
+
     //new user creations
 
     Route::get('admin/users/with-loans', [UserController::class, 'usersWithLoans']);
@@ -343,6 +354,7 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
 
     // ================= AUDIT ADMIN ROUTES =================
     Route::prefix('admin/audit')->group(function () {
+        Route::get('/users-with-requests', [\App\Http\Controllers\Api\Admin\AuditAdminController::class, 'getUsersWithAuditRequests']);
         Route::get('/requests', [\App\Http\Controllers\Api\Admin\AuditAdminController::class, 'index']);
         Route::get('/requests/{id}', [\App\Http\Controllers\Api\Admin\AuditAdminController::class, 'show']);
         Route::put('/requests/{id}/status', [\App\Http\Controllers\Api\Admin\AuditAdminController::class, 'updateStatus']);
@@ -356,4 +368,19 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
         Route::get('/bnpl', [OrderController::class, 'getBnplOrders']);
         Route::get('/bnpl/{id}', [OrderController::class, 'getBnplOrder']);
     });
+
+    // ================= ADMIN CUSTOM ORDER ROUTES =================
+    Route::prefix('admin/cart')->group(function () {
+        Route::get('/users-with-carts', [\App\Http\Controllers\Api\Admin\AdminCartController::class, 'getUsersWithCarts']);
+        Route::post('/create-custom-order', [\App\Http\Controllers\Api\Admin\AdminCartController::class, 'createCustomOrder']);
+        Route::get('/products', [\App\Http\Controllers\Api\Admin\AdminCartController::class, 'getProducts']);
+        Route::get('/user/{userId}', [\App\Http\Controllers\Api\Admin\AdminCartController::class, 'getUserCart']);
+        Route::delete('/user/{userId}/item/{itemId}', [\App\Http\Controllers\Api\Admin\AdminCartController::class, 'removeCartItem']);
+        Route::delete('/user/{userId}/clear', [\App\Http\Controllers\Api\Admin\AdminCartController::class, 'clearUserCart']);
+        Route::post('/resend-email/{userId}', [\App\Http\Controllers\Api\Admin\AdminCartController::class, 'resendCartEmail']);
+    });
+
+    // ================= USER CART ACCESS VIA TOKEN =================
+    // Note: This route is inside auth middleware but should allow public access
+    // Consider moving outside auth middleware if users need to access before login
 });

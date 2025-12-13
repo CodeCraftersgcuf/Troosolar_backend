@@ -303,4 +303,40 @@ class CartController extends Controller
             return ResponseHelper::error('Failed to clear cart', 500);
         }
     }
+
+    /**
+     * Access cart via token (from email link)
+     * GET /api/cart/access/{token}
+     */
+    public function accessCartViaToken($token)
+    {
+        try {
+            $user = \App\Models\User::where('cart_access_token', $token)->first();
+
+            if (!$user) {
+                return ResponseHelper::error('Invalid or expired cart link', 404);
+            }
+
+            $cartItems = CartItem::with('itemable')
+                ->where('user_id', $user->id)
+                ->get();
+
+            return ResponseHelper::success([
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->first_name . ' ' . $user->sur_name,
+                    'email' => $user->email,
+                ],
+                'cart_items' => $cartItems,
+                'requires_login' => !Auth::check() || Auth::id() !== $user->id,
+                'message' => Auth::check() && Auth::id() === $user->id 
+                    ? 'Cart accessed successfully' 
+                    : 'Please login to proceed with checkout',
+            ], 'Cart accessed successfully');
+
+        } catch (Exception $e) {
+            Log::error('Error accessing cart via token: ' . $e->getMessage());
+            return ResponseHelper::error('Failed to access cart', 500);
+        }
+    }
 }

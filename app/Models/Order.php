@@ -60,5 +60,5 @@ class Order extends Model
     public function auditRequest()
     {
         return $this->belongsTo(AuditRequest::class);
-    }
+}
 }

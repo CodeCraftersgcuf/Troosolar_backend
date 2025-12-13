@@ -5,13 +5,162 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Helpers\ResponseHelper;
 use App\Models\AuditRequest;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Exception;
 
 class AuditAdminController extends Controller
 {
+    /**
+     * Get all users who have made audit requests
+     * GET /api/admin/audit/users-with-requests
+     */
+    public function getUsersWithAuditRequests(Request $request)
+    {
+        try {
+            // Get users who have audit requests with aggregated data
+            $query = User::select([
+                'users.id',
+                'users.first_name',
+                'users.sur_name',
+                'users.email',
+                'users.phone',
+                'users.created_at',
+                DB::raw('COUNT(audit_requests.id) as audit_request_count'),
+                DB::raw('SUM(CASE WHEN audit_requests.status = "pending" THEN 1 ELSE 0 END) as pending_count'),
+                DB::raw('SUM(CASE WHEN audit_requests.status = "approved" THEN 1 ELSE 0 END) as approved_count'),
+                DB::raw('SUM(CASE WHEN audit_requests.status = "rejected" THEN 1 ELSE 0 END) as rejected_count'),
+                DB::raw('SUM(CASE WHEN audit_requests.status = "completed" THEN 1 ELSE 0 END) as completed_count'),
+                DB::raw('MAX(audit_requests.created_at) as last_audit_request_date'),
+            ])
+            ->leftJoin('audit_requests', 'audit_requests.user_id', '=', 'users.id')
+            ->groupBy('users.id', 'users.first_name', 'users.sur_name', 'users.email', 'users.phone', 'users.created_at')
+            ->havingRaw('COUNT(audit_requests.id) > 0'); // Only users with audit requests
+
+            // Search functionality
+            if ($request->has('search') && $request->search) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('users.first_name', 'like', "%{$search}%")
+                      ->orWhere('users.sur_name', 'like', "%{$search}%")
+                      ->orWhere('users.email', 'like', "%{$search}%")
+                      ->orWhere('users.phone', 'like', "%{$search}%");
+                });
+            }
+
+            // Filter by audit type
+            if ($request->has('audit_type')) {
+                $auditType = $request->audit_type;
+                $query->whereExists(function ($q) use ($auditType) {
+                    $q->select(DB::raw(1))
+                      ->from('audit_requests')
+                      ->whereColumn('audit_requests.user_id', 'users.id')
+                      ->where('audit_requests.audit_type', $auditType);
+                });
+            }
+
+            // Filter by status
+            if ($request->has('has_pending')) {
+                $query->havingRaw('SUM(CASE WHEN audit_requests.status = "pending" THEN 1 ELSE 0 END) > 0');
+            }
+
+            // Sort functionality
+            $sortBy = $request->get('sort_by', 'last_audit_request_date');
+            $sortOrder = $request->get('sort_order', 'desc');
+            
+            $allowedSorts = ['name', 'email', 'audit_request_count', 'last_audit_request_date', 'created_at'];
+            if (!in_array($sortBy, $allowedSorts)) {
+                $sortBy = 'last_audit_request_date';
+            }
+
+            if ($sortBy === 'name') {
+                $query->orderBy('users.first_name', $sortOrder)
+                      ->orderBy('users.sur_name', $sortOrder);
+            } elseif ($sortBy === 'email') {
+                $query->orderBy('users.email', $sortOrder);
+            } elseif ($sortBy === 'audit_request_count') {
+                $query->orderBy('audit_request_count', $sortOrder);
+            } elseif ($sortBy === 'last_audit_request_date') {
+                $query->orderBy('last_audit_request_date', $sortOrder);
+            } else {
+                $query->orderBy('users.created_at', $sortOrder);
+            }
+
+            // Pagination
+            $perPage = $request->get('per_page', 15);
+            $users = $query->paginate($perPage);
+
+            // Get all user IDs for batch loading audit requests
+            $userIds = $users->pluck('id');
+            
+            // Batch load audit requests for all users
+            $allAuditRequests = AuditRequest::whereIn('user_id', $userIds)
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->groupBy('user_id');
+
+            // Format response
+            $formattedData = $users->getCollection()->map(function ($user) use ($allAuditRequests) {
+                // Get audit requests for this user
+                $auditRequests = $allAuditRequests->get($user->id, collect());
+
+                // Format audit requests
+                $requests = $auditRequests->map(function ($request) {
+                    return [
+                        'id' => $request->id,
+                        'audit_type' => $request->audit_type,
+                        'customer_type' => $request->customer_type,
+                        'status' => $request->status,
+                        'property_state' => $request->property_state,
+                        'property_address' => $request->property_address,
+                        'property_floors' => $request->property_floors,
+                        'property_rooms' => $request->property_rooms,
+                        'is_gated_estate' => $request->is_gated_estate,
+                        'has_property_details' => !empty($request->property_address), // Check if user provided data
+                        'order_id' => $request->order_id,
+                        'created_at' => $request->created_at ? $request->created_at->format('Y-m-d H:i:s') : null,
+                    ];
+                })->values();
+
+                return [
+                    'id' => $user->id,
+                    'name' => trim(($user->first_name ?? '') . ' ' . ($user->sur_name ?? '')),
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'audit_request_count' => (int) $user->audit_request_count,
+                    'pending_count' => (int) $user->pending_count,
+                    'approved_count' => (int) $user->approved_count,
+                    'rejected_count' => (int) $user->rejected_count,
+                    'completed_count' => (int) $user->completed_count,
+                    'last_audit_request_date' => $user->last_audit_request_date ? date('Y-m-d H:i:s', strtotime($user->last_audit_request_date)) : null,
+                    'user_created_at' => $user->created_at ? $user->created_at->format('Y-m-d H:i:s') : null,
+                    'audit_requests' => $requests,
+                ];
+            });
+
+            return ResponseHelper::success([
+                'data' => $formattedData,
+                'pagination' => [
+                    'current_page' => $users->currentPage(),
+                    'last_page' => $users->lastPage(),
+                    'per_page' => $users->perPage(),
+                    'total' => $users->total(),
+                    'from' => $users->firstItem(),
+                    'to' => $users->lastItem(),
+                ],
+            ], 'Users with audit requests retrieved successfully');
+
+        } catch (Exception $e) {
+            Log::error('Error fetching users with audit requests: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            return ResponseHelper::error('Failed to retrieve users with audit requests: ' . $e->getMessage(), 500);
+        }
+    }
+
     /**
      * Get all audit requests
      * GET /api/admin/audit/requests

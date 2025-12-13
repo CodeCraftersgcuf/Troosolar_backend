@@ -30,7 +30,8 @@ class User extends Authenticatable
         'is_verified',
         'is_active',
         'otp',
-        'bvn'
+        'bvn',
+        'cart_access_token'
     ];
 
     public function wallet()
@@ -72,6 +73,23 @@ public function activitys()
 public function loanApplications()
 {
     return $this->hasMany(LoanApplication::class);
+}
+
+// orders
+public function orders()
+{
+    return $this->hasMany(Order::class);
+}
+
+// referral relationships
+public function referredUsers()
+{
+    return $this->hasMany(User::class, 'refferal_code', 'user_code');
+}
+
+public function referrer()
+{
+    return $this->belongsTo(User::class, 'refferal_code', 'user_code');
 }
 
     /**

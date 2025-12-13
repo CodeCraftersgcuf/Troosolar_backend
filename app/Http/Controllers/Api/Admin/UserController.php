@@ -55,7 +55,7 @@ public function index()
         }
 
         // Check if email already exists
-        if (User::where('email', $data['email'])->exists()) {
+         if (User::where('email', $data['email'])->exists()) {
             return ResponseHelper::error('Email is already registered', 409);
         }
 
@@ -68,11 +68,11 @@ public function index()
                     mkdir($uploadPath, 0755, true);
                 }
 
-                $img = $data['profile_picture'];
-                $ext = $img->getClientOriginalExtension();
+            $img = $data['profile_picture'];
+            $ext = $img->getClientOriginalExtension();
                 $imageName = time() . '_' . Str::random(10) . '.' . $ext;
                 $img->move($uploadPath, $imageName);
-                $data['profile_picture'] = 'users/' . $imageName;
+            $data['profile_picture'] = 'users/' . $imageName;
             } catch (\Exception $e) {
                 Log::warning('Profile picture upload failed: ' . $e->getMessage());
                 // Continue without profile picture
@@ -102,7 +102,7 @@ public function index()
 
         // Create wallet for user
         try {
-            $this->createWallet($user);
+        $this->createWallet($user);
         } catch (\Exception $e) {
             Log::error('Wallet creation failed for user: ' . $user->id, ['error' => $e->getMessage()]);
             // Continue even if wallet creation fails - user is already created
@@ -110,7 +110,7 @@ public function index()
 
         // Send OTP email
         try {
-            Mail::to($user->email)->send(new SendOtpMail($user->otp, $user));
+        Mail::to($user->email)->send(new SendOtpMail($user->otp, $user));
         } catch (\Exception $e) {
             Log::warning('OTP email sending failed for user: ' . $user->id, ['error' => $e->getMessage()]);
             // Continue even if email fails - user is registered

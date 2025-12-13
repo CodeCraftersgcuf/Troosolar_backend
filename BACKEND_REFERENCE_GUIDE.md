@@ -763,5 +763,106 @@ PUT    /api/admin/orders/buy-now/{id}/status
 
 ---
 
+---
+
+## 🛒 Admin Custom Order Management
+
+### Overview
+Admin can create custom orders for users by adding products/bundles to their cart and sending email links.
+
+### Key Endpoints
+```
+POST   /api/admin/cart/create-custom-order    # Create custom order & add to user cart
+GET    /api/admin/cart/products               # Get products/bundles for selection
+GET    /api/admin/cart/user/{userId}          # Get user's cart
+DELETE /api/admin/cart/user/{userId}/item/{itemId} # Remove item from cart
+DELETE /api/admin/cart/user/{userId}/clear    # Clear user's cart
+POST   /api/admin/cart/resend-email/{userId}  # Resend cart link email
+GET    /api/cart/access/{token}               # Access cart via email token
+```
+
+### Workflow
+1. Admin selects user
+2. Admin selects products/bundles
+3. Admin chooses order type (Buy Now/BNPL)
+4. Items added to user's cart
+5. Email sent with cart link
+6. User clicks link → logs in → sees cart → proceeds to checkout
+
+### Models
+- Uses existing `CartItem` model with polymorphic `itemable` relationship
+- Stores `cart_access_token` in `users` table for secure link access
+
+---
+
+## 📊 Analytics System
+
+### Analytics Endpoint
+```
+GET    /api/admin/analytics?period={period}  # Get comprehensive analytics
+```
+
+### Time Periods
+- `all_time` - All data from beginning
+- `daily` - Today's data
+- `weekly` - Current week
+- `monthly` - Current month
+- `yearly` - Current year
+
+### Metrics Provided
+- **General:** Users, Orders, Revenue, Deposits, Withdrawals, Bounce Rate
+- **Financial:** Loans, Approvals, Disbursements, Defaults, Repayments
+- **Revenue:** By Product, Fees, Growth Rate, Interest Earned
+
+### Data Sources
+- `users` - User metrics
+- `orders` - Revenue and order metrics
+- `transactions` - Deposit metrics
+- `withdraw_requests` - Withdrawal metrics
+- `loan_applications` - Loan metrics
+- `loan_installments` - Repayment metrics
+- `order_items` - Product sales metrics
+
+---
+
+## 🎁 Referral System
+
+### Overview
+Referral system allows users to refer others and earn commissions. Admin can manage referral settings and view referral statistics.
+
+### Key Endpoints
+```
+GET    /api/admin/referral/settings          # Get referral settings
+PUT    /api/admin/referral/settings          # Update settings (commission %, min withdrawal)
+GET    /api/admin/referral/list              # Get referral list (search, sort, paginate)
+GET    /api/admin/referral/user/{userId}     # Get user referral details
+```
+
+### User Endpoints
+```
+GET    /api/get-referral-details             # Get user's referral balance
+```
+
+### Referral Settings
+- **Commission Percentage:** Configurable (0-100%)
+- **Minimum Withdrawal:** Minimum amount for withdrawal
+- Stored in `referral_settings` table (singleton)
+
+### User Referral Fields
+- `user_code` - User's own referral code (for sharing)
+- `refferal_code` - Code used when registering (who referred them)
+- `wallet.referral_balance` - Total referral earnings
+
+### Referral Relationships
+- `User::referredUsers()` - Users referred by this user
+- `User::referrer()` - User who referred this user
+
+### Models
+- `ReferralSettings` - Commission and withdrawal settings
+- `User` - Referral codes and relationships
+- `Wallet` - Referral balance storage
+
+---
+
 **End of Reference Guide**
 
