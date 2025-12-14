@@ -44,8 +44,10 @@ class AuditAdminController extends Controller
                 DB::raw('SUM(CASE WHEN audit_requests.status = "approved" THEN 1 ELSE 0 END) as approved_count'),
                 DB::raw('SUM(CASE WHEN audit_requests.status = "rejected" THEN 1 ELSE 0 END) as rejected_count'),
                 DB::raw('SUM(CASE WHEN audit_requests.status = "completed" THEN 1 ELSE 0 END) as completed_count'),
+                DB::raw('SUM(CASE WHEN audit_requests.order_id IS NOT NULL THEN 1 ELSE 0 END) as audit_orders_count'),
                 DB::raw('MAX(audit_requests.created_at) as last_audit_request_date'),
                 DB::raw('(SELECT COUNT(*) FROM orders WHERE orders.user_id = users.id) as total_orders'),
+                DB::raw('(SELECT COUNT(*) FROM orders WHERE orders.user_id = users.id AND (orders.order_type = "audit_only" OR orders.audit_request_id IS NOT NULL)) as audit_related_orders_count'),
             ])
                 ->leftJoin('audit_requests', function ($join) use ($auditTypeFilter) {
                     $join->on('audit_requests.user_id', '=', 'users.id');
@@ -168,7 +170,9 @@ class AuditAdminController extends Controller
                     'approved_count' => (int) $user->approved_count,
                     'rejected_count' => (int) $user->rejected_count,
                     'completed_count' => (int) $user->completed_count,
-                    'total_orders' => (int) ($user->total_orders ?? 0),
+                    'audit_orders_count' => (int) ($user->audit_orders_count ?? 0), // Count of audit requests that have orders
+                    'total_orders' => (int) ($user->total_orders ?? 0), // Total number of all orders for this user
+                    'audit_related_orders_count' => (int) ($user->audit_related_orders_count ?? 0), // Count of orders that are audit-related (order_type='audit_only' or has audit_request_id)
                     'last_audit_request_date' => $user->last_audit_request_date ? date('Y-m-d H:i:s', strtotime($user->last_audit_request_date)) : null,
                     'user_created_at' => $user->created_at ? $user->created_at->format('Y-m-d H:i:s') : null,
                     'audit_requests' => $requests,
