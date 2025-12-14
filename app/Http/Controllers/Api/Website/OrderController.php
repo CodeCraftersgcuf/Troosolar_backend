@@ -1004,56 +1004,123 @@ class OrderController extends Controller
     public function getOrderSummary($id)
     {
         try {
-            $order = Order::with(['product.category', 'bundle.bundleItems.product.category', 'user'])
-                ->where('id', $id)
-                ->where('user_id', Auth::id())
-                ->firstOrFail();
+            $user = Auth::user();
+            $isAdmin = $user && $user->role === 'admin';
+
+            // Build query - admins can view any order, users can only view their own
+            $query = Order::with(['product.category', 'bundle.bundleItems.product.category', 'user'])
+                ->where('id', $id);
+
+            if (!$isAdmin) {
+                $query->where('user_id', Auth::id());
+            }
+
+            $order = $query->first();
+
+            if (!$order) {
+                Log::warning('Order Summary - Order not found', [
+                    'order_id' => $id,
+                    'user_id' => Auth::id(),
+                    'is_admin' => $isAdmin
+                ]);
+                return ResponseHelper::error('Order not found', 404);
+            }
 
             $items = [];
             $appliances = 'Standard household appliances';
             $backupTime = '8-12 hours (depending on usage)';
 
-            if ($order->bundle) {
-                $bundle = $order->bundle;
-                $bundleItems = $bundle->bundleItems()->with('product.category')->get();
-                
-                foreach ($bundleItems as $item) {
-                    if ($item->product) {
-                        $items[] = [
-                            'name' => $item->product->title,
-                            'description' => $item->product->details->pluck('detail')->join(', ') ?: $item->product->title,
-                            'quantity' => 1,
-                            'price' => $item->product->discount_price ?? $item->product->price ?? 0,
-                        ];
+            try {
+                if ($order->bundle) {
+                    $bundle = $order->bundle;
+                    $bundleItems = $bundle->bundleItems()->with('product.category')->get();
+                    
+                    foreach ($bundleItems as $item) {
+                        if ($item->product) {
+                            $productDetails = [];
+                            try {
+                                if (method_exists($item->product, 'details') && $item->product->details) {
+                                    $productDetails = $item->product->details->pluck('detail')->toArray();
+                                }
+                            } catch (\Exception $e) {
+                                Log::warning('Error getting product details: ' . $e->getMessage());
+                            }
+
+                            $items[] = [
+                                'name' => $item->product->title ?? 'Unknown Product',
+                                'description' => !empty($productDetails) ? implode(', ', $productDetails) : ($item->product->title ?? 'No description'),
+                                'quantity' => $item->quantity ?? 1,
+                                'price' => $item->product->discount_price ?? $item->product->price ?? 0,
+                            ];
+                        }
+                    }
+
+                    // Calculate backup time based on bundle specs
+                    if (isset($bundle->total_output) && $bundle->total_output) {
+                        $backupTime = $this->calculateBackupTime($bundle->total_output, $bundle->total_load ?? 1000);
+                    }
+                } elseif ($order->product) {
+                    $product = $order->product;
+                    $productDetails = [];
+                    try {
+                        if (method_exists($product, 'details') && $product->details) {
+                            $productDetails = $product->details->pluck('detail')->toArray();
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning('Error getting product details: ' . $e->getMessage());
+                    }
+
+                    $items[] = [
+                        'name' => $product->title ?? 'Unknown Product',
+                        'description' => !empty($productDetails) ? implode(', ', $productDetails) : ($product->title ?? 'No description'),
+                        'quantity' => 1,
+                        'price' => $product->discount_price ?? $product->price ?? 0,
+                    ];
+                } else {
+                    // If no product or bundle, try to get items from order_items
+                    try {
+                        $orderItems = $order->items()->with('itemable')->get();
+                        foreach ($orderItems as $orderItem) {
+                            if ($orderItem->itemable) {
+                                $itemName = $orderItem->itemable->title ?? 'Unknown Item';
+                                $items[] = [
+                                    'name' => $itemName,
+                                    'description' => $itemName,
+                                    'quantity' => $orderItem->quantity ?? 1,
+                                    'price' => $orderItem->unit_price ?? 0,
+                                ];
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning('Error getting order items: ' . $e->getMessage());
                     }
                 }
-
-                // Calculate backup time based on bundle specs
-                if ($bundle->total_output) {
-                    $backupTime = $this->calculateBackupTime($bundle->total_output, $bundle->total_load ?? 1000);
-                }
-            } elseif ($order->product) {
-                $product = $order->product;
-                $items[] = [
-                    'name' => $product->title,
-                    'description' => $product->details->pluck('detail')->join(', ') ?: $product->title,
-                    'quantity' => 1,
-                    'price' => $product->discount_price ?? $product->price ?? 0,
-                ];
+            } catch (\Exception $e) {
+                Log::error('Error processing order items: ' . $e->getMessage(), [
+                    'order_id' => $order->id,
+                    'trace' => $e->getTraceAsString()
+                ]);
+                // Continue with empty items array rather than failing completely
             }
 
             return ResponseHelper::success([
                 'order_id' => $order->id,
-                'order_number' => $order->order_number,
+                'order_number' => $order->order_number ?? null,
                 'items' => $items,
                 'appliances' => $appliances,
                 'backup_time' => $backupTime,
-                'total_price' => $order->total_price,
+                'total_price' => $order->total_price ?? 0,
             ], 'Order summary retrieved successfully');
 
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            Log::error('Order Summary - Model not found: ' . $e->getMessage());
+            return ResponseHelper::error('Order not found', 404);
         } catch (\Exception $e) {
-            Log::error('Order Summary Error: ' . $e->getMessage());
-            return ResponseHelper::error('Failed to retrieve order summary', 500);
+            Log::error('Order Summary Error: ' . $e->getMessage(), [
+                'order_id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return ResponseHelper::error('Failed to retrieve order summary: ' . $e->getMessage(), 500);
         }
     }
 
