@@ -21,6 +21,16 @@ class AuditAdminController extends Controller
     public function getUsersWithAuditRequests(Request $request)
     {
         try {
+            // Start with users who have audit requests
+            // First, filter by audit_type if specified (before join to optimize)
+            $auditTypeFilter = null;
+            if ($request->has('audit_type') && $request->audit_type !== 'all') {
+                $auditType = $request->audit_type;
+                if (in_array($auditType, ['home-office', 'commercial'])) {
+                    $auditTypeFilter = $auditType;
+                }
+            }
+
             // Get users who have audit requests with aggregated data
             $query = User::select([
                 'users.id',
@@ -36,7 +46,12 @@ class AuditAdminController extends Controller
                 DB::raw('SUM(CASE WHEN audit_requests.status = "completed" THEN 1 ELSE 0 END) as completed_count'),
                 DB::raw('MAX(audit_requests.created_at) as last_audit_request_date'),
             ])
-            ->leftJoin('audit_requests', 'audit_requests.user_id', '=', 'users.id')
+            ->leftJoin('audit_requests', function ($join) use ($auditTypeFilter) {
+                $join->on('audit_requests.user_id', '=', 'users.id');
+                if ($auditTypeFilter) {
+                    $join->where('audit_requests.audit_type', '=', $auditTypeFilter);
+                }
+            })
             ->groupBy('users.id', 'users.first_name', 'users.sur_name', 'users.email', 'users.phone', 'users.created_at')
             ->havingRaw('COUNT(audit_requests.id) > 0'); // Only users with audit requests
 
@@ -51,16 +66,7 @@ class AuditAdminController extends Controller
                 });
             }
 
-            // Filter by audit type
-            if ($request->has('audit_type')) {
-                $auditType = $request->audit_type;
-                $query->whereExists(function ($q) use ($auditType) {
-                    $q->select(DB::raw(1))
-                      ->from('audit_requests')
-                      ->whereColumn('audit_requests.user_id', 'users.id')
-                      ->where('audit_requests.audit_type', $auditType);
-                });
-            }
+            // Audit type filtering is now handled in the join (above) for better performance
 
             // Filter by status
             if ($request->has('has_pending')) {
@@ -91,16 +97,42 @@ class AuditAdminController extends Controller
 
             // Pagination
             $perPage = $request->get('per_page', 15);
+            
+            // Debug: Log the query SQL
+            Log::info('Audit Users Query', [
+                'sql' => $query->toSql(),
+                'bindings' => $query->getBindings(),
+                'audit_type_filter' => $auditTypeFilter
+            ]);
+            
             $users = $query->paginate($perPage);
+
+            // If no users found, still return empty result properly
+            if ($users->isEmpty()) {
+                // Check if there are any audit requests at all (for debugging)
+                $totalAuditRequests = AuditRequest::count();
+                Log::info('No users with audit requests found', [
+                    'total_audit_requests_in_db' => $totalAuditRequests,
+                    'audit_type_filter' => $auditTypeFilter
+                ]);
+            }
 
             // Get all user IDs for batch loading audit requests
             $userIds = $users->pluck('id');
             
-            // Batch load audit requests for all users
-            $allAuditRequests = AuditRequest::whereIn('user_id', $userIds)
-                ->orderBy('created_at', 'desc')
-                ->get()
-                ->groupBy('user_id');
+            // Batch load audit requests for all users (respect audit_type filter if set)
+            if ($userIds->isNotEmpty()) {
+                $auditRequestsQuery = AuditRequest::whereIn('user_id', $userIds);
+                if ($auditTypeFilter) {
+                    $auditRequestsQuery->where('audit_type', $auditTypeFilter);
+                }
+                $allAuditRequests = $auditRequestsQuery
+                    ->orderBy('created_at', 'desc')
+                    ->get()
+                    ->groupBy('user_id');
+            } else {
+                $allAuditRequests = collect();
+            }
 
             // Format response
             $formattedData = $users->getCollection()->map(function ($user) use ($allAuditRequests) {
