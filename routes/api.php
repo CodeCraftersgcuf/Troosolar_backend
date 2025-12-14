@@ -175,8 +175,9 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     Route::post('/loan-application/{monoLoanCalculationId}', [LoanApplicationController::class, 'documents']);
     
     // BNPL Flow endpoints
+    Route::get('/bnpl/applications', [BNPLController::class, 'getApplications']); // List all user's BNPL applications
     Route::post('/bnpl/apply', [BNPLController::class, 'apply']);
-    Route::get('/bnpl/status/{application_id}', [BNPLController::class, 'getStatus']);
+    Route::get('/bnpl/status/{application_id}', [BNPLController::class, 'getStatus']); // Get single application details
     Route::post('/bnpl/guarantor/invite', [BNPLController::class, 'inviteGuarantor']);
     Route::post('/bnpl/guarantor/upload', [BNPLController::class, 'uploadGuarantorForm']);
     Route::post('/bnpl/counteroffer/accept', [BNPLController::class, 'acceptCounterOffer']);

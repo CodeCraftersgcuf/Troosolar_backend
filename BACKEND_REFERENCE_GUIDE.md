@@ -205,7 +205,8 @@ POST   /api/loan-calculation-finalized/{id} # Finalize calculation
 GET    /api/loan-calculation-stauts       # Check calculation status
 GET    /api/offered-loan-calculation      # Get offered calculation
 POST   /api/bnpl/apply                    # Submit BNPL application
-GET    /api/bnpl/status/{application_id}  # Check application status
+GET    /api/bnpl/applications             # List all user's BNPL applications
+GET    /api/bnpl/status/{application_id}  # Get detailed application status
 POST   /api/bnpl/guarantor/invite         # Invite guarantor
 POST   /api/bnpl/guarantor/upload         # Upload guarantor form
 POST   /api/bnpl/counteroffer/accept      # Accept counter offer

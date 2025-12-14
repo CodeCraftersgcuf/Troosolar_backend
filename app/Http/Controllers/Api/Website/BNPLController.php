@@ -292,32 +292,142 @@ class BNPLController extends Controller
     }
 
     /**
+     * GET /api/bnpl/applications
+     * Get all BNPL applications for the authenticated user
+     */
+    public function getApplications(Request $request)
+    {
+        try {
+            $userId = Auth::id();
+            
+            $query = LoanApplication::with([
+                'mono',
+                'guarantor:id,loan_application_id,full_name,status',
+            ])
+            ->where('user_id', $userId);
+
+            // Filter by status if provided
+            if ($request->has('status')) {
+                $query->where('status', $request->status);
+            }
+
+            // Sort by latest first
+            $applications = $query->orderBy('created_at', 'desc')
+                ->paginate($request->get('per_page', 15));
+
+            $formattedData = $applications->getCollection()->map(function ($application) {
+                return [
+                    'id' => $application->id,
+                    'customer_type' => $application->customer_type,
+                    'product_category' => $application->product_category,
+                    'loan_amount' => number_format((float) $application->loan_amount, 2),
+                    'repayment_duration' => $application->repayment_duration,
+                    'status' => $application->status, // pending, approved, rejected, counter_offer
+                    'property_state' => $application->property_state,
+                    'property_address' => $application->property_address,
+                    'is_gated_estate' => $application->is_gated_estate,
+                    'guarantor' => $application->guarantor ? [
+                        'id' => $application->guarantor->id,
+                        'full_name' => $application->guarantor->full_name,
+                        'status' => $application->guarantor->status,
+                    ] : null,
+                    'order' => null, // Order relationship will be added if needed
+                    'created_at' => $application->created_at->format('Y-m-d H:i:s'),
+                    'updated_at' => $application->updated_at->format('Y-m-d H:i:s'),
+                ];
+            });
+
+            return ResponseHelper::success([
+                'data' => $formattedData,
+                'pagination' => [
+                    'current_page' => $applications->currentPage(),
+                    'last_page' => $applications->lastPage(),
+                    'per_page' => $applications->perPage(),
+                    'total' => $applications->total(),
+                    'from' => $applications->firstItem(),
+                    'to' => $applications->lastItem(),
+                ],
+            ], 'BNPL applications retrieved successfully');
+
+        } catch (Exception $e) {
+            Log::error('BNPL Applications List Error: ' . $e->getMessage());
+            return ResponseHelper::error('Failed to retrieve BNPL applications: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
      * GET /api/bnpl/status/{application_id}
-     * Get BNPL application status
+     * Get BNPL application status with detailed information
      */
     public function getStatus($applicationId)
     {
         try {
-            $application = LoanApplication::where('id', $applicationId)
-                ->where('user_id', Auth::id())
-                ->first();
+            $application = LoanApplication::with([
+                'mono',
+                'guarantor:id,loan_application_id,full_name,email,phone,status,signed_form_path',
+            ])
+            ->where('id', $applicationId)
+            ->where('user_id', Auth::id())
+            ->first();
 
             if (!$application) {
                 return ResponseHelper::error('Application not found', 404);
             }
 
-            $status = $application->status; // pending, approved, rejected, counter_offer
+            // Get loan calculation details if available
+            $loanCalculationDetails = null;
+            if ($application->mono_loan_calculation && $application->mono) {
+                $monoLoan = $application->mono;
+                $loanCalculationDetails = [
+                    'loan_amount' => number_format((float) ($monoLoan->loan_amount ?? $application->loan_amount), 2),
+                    'repayment_duration' => $monoLoan->repayment_duration ?? $application->repayment_duration,
+                    'down_payment' => number_format((float) ($monoLoan->down_payment ?? 0), 2),
+                    'total_amount' => number_format((float) ($monoLoan->total_amount ?? 0), 2),
+                    'interest_rate' => $monoLoan->interest_rate ?? null,
+                ];
+            }
 
             return ResponseHelper::success([
-                'application_id' => $application->id,
-                'status' => $status,
-                'loan_amount' => $application->loan_amount,
+                'id' => $application->id,
+                'customer_type' => $application->customer_type,
+                'product_category' => $application->product_category,
+                'loan_amount' => number_format((float) $application->loan_amount, 2),
                 'repayment_duration' => $application->repayment_duration,
+                'status' => $application->status, // pending, approved, rejected, counter_offer, counter_offer_accepted
+                'property_state' => $application->property_state,
+                'property_address' => $application->property_address,
+                'property_landmark' => $application->property_landmark,
+                'property_floors' => $application->property_floors,
+                'property_rooms' => $application->property_rooms,
+                'is_gated_estate' => $application->is_gated_estate,
+                'estate_name' => $application->estate_name,
+                'estate_address' => $application->estate_address,
+                'credit_check_method' => $application->credit_check_method,
+                'social_media_handle' => $application->social_media_handle,
+                'bank_statement_path' => $application->bank_statement_path,
+                'live_photo_path' => $application->live_photo_path,
+                'loan_calculation' => $loanCalculationDetails,
+                'guarantor' => $application->guarantor ? [
+                    'id' => $application->guarantor->id,
+                    'full_name' => $application->guarantor->full_name,
+                    'email' => $application->guarantor->email,
+                    'phone' => $application->guarantor->phone,
+                    'status' => $application->guarantor->status,
+                    'has_signed_form' => !empty($application->guarantor->signed_form_path),
+                ] : null,
+                'created_at' => $application->created_at->format('Y-m-d H:i:s'),
+                'updated_at' => $application->updated_at->format('Y-m-d H:i:s'),
             ], 'Application status retrieved successfully');
 
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            Log::error('BNPL Status - Application not found: ' . $e->getMessage());
+            return ResponseHelper::error('Application not found', 404);
         } catch (Exception $e) {
-            Log::error('BNPL Status Error: ' . $e->getMessage());
-            return ResponseHelper::error('Failed to retrieve application status', 500);
+            Log::error('BNPL Status Error: ' . $e->getMessage(), [
+                'application_id' => $applicationId,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return ResponseHelper::error('Failed to retrieve application status: ' . $e->getMessage(), 500);
         }
     }
 
