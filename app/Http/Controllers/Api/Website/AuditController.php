@@ -22,10 +22,13 @@ class AuditController extends Controller
     public function submit(Request $request)
     {
         try {
-            // Validate required fields - property details required for home-office audits
+            // Validate required fields
+            // For home-office: property_state and property_address are required
+            // For commercial: all property details are optional (admin will gather details)
             $data = $request->validate([
                 'audit_type' => 'required|in:home-office,commercial',
                 'customer_type' => 'nullable|in:residential,sme,commercial',
+                // Property fields - required for home-office, optional for commercial
                 'property_state' => 'required_if:audit_type,home-office|nullable|string|max:255',
                 'property_address' => 'required_if:audit_type,home-office|nullable|string',
                 'property_landmark' => 'nullable|string|max:255',
@@ -95,14 +98,26 @@ class AuditController extends Controller
                 return ResponseHelper::error('Failed to create audit request', 500);
             }
 
+            $message = $auditRequest->audit_type === 'commercial' 
+                ? 'Commercial audit request submitted successfully. Admin will contact you for property details.'
+                : 'Audit request submitted successfully';
+
             return ResponseHelper::success([
                 'id' => $auditRequest->id,
                 'audit_type' => $auditRequest->audit_type,
+                'customer_type' => $auditRequest->customer_type,
                 'status' => $auditRequest->status,
                 'property_state' => $auditRequest->property_state,
                 'property_address' => $auditRequest->property_address,
+                'property_landmark' => $auditRequest->property_landmark,
+                'property_floors' => $auditRequest->property_floors,
+                'property_rooms' => $auditRequest->property_rooms,
+                'is_gated_estate' => $auditRequest->is_gated_estate,
+                'estate_name' => $auditRequest->estate_name,
+                'estate_address' => $auditRequest->estate_address,
+                'has_property_details' => !empty($auditRequest->property_address), // Indicates if user provided details
                 'created_at' => $auditRequest->created_at->toIso8601String(),
-            ], 'Audit request submitted successfully');
+            ], $message);
 
         } catch (ValidationException $e) {
             Log::error('Audit request validation failed', [

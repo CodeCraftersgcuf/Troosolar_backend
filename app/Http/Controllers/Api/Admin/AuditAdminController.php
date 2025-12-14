@@ -39,30 +39,31 @@ class AuditAdminController extends Controller
                 'users.email',
                 'users.phone',
                 'users.created_at',
-                DB::raw('COUNT(audit_requests.id) as audit_request_count'),
+                DB::raw('COUNT(DISTINCT audit_requests.id) as audit_request_count'),
                 DB::raw('SUM(CASE WHEN audit_requests.status = "pending" THEN 1 ELSE 0 END) as pending_count'),
                 DB::raw('SUM(CASE WHEN audit_requests.status = "approved" THEN 1 ELSE 0 END) as approved_count'),
                 DB::raw('SUM(CASE WHEN audit_requests.status = "rejected" THEN 1 ELSE 0 END) as rejected_count'),
                 DB::raw('SUM(CASE WHEN audit_requests.status = "completed" THEN 1 ELSE 0 END) as completed_count'),
                 DB::raw('MAX(audit_requests.created_at) as last_audit_request_date'),
+                DB::raw('(SELECT COUNT(*) FROM orders WHERE orders.user_id = users.id) as total_orders'),
             ])
-            ->leftJoin('audit_requests', function ($join) use ($auditTypeFilter) {
-                $join->on('audit_requests.user_id', '=', 'users.id');
-                if ($auditTypeFilter) {
-                    $join->where('audit_requests.audit_type', '=', $auditTypeFilter);
-                }
-            })
-            ->groupBy('users.id', 'users.first_name', 'users.sur_name', 'users.email', 'users.phone', 'users.created_at')
-            ->havingRaw('COUNT(audit_requests.id) > 0'); // Only users with audit requests
+                ->leftJoin('audit_requests', function ($join) use ($auditTypeFilter) {
+                    $join->on('audit_requests.user_id', '=', 'users.id');
+                    if ($auditTypeFilter) {
+                        $join->where('audit_requests.audit_type', '=', $auditTypeFilter);
+                    }
+                })
+                ->groupBy('users.id', 'users.first_name', 'users.sur_name', 'users.email', 'users.phone', 'users.created_at')
+                ->havingRaw('COUNT(audit_requests.id) > 0'); // Only users with audit requests
 
             // Search functionality
             if ($request->has('search') && $request->search) {
                 $search = $request->search;
                 $query->where(function ($q) use ($search) {
                     $q->where('users.first_name', 'like', "%{$search}%")
-                      ->orWhere('users.sur_name', 'like', "%{$search}%")
-                      ->orWhere('users.email', 'like', "%{$search}%")
-                      ->orWhere('users.phone', 'like', "%{$search}%");
+                        ->orWhere('users.sur_name', 'like', "%{$search}%")
+                        ->orWhere('users.email', 'like', "%{$search}%")
+                        ->orWhere('users.phone', 'like', "%{$search}%");
                 });
             }
 
@@ -76,7 +77,7 @@ class AuditAdminController extends Controller
             // Sort functionality
             $sortBy = $request->get('sort_by', 'last_audit_request_date');
             $sortOrder = $request->get('sort_order', 'desc');
-            
+
             $allowedSorts = ['name', 'email', 'audit_request_count', 'last_audit_request_date', 'created_at'];
             if (!in_array($sortBy, $allowedSorts)) {
                 $sortBy = 'last_audit_request_date';
@@ -84,7 +85,7 @@ class AuditAdminController extends Controller
 
             if ($sortBy === 'name') {
                 $query->orderBy('users.first_name', $sortOrder)
-                      ->orderBy('users.sur_name', $sortOrder);
+                    ->orderBy('users.sur_name', $sortOrder);
             } elseif ($sortBy === 'email') {
                 $query->orderBy('users.email', $sortOrder);
             } elseif ($sortBy === 'audit_request_count') {
@@ -97,14 +98,14 @@ class AuditAdminController extends Controller
 
             // Pagination
             $perPage = $request->get('per_page', 15);
-            
+
             // Debug: Log the query SQL
             Log::info('Audit Users Query', [
                 'sql' => $query->toSql(),
                 'bindings' => $query->getBindings(),
                 'audit_type_filter' => $auditTypeFilter
             ]);
-            
+
             $users = $query->paginate($perPage);
 
             // If no users found, still return empty result properly
@@ -119,7 +120,7 @@ class AuditAdminController extends Controller
 
             // Get all user IDs for batch loading audit requests
             $userIds = $users->pluck('id');
-            
+
             // Batch load audit requests for all users (respect audit_type filter if set)
             if ($userIds->isNotEmpty()) {
                 $auditRequestsQuery = AuditRequest::whereIn('user_id', $userIds);
@@ -135,7 +136,7 @@ class AuditAdminController extends Controller
             }
 
             // Format response
-            $formattedData = $users->getCollection()->map(function ($user) use ($allAuditRequests) {
+            $formattedData = collect($users->items())->map(function ($user) use ($allAuditRequests) {
                 // Get audit requests for this user
                 $auditRequests = $allAuditRequests->get($user->id, collect());
 
@@ -167,6 +168,7 @@ class AuditAdminController extends Controller
                     'approved_count' => (int) $user->approved_count,
                     'rejected_count' => (int) $user->rejected_count,
                     'completed_count' => (int) $user->completed_count,
+                    'total_orders' => (int) ($user->total_orders ?? 0),
                     'last_audit_request_date' => $user->last_audit_request_date ? date('Y-m-d H:i:s', strtotime($user->last_audit_request_date)) : null,
                     'user_created_at' => $user->created_at ? $user->created_at->format('Y-m-d H:i:s') : null,
                     'audit_requests' => $requests,
@@ -207,9 +209,12 @@ class AuditAdminController extends Controller
                 $query->where('status', $request->status);
             }
 
-            // Filter by audit type
-            if ($request->has('audit_type')) {
-                $query->where('audit_type', $request->audit_type);
+            // Filter by audit type (support 'all' to show all types)
+            if ($request->has('audit_type') && $request->audit_type !== 'all') {
+                $auditType = $request->audit_type;
+                if (in_array($auditType, ['home-office', 'commercial'])) {
+                    $query->where('audit_type', $auditType);
+                }
             }
 
             // Search by user name, email, or property address
@@ -218,18 +223,69 @@ class AuditAdminController extends Controller
                 $query->where(function ($q) use ($search) {
                     $q->whereHas('user', function ($userQuery) use ($search) {
                         $userQuery->where('first_name', 'like', "%{$search}%")
-                                  ->orWhere('sur_name', 'like', "%{$search}%")
-                                  ->orWhere('email', 'like', "%{$search}%");
+                            ->orWhere('sur_name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
                     })
-                    ->orWhere('property_address', 'like', "%{$search}%")
-                    ->orWhere('property_state', 'like', "%{$search}%");
+                        ->orWhere('property_address', 'like', "%{$search}%")
+                        ->orWhere('property_state', 'like', "%{$search}%");
                 });
             }
 
             $auditRequests = $query->orderBy('created_at', 'desc')
                 ->paginate($request->get('per_page', 15));
 
-            return ResponseHelper::success($auditRequests, 'Audit requests retrieved successfully');
+            // Format the response to include additional helpful fields
+            $formattedData = collect($auditRequests->items())->map(function ($request) {
+                return [
+                    'id' => $request->id,
+                    'audit_type' => $request->audit_type,
+                    'customer_type' => $request->customer_type,
+                    'status' => $request->status,
+                    'user' => $request->user ? [
+                        'id' => $request->user->id,
+                        'name' => trim(($request->user->first_name ?? '') . ' ' . ($request->user->sur_name ?? '')),
+                        'email' => $request->user->email,
+                        'phone' => $request->user->phone,
+                    ] : null,
+                    'property_state' => $request->property_state,
+                    'property_address' => $request->property_address,
+                    'property_landmark' => $request->property_landmark,
+                    'property_floors' => $request->property_floors,
+                    'property_rooms' => $request->property_rooms,
+                    'is_gated_estate' => $request->is_gated_estate,
+                    'estate_name' => $request->estate_name,
+                    'estate_address' => $request->estate_address,
+                    'has_property_details' => !empty($request->property_address), // Indicates if user provided property details
+                    'needs_admin_input' => $request->audit_type === 'commercial' && empty($request->property_address), // Commercial requests may need admin to gather details
+                    'admin_notes' => $request->admin_notes,
+                    'approved_by' => $request->approver ? [
+                        'id' => $request->approver->id,
+                        'name' => trim(($request->approver->first_name ?? '') . ' ' . ($request->approver->sur_name ?? '')),
+                        'email' => $request->approver->email,
+                    ] : null,
+                    'approved_at' => $request->approved_at?->toIso8601String(),
+                    'order' => $request->order ? [
+                        'id' => $request->order->id,
+                        'order_number' => $request->order->order_number,
+                        'total_price' => $request->order->total_price,
+                        'payment_status' => $request->order->payment_status,
+                    ] : null,
+                    'created_at' => $request->created_at->toIso8601String(),
+                    'updated_at' => $request->updated_at->toIso8601String(),
+                ];
+            });
+
+            return ResponseHelper::success([
+                'data' => $formattedData,
+                'pagination' => [
+                    'current_page' => $auditRequests->currentPage(),
+                    'last_page' => $auditRequests->lastPage(),
+                    'per_page' => $auditRequests->perPage(),
+                    'total' => $auditRequests->total(),
+                    'from' => $auditRequests->firstItem(),
+                    'to' => $auditRequests->lastItem(),
+                ],
+            ], 'Audit requests retrieved successfully');
         } catch (Exception $e) {
             Log::error('Audit Admin Index Error: ' . $e->getMessage());
             return ResponseHelper::error('Failed to retrieve audit requests', 500);
@@ -307,7 +363,7 @@ class AuditAdminController extends Controller
 
             $auditRequest->status = $data['status'];
             $auditRequest->admin_notes = $data['admin_notes'] ?? $auditRequest->admin_notes;
-            
+
             if ($data['status'] === 'approved' || $data['status'] === 'completed') {
                 $auditRequest->approved_by = Auth::id();
                 $auditRequest->approved_at = now();

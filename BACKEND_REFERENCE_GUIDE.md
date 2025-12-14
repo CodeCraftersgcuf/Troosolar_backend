@@ -295,36 +295,46 @@ POST   /api/installments/{installmentId}/pay # Pay installment
 
 ### Flow
 1. User selects audit type (`home-office|commercial`)
-2. Fills property details
+2. Fills property details (required for home-office, optional for commercial)
 3. Creates audit request (status: `pending`)
-4. For `home-office`: Creates audit order immediately
-5. For `commercial`: Admin notification, no instant invoice
-6. User pays audit fee
+4. For `home-office`: Creates audit order immediately with invoice
+5. For `commercial`: Admin notification, no instant invoice (admin gathers property details)
+6. User pays audit fee (if home-office or after commercial quote)
 7. Admin approves/rejects
 8. Calendar booking available 48 hours after payment
 
 ### Key Endpoints
 ```
-POST   /api/audit/request                  # Submit audit request
+POST   /api/audit/request                  # Submit audit request (supports both home-office and commercial)
 GET    /api/audit/request/{id}             # Get audit status
 GET    /api/audit/requests                 # List user's audit requests
 ```
 
 ### Admin Endpoints
 ```
-GET    /api/admin/audit/requests           # List all audit requests
+GET    /api/admin/audit/users-with-requests # List users with audit requests (with filtering)
+GET    /api/admin/audit/requests           # List all audit requests (filterable by audit_type, status)
 GET    /api/admin/audit/requests/{id}      # Get single audit request
 PUT    /api/admin/audit/requests/{id}/status # Approve/reject (status: approved|rejected|completed)
 ```
 
+### Commercial Audit Request
+- **Property Details:** Optional (admin will gather details later)
+- **Validation:** Only `audit_type` and `customer_type` required
+- **Response:** Includes `has_property_details` flag to indicate if user provided data
+- **Admin:** Shows `needs_admin_input: true` for commercial requests without property details
+
 ### Audit Request Fields
-- `audit_type` - `home-office|commercial`
-- `customer_type` - `residential|sme|commercial`
-- `property_state`, `property_address`, `property_landmark`
-- `property_floors`, `property_rooms`
-- `is_gated_estate`, `estate_name`, `estate_address`
+- `audit_type` - `home-office|commercial` (required)
+- `customer_type` - `residential|sme|commercial` (optional)
+- `property_state` - Required for home-office, optional for commercial
+- `property_address` - Required for home-office, optional for commercial
+- `property_landmark`, `property_floors`, `property_rooms` (all optional)
+- `is_gated_estate`, `estate_name`, `estate_address` (optional)
 - `status` - `pending|approved|rejected|completed`
-- `order_id` - Links to audit order
+- `order_id` - Links to audit order (created after payment)
+- `has_property_details` - Boolean flag indicating if user provided property details
+- `needs_admin_input` - Boolean flag (true for commercial requests without property details)
 
 ### Audit Fee Calculation
 - **Home/Office Base:** ₦50,000
