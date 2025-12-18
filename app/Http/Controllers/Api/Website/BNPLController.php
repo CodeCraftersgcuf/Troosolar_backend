@@ -8,6 +8,9 @@ use App\Models\Guarantor;
 use App\Models\LoanApplication;
 use App\Models\LoanCalculation;
 use App\Models\MonoLoanCalculation;
+use App\Models\Order;
+use App\Models\LoanInstallment;
+use App\Models\LoanRepayment;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -562,5 +565,325 @@ class BNPLController extends Controller
             Log::error('Counteroffer Accept Error: ' . $e->getMessage());
             return ResponseHelper::error('Failed to accept counteroffer: ' . $e->getMessage(), 500);
         }
+    }
+
+    /**
+     * GET /api/bnpl/orders
+     * Get all BNPL orders for the authenticated user
+     */
+    public function getOrders(Request $request)
+    {
+        try {
+            $userId = Auth::id();
+            
+            $query = Order::with([
+                'items.itemable',
+                'deliveryAddress',
+                'monoCalculation.loanInstallments',
+                'monoCalculation.loanRepayments',
+            ])
+            ->where('user_id', $userId)
+            ->where('order_type', 'bnpl');
+
+            // Filter by status if provided
+            if ($request->has('status')) {
+                $query->where('order_status', $request->status);
+            }
+
+            // Sort by latest first
+            $orders = $query->orderBy('created_at', 'desc')
+                ->paginate($request->get('per_page', 15));
+
+            $formattedData = $orders->getCollection()->map(function ($order) {
+                return $this->formatBnplOrder($order);
+            });
+
+            return ResponseHelper::success([
+                'data' => $formattedData,
+                'pagination' => [
+                    'current_page' => $orders->currentPage(),
+                    'last_page' => $orders->lastPage(),
+                    'per_page' => $orders->perPage(),
+                    'total' => $orders->total(),
+                    'from' => $orders->firstItem(),
+                    'to' => $orders->lastItem(),
+                ],
+            ], 'BNPL orders retrieved successfully');
+
+        } catch (Exception $e) {
+            Log::error('BNPL Orders List Error: ' . $e->getMessage());
+            return ResponseHelper::error('Failed to retrieve BNPL orders: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * GET /api/bnpl/orders/{order_id}
+     * Get single BNPL order with full repayment details
+     */
+    public function getOrderDetails($orderId)
+    {
+        try {
+            $userId = Auth::id();
+            
+            $order = Order::with([
+                'items.itemable',
+                'deliveryAddress',
+                'monoCalculation.loanInstallments.transaction',
+                'monoCalculation.loanRepayments',
+                'monoCalculation.loanCalculation',
+            ])
+            ->where('id', $orderId)
+            ->where('user_id', $userId)
+            ->where('order_type', 'bnpl')
+            ->first();
+
+            if (!$order) {
+                return ResponseHelper::error('BNPL order not found', 404);
+            }
+
+            // Get loan application linked to this order
+            $loanApplication = null;
+            if ($order->mono_calculation_id) {
+                $loanApplication = LoanApplication::with(['guarantor'])
+                    ->where('mono_loan_calculation', $order->mono_calculation_id)
+                    ->where('user_id', $userId)
+                    ->first();
+            }
+
+            // Format installments with repayment schedule
+            $installments = [];
+            $repaymentSchedule = [];
+            if ($order->monoCalculation) {
+                $allInstallments = $order->monoCalculation->loanInstallments()
+                    ->orderBy('payment_date', 'asc')
+                    ->get();
+                
+                foreach ($allInstallments as $installment) {
+                    $installmentData = [
+                        'id' => $installment->id,
+                        'installment_number' => $installment->installment_number ?? null,
+                        'amount' => (float) $installment->amount,
+                        'payment_date' => $installment->payment_date ? $installment->payment_date->format('Y-m-d') : null,
+                        'status' => $installment->status,
+                        'paid_at' => $installment->paid_at ? $installment->paid_at->format('Y-m-d H:i:s') : null,
+                        'is_overdue' => $installment->payment_date && $installment->payment_date->lt(now()) && $installment->status !== 'paid',
+                        'transaction' => $installment->transaction ? [
+                            'id' => $installment->transaction->id,
+                            'tx_id' => $installment->transaction->tx_id,
+                            'method' => $installment->transaction->method,
+                            'amount' => (float) $installment->transaction->amount,
+                            'transacted_at' => $installment->transaction->transacted_at ? $installment->transaction->transacted_at->format('Y-m-d H:i:s') : null,
+                        ] : null,
+                    ];
+                    $installments[] = $installmentData;
+                    $repaymentSchedule[] = $installmentData;
+                }
+            }
+
+            // Get repayment history
+            $repayments = [];
+            if ($order->monoCalculation) {
+                $repaymentRecords = $order->monoCalculation->loanRepayments()
+                    ->orderBy('created_at', 'desc')
+                    ->get();
+                
+                foreach ($repaymentRecords as $repayment) {
+                    $repayments[] = [
+                        'id' => $repayment->id,
+                        'amount' => (float) $repayment->amount,
+                        'status' => $repayment->status,
+                        'created_at' => $repayment->created_at->format('Y-m-d H:i:s'),
+                    ];
+                }
+            }
+
+            // Calculate summary
+            $totalInstallments = count($installments);
+            $paidInstallments = count(array_filter($installments, fn($i) => $i['status'] === 'paid'));
+            $pendingInstallments = count(array_filter($installments, fn($i) => $i['status'] !== 'paid'));
+            $overdueInstallments = count(array_filter($installments, fn($i) => $i['is_overdue'] === true));
+            $totalAmount = array_sum(array_column($installments, 'amount'));
+            $paidAmount = array_sum(array_column(array_filter($installments, fn($i) => $i['status'] === 'paid'), 'amount'));
+            $pendingAmount = $totalAmount - $paidAmount;
+
+            $orderData = $this->formatBnplOrder($order);
+            $orderData['loan_application'] = $loanApplication ? [
+                'id' => $loanApplication->id,
+                'status' => $loanApplication->status,
+                'loan_amount' => (float) $loanApplication->loan_amount,
+                'repayment_duration' => $loanApplication->repayment_duration,
+                'guarantor' => $loanApplication->guarantor ? [
+                    'id' => $loanApplication->guarantor->id,
+                    'full_name' => $loanApplication->guarantor->full_name,
+                    'status' => $loanApplication->guarantor->status,
+                ] : null,
+            ] : null;
+            $orderData['repayment_schedule'] = $repaymentSchedule;
+            $orderData['repayment_summary'] = [
+                'total_installments' => $totalInstallments,
+                'paid_installments' => $paidInstallments,
+                'pending_installments' => $pendingInstallments,
+                'overdue_installments' => $overdueInstallments,
+                'total_amount' => $totalAmount,
+                'paid_amount' => $paidAmount,
+                'pending_amount' => $pendingAmount,
+            ];
+            $orderData['repayment_history'] = $repayments;
+            $orderData['loan_details'] = $order->monoCalculation ? [
+                'loan_amount' => (float) ($order->monoCalculation->loan_amount ?? 0),
+                'down_payment' => (float) ($order->monoCalculation->down_payment ?? 0),
+                'total_amount' => (float) ($order->monoCalculation->total_amount ?? 0),
+                'repayment_duration' => $order->monoCalculation->repayment_duration,
+                'interest_rate' => $order->monoCalculation->interest_rate,
+            ] : null;
+
+            return ResponseHelper::success($orderData, 'BNPL order details retrieved successfully');
+
+        } catch (Exception $e) {
+            Log::error('BNPL Order Details Error: ' . $e->getMessage(), [
+                'order_id' => $orderId,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return ResponseHelper::error('Failed to retrieve BNPL order details: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * GET /api/bnpl/applications/{application_id}/repayment-schedule
+     * Get repayment schedule for a specific BNPL application
+     */
+    public function getRepaymentSchedule($applicationId)
+    {
+        try {
+            $userId = Auth::id();
+            
+            $application = LoanApplication::with(['mono.loanInstallments.transaction'])
+                ->where('id', $applicationId)
+                ->where('user_id', $userId)
+                ->first();
+
+            if (!$application) {
+                return ResponseHelper::error('Application not found', 404);
+            }
+
+            if (!$application->mono_loan_calculation || !$application->mono) {
+                return ResponseHelper::error('Loan calculation not found for this application', 404);
+            }
+
+            $installments = $application->mono->loanInstallments()
+                ->orderBy('payment_date', 'asc')
+                ->get();
+
+            $schedule = [];
+            foreach ($installments as $installment) {
+                $schedule[] = [
+                    'id' => $installment->id,
+                    'installment_number' => $installment->installment_number ?? null,
+                    'amount' => (float) $installment->amount,
+                    'payment_date' => $installment->payment_date ? $installment->payment_date->format('Y-m-d') : null,
+                    'status' => $installment->status,
+                    'paid_at' => $installment->paid_at ? $installment->paid_at->format('Y-m-d H:i:s') : null,
+                    'is_overdue' => $installment->payment_date && $installment->payment_date->lt(now()) && $installment->status !== 'paid',
+                    'days_until_due' => $installment->payment_date ? now()->diffInDays($installment->payment_date, false) : null,
+                    'transaction' => $installment->transaction ? [
+                        'id' => $installment->transaction->id,
+                        'tx_id' => $installment->transaction->tx_id,
+                        'method' => $installment->transaction->method,
+                        'amount' => (float) $installment->transaction->amount,
+                        'transacted_at' => $installment->transaction->transacted_at ? $installment->transaction->transacted_at->format('Y-m-d H:i:s') : null,
+                    ] : null,
+                ];
+            }
+
+            // Calculate summary
+            $totalInstallments = count($schedule);
+            $paidInstallments = count(array_filter($schedule, fn($i) => $i['status'] === 'paid'));
+            $pendingInstallments = count(array_filter($schedule, fn($i) => $i['status'] !== 'paid'));
+            $overdueInstallments = count(array_filter($schedule, fn($i) => $i['is_overdue'] === true));
+            $totalAmount = array_sum(array_column($schedule, 'amount'));
+            $paidAmount = array_sum(array_column(array_filter($schedule, fn($i) => $i['status'] === 'paid'), 'amount'));
+            $pendingAmount = $totalAmount - $paidAmount;
+
+            return ResponseHelper::success([
+                'application_id' => $application->id,
+                'loan_amount' => (float) ($application->mono->loan_amount ?? $application->loan_amount),
+                'repayment_duration' => $application->mono->repayment_duration ?? $application->repayment_duration,
+                'schedule' => $schedule,
+                'summary' => [
+                    'total_installments' => $totalInstallments,
+                    'paid_installments' => $paidInstallments,
+                    'pending_installments' => $pendingInstallments,
+                    'overdue_installments' => $overdueInstallments,
+                    'total_amount' => $totalAmount,
+                    'paid_amount' => $paidAmount,
+                    'pending_amount' => $pendingAmount,
+                ],
+            ], 'Repayment schedule retrieved successfully');
+
+        } catch (Exception $e) {
+            Log::error('Repayment Schedule Error: ' . $e->getMessage(), [
+                'application_id' => $applicationId,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return ResponseHelper::error('Failed to retrieve repayment schedule: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Helper method to format BNPL order
+     */
+    private function formatBnplOrder($order)
+    {
+        $installmentsCount = 0;
+        $paidInstallmentsCount = 0;
+        $nextPaymentDate = null;
+        $nextPaymentAmount = null;
+
+        if ($order->monoCalculation) {
+            $allInstallments = $order->monoCalculation->loanInstallments;
+            $installmentsCount = $allInstallments->count();
+            $paidInstallmentsCount = $allInstallments->where('status', 'paid')->count();
+            
+            $nextInstallment = $allInstallments->where('status', '!=', 'paid')
+                ->sortBy('payment_date')
+                ->first();
+            
+            if ($nextInstallment) {
+                $nextPaymentDate = $nextInstallment->payment_date ? $nextInstallment->payment_date->format('Y-m-d') : null;
+                $nextPaymentAmount = (float) $nextInstallment->amount;
+            }
+        }
+
+        return [
+            'id' => $order->id,
+            'order_number' => $order->order_number,
+            'order_status' => $order->order_status,
+            'payment_status' => $order->payment_status,
+            'total_price' => (float) $order->total_price,
+            'items' => $order->items->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'itemable_type' => strtolower(class_basename($item->itemable_type)),
+                    'itemable_id' => $item->itemable_id,
+                    'quantity' => $item->quantity,
+                    'unit_price' => (float) $item->unit_price,
+                    'subtotal' => (float) $item->subtotal,
+                    'item' => $item->itemable ? [
+                        'id' => $item->itemable->id,
+                        'title' => $item->itemable->title ?? null,
+                    ] : null,
+                ];
+            }),
+            'delivery_address' => $order->deliveryAddress,
+            'loan_summary' => [
+                'total_installments' => $installmentsCount,
+                'paid_installments' => $paidInstallmentsCount,
+                'pending_installments' => $installmentsCount - $paidInstallmentsCount,
+                'next_payment_date' => $nextPaymentDate,
+                'next_payment_amount' => $nextPaymentAmount,
+            ],
+            'created_at' => $order->created_at->format('Y-m-d H:i:s'),
+            'updated_at' => $order->updated_at->format('Y-m-d H:i:s'),
+        ];
     }
 }

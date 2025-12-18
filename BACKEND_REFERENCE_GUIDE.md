@@ -207,9 +207,14 @@ GET    /api/offered-loan-calculation      # Get offered calculation
 POST   /api/bnpl/apply                    # Submit BNPL application
 GET    /api/bnpl/applications             # List all user's BNPL applications
 GET    /api/bnpl/status/{application_id}  # Get detailed application status
+GET    /api/bnpl/applications/{application_id}/repayment-schedule # Get repayment schedule
 POST   /api/bnpl/guarantor/invite         # Invite guarantor
 POST   /api/bnpl/guarantor/upload         # Upload guarantor form
 POST   /api/bnpl/counteroffer/accept      # Accept counter offer
+
+# BNPL Orders & Repayment Details
+GET    /api/bnpl/orders                   # List all user's BNPL orders
+GET    /api/bnpl/orders/{order_id}        # Get BNPL order with full repayment details
 ```
 
 ### Loan Calculation Flow
@@ -229,6 +234,17 @@ POST   /api/bnpl/counteroffer/accept      # Accept counter offer
 - `status` - `pending|approved|rejected|counter_offer`
 - `mono_loan_calculation` (links to MonoLoanCalculation)
 
+### BNPL Orders & Repayment Details
+- Users can view all their BNPL orders via `GET /api/bnpl/orders`
+- Each BNPL order includes:
+  - Order details (items, total, status)
+  - Loan application information
+  - Complete repayment schedule with all installments
+  - Repayment summary (total, paid, pending, overdue counts and amounts)
+  - Repayment history
+  - Loan calculation details (amount, duration, interest rate)
+- Repayment schedule can also be accessed via application ID: `GET /api/bnpl/applications/{id}/repayment-schedule`
+
 ### Minimum Loan Amount
 - **₦1,500,000** - Minimum required for BNPL
 
@@ -238,6 +254,43 @@ POST   /api/bnpl/counteroffer/accept      # Accept counter offer
 3. Guarantor uploads signed form
 4. Admin reviews guarantor documents
 5. Status: `pending|approved|rejected`
+
+### BNPL Orders & Repayment Management
+
+#### Viewing BNPL Orders
+- **List All Orders:** `GET /api/bnpl/orders` - Returns all user's BNPL orders with loan summary
+- **Order Details:** `GET /api/bnpl/orders/{order_id}` - Returns complete order with:
+  - Order information (items, total, status)
+  - Linked loan application details
+  - Complete repayment schedule (all installments with dates, amounts, status)
+  - Repayment summary (total/paid/pending/overdue counts and amounts)
+  - Repayment history (all payment records)
+  - Loan calculation details (amount, duration, interest rate, down payment)
+
+#### Repayment Schedule
+- **By Application:** `GET /api/bnpl/applications/{application_id}/repayment-schedule`
+  - Returns complete repayment schedule for a specific BNPL application
+  - Includes all installments with payment dates, amounts, status
+  - Shows overdue status and days until due
+  - Includes summary statistics
+
+#### Installment Management
+- **View Installments:** `GET /api/installments/with-history`
+  - Returns current month installments and historical installments
+  - Includes overdue information and loan details
+- **Pay Installment:** `POST /api/installments/{installmentId}/pay`
+  - Payment methods: `wallet`, `bank`, `card`, `transfer`
+  - For wallet: requires `type` (shop|loan)
+  - For others: requires `tx_id` from payment gateway
+
+#### Repayment Data Structure
+Each installment includes:
+- `id`, `installment_number`, `amount`, `payment_date`
+- `status` (pending|paid|overdue)
+- `paid_at` (timestamp when paid)
+- `is_overdue` (boolean)
+- `days_until_due` (number of days)
+- `transaction` (payment transaction details if paid)
 
 ---
 
@@ -597,9 +650,17 @@ GET    /api/orders/{id}/invoice-details
 # BNPL
 POST   /api/loan-calculation
 POST   /api/bnpl/apply
+GET    /api/bnpl/applications
 GET    /api/bnpl/status/{application_id}
+GET    /api/bnpl/applications/{application_id}/repayment-schedule
 POST   /api/bnpl/guarantor/invite
 POST   /api/bnpl/guarantor/upload
+
+# BNPL Orders & Repayments
+GET    /api/bnpl/orders
+GET    /api/bnpl/orders/{order_id}
+GET    /api/installments/with-history
+POST   /api/installments/{installmentId}/pay
 
 # Audit
 POST   /api/audit/request
@@ -700,7 +761,11 @@ PUT    /api/admin/orders/buy-now/{id}/status
 9. POST /api/bnpl/guarantor/upload → Guarantor form
 10. Admin approves guarantor
 11. GET /api/calendar/slots → Book installation
-12. Order fulfillment
+12. Order fulfillment (BNPL order created)
+13. GET /api/bnpl/orders → View all BNPL orders
+14. GET /api/bnpl/orders/{order_id} → View order with repayment details
+15. GET /api/installments/with-history → View payment schedule
+16. POST /api/installments/{id}/pay → Pay installments monthly
 ```
 
 ### Audit Flow
