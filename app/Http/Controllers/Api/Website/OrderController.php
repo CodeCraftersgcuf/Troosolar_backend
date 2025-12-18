@@ -811,9 +811,12 @@ class OrderController extends Controller
 
             $order = Order::where('order_type', 'buy_now')->findOrFail($id);
             $order->order_status = $request->order_status;
-            if ($request->has('admin_notes')) {
+            
+            // Only set admin_notes if column exists and value is provided
+            if ($request->has('admin_notes') && Schema::hasColumn('orders', 'admin_notes')) {
                 $order->admin_notes = $request->admin_notes;
             }
+            
             $order->save();
 
             return ResponseHelper::success($order, 'Buy Now order status updated successfully');
@@ -823,9 +826,12 @@ class OrderController extends Controller
                 'message' => 'Validation failed',
                 'errors' => $e->errors()
             ], 422);
-        } catch (Exception $e) {
-            Log::error('Buy Now Order Status Update Error: ' . $e->getMessage());
-            return ResponseHelper::error('Failed to update Buy Now order status', 500);
+        } catch (\Exception $e) {
+            Log::error('Buy Now Order Status Update Error: ' . $e->getMessage(), [
+                'order_id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return ResponseHelper::error('Failed to update Buy Now order status: ' . $e->getMessage(), 500);
         }
     }
 
@@ -836,8 +842,26 @@ class OrderController extends Controller
     public function getBnplOrders(Request $request)
     {
         try {
-            $query = Order::with(['items.itemable', 'deliveryAddress', 'user:id,first_name,sur_name,email,phone'])
-                ->where('order_type', 'bnpl');
+            $query = Order::with(['items.itemable', 'deliveryAddress', 'user:id,first_name,sur_name,email,phone', 'monoCalculation']);
+            
+            // BNPL orders: either have order_type='bnpl' OR have mono_calculation_id (for backward compatibility)
+            // This handles cases where order_type column exists but might be NULL for older orders
+            if (Schema::hasColumn('orders', 'order_type')) {
+                $query->where(function($q) {
+                    $q->where('order_type', 'bnpl')
+                      ->orWhere(function($subQ) {
+                          // Include orders with mono_calculation_id that don't have order_type set to buy_now or audit_only
+                          $subQ->whereNotNull('mono_calculation_id')
+                               ->where(function($typeQ) {
+                                   $typeQ->whereNull('order_type')
+                                         ->orWhereNotIn('order_type', ['buy_now', 'audit_only']);
+                               });
+                      });
+                });
+            } else {
+                // Fallback: BNPL orders have mono_calculation_id
+                $query->whereNotNull('mono_calculation_id');
+            }
 
             // Filter by status
             if ($request->has('status')) {
@@ -859,8 +883,10 @@ class OrderController extends Controller
 
             return ResponseHelper::success($orders, 'BNPL orders retrieved successfully');
         } catch (Exception $e) {
-            Log::error('BNPL Orders Admin Error: ' . $e->getMessage());
-            return ResponseHelper::error('Failed to retrieve BNPL orders', 500);
+            Log::error('BNPL Orders Admin Error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            return ResponseHelper::error('Failed to retrieve BNPL orders: ' . $e->getMessage(), 500);
         }
     }
 
@@ -871,14 +897,33 @@ class OrderController extends Controller
     public function getBnplOrder($id)
     {
         try {
-            $order = Order::with(['items.itemable', 'deliveryAddress', 'user', 'loanApplication'])
-                ->where('order_type', 'bnpl')
-                ->findOrFail($id);
+            $query = Order::with(['items.itemable', 'deliveryAddress', 'user', 'monoCalculation']);
+            
+            // BNPL orders: either have order_type='bnpl' OR have mono_calculation_id
+            if (Schema::hasColumn('orders', 'order_type')) {
+                $query->where(function($q) {
+                    $q->where('order_type', 'bnpl')
+                      ->orWhere(function($subQ) {
+                          $subQ->whereNotNull('mono_calculation_id')
+                               ->where(function($typeQ) {
+                                   $typeQ->whereNull('order_type')
+                                         ->orWhereNotIn('order_type', ['buy_now', 'audit_only']);
+                               });
+                      });
+                });
+            } else {
+                $query->whereNotNull('mono_calculation_id');
+            }
+            
+            $order = $query->findOrFail($id);
 
             return ResponseHelper::success($order, 'BNPL order retrieved successfully');
         } catch (Exception $e) {
-            Log::error('BNPL Order Admin Error: ' . $e->getMessage());
-            return ResponseHelper::error('Failed to retrieve BNPL order', 500);
+            Log::error('BNPL Order Admin Error: ' . $e->getMessage(), [
+                'order_id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return ResponseHelper::error('Failed to retrieve BNPL order: ' . $e->getMessage(), 500);
         }
     }
 

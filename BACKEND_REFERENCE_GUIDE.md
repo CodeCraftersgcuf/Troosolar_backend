@@ -282,6 +282,14 @@ GET    /api/bnpl/orders/{order_id}        # Get BNPL order with full repayment d
   - Payment methods: `wallet`, `bank`, `card`, `transfer`
   - For wallet: requires `type` (shop|loan)
   - For others: requires `tx_id` from payment gateway
+  - **Payment Flow:**
+    1. User selects installment from repayment schedule
+    2. User chooses payment method
+    3. For wallet: Check balance → Deduct → Update installment status
+    4. For gateway: Initialize payment → Get tx_id → Confirm with backend
+    5. Installment status updated to "paid"
+    6. Transaction record created
+  - **See:** `REPAYMENT_PAYMENT_GUIDE.md` for complete Flutter integration examples
 
 #### Repayment Data Structure
 Each installment includes:

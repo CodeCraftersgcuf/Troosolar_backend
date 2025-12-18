@@ -106,14 +106,39 @@ GET    /api/bnpl/orders/{order_id}
 ```http
 GET    /api/installments/with-history
        Returns: Current month installments and history with overdue information
+       Response includes:
+       - current_month: Array of current month installments
+       - history: Array of past installments
+       - isActive: Boolean (has any paid installments)
+       - isCompleted: Boolean (all installments paid)
+       - hasOverdue: Boolean (has overdue installments)
+       - overdueCount: Number of overdue installments
+       - overdueAmount: Total overdue amount
+       - loan: MonoLoanCalculation details
 
 POST   /api/installments/{installmentId}/pay
-       Body: method (wallet|bank|card|transfer), type (shop|loan, if wallet), 
-             tx_id (required if not wallet), reference, title
+       Body: {
+         method: "wallet" | "bank" | "card" | "transfer" (required),
+         type: "shop" | "loan" (required if method=wallet),
+         tx_id: string (required if method != wallet),
+         reference: string (optional),
+         title: string (optional, default: "Loan installment payment")
+       }
        Returns: Updated installment with transaction details
+       
+       Payment Methods:
+       - wallet: Pay from user's wallet (shop_balance or loan_balance)
+       - bank: Bank transfer (requires tx_id from payment gateway)
+       - card: Card payment (requires tx_id from payment gateway)
+       - transfer: Bank transfer (requires tx_id from payment gateway)
 
 GET    /api/show-loan-installment/{monoCalculationId}
        Returns: All installments for a specific loan calculation
+       Response: Array of installments with:
+       - installment: Installment number (1, 2, 3...)
+       - status: Payment status
+       - amount: Installment amount
+       - created_at: Creation timestamp
 ```
 
 ---
@@ -539,6 +564,461 @@ GET    /api/bnpl/applications              # List BNPL applications
 GET    /api/bnpl/status/{id}               # Get application status
 POST   /api/bnpl/apply                     # Submit BNPL application
 ```
+
+---
+
+## 💳 Repayment Payment Flow (Detailed Guide)
+
+### Complete Payment Flow for BNPL Repayments
+
+#### Step 1: Get Repayment Schedule
+```http
+GET /api/bnpl/orders/{order_id}
+   OR
+GET /api/bnpl/applications/{application_id}/repayment-schedule
+```
+Returns all installments with their IDs, amounts, due dates, and status.
+
+#### Step 2: Select Installment to Pay
+From the repayment schedule, identify the installment you want to pay:
+- Get the `id` of the installment
+- Check `status` (should be "pending" or "overdue")
+- Note the `amount` to be paid
+- Check `payment_date` for due date
+
+#### Step 3: Pay Installment
+```http
+POST /api/installments/{installmentId}/pay
+```
+
+### Payment Method Details
+
+#### 1. Wallet Payment (Shop Balance)
+```json
+{
+  "method": "wallet",
+  "type": "shop",
+  "reference": "INSTALLMENT#123" // optional
+}
+```
+- Deducts from user's `shop_balance`
+- Requires sufficient shop balance
+- Returns immediately with transaction details
+
+#### 2. Wallet Payment (Loan Balance)
+```json
+{
+  "method": "wallet",
+  "type": "loan",
+  "reference": "INSTALLMENT#123" // optional
+}
+```
+- Deducts from user's `loan_balance`
+- Requires sufficient loan balance
+- Returns immediately with transaction details
+
+#### 3. Bank Transfer / Card Payment
+```json
+{
+  "method": "bank", // or "card" or "transfer"
+  "tx_id": "TXN123456789", // Transaction ID from payment gateway
+  "reference": "INSTALLMENT#123", // optional
+  "title": "Loan Installment Payment" // optional
+}
+```
+- Requires `tx_id` from your payment gateway (Flutterwave, Paystack, etc.)
+- Payment gateway processes the payment first
+- Then call this endpoint with the transaction ID
+- Returns updated installment with transaction details
+
+### Payment Response
+```json
+{
+  "status": "success",
+  "message": "Installment paid successfully",
+  "data": {
+    "id": 123,
+    "mono_calculation_id": 45,
+    "amount": 50000.00,
+    "payment_date": "2024-01-15",
+    "status": "paid",
+    "computed_status": "paid",
+    "paid_at": "2024-01-10 14:30:00",
+    "remaining_duration": 5,
+    "transaction": {
+      "id": 789,
+      "tx_id": "TXN123456789",
+      "method": "bank",
+      "type": "debit",
+      "status": "success",
+      "amount": 50000.00,
+      "reference": "INSTALLMENT#123",
+      "transacted_at": "2024-01-10 14:30:00"
+    }
+  }
+}
+```
+
+### Error Responses
+
+#### Insufficient Balance (Wallet)
+```json
+{
+  "status": "error",
+  "message": "Insufficient shop balance",
+  "errors": {
+    "shop_balance": ["Insufficient balance"]
+  }
+}
+```
+
+#### Already Paid
+```json
+{
+  "status": "success",
+  "message": "Installment already paid",
+  "data": { /* installment details */ }
+}
+```
+
+#### Validation Error
+```json
+{
+  "status": "error",
+  "message": "Validation failed.",
+  "errors": {
+    "method": ["Payment method is required."],
+    "type": ["type is required and must be one of: shop, loan when method=wallet"],
+    "tx_id": ["tx_id is required for non-wallet methods"]
+  }
+}
+```
+
+---
+
+## 📱 Flutter Integration Examples
+
+### Example 1: Get Repayment Schedule
+```dart
+Future<Map<String, dynamic>> getRepaymentSchedule(int orderId) async {
+  final response = await http.get(
+    Uri.parse('$baseUrl/api/bnpl/orders/$orderId'),
+    headers: {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+    },
+  );
+  
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    return data['data'];
+  } else {
+    throw Exception('Failed to load repayment schedule');
+  }
+}
+```
+
+### Example 2: Pay Installment with Wallet
+```dart
+Future<Map<String, dynamic>> payInstallmentWithWallet({
+  required int installmentId,
+  required String walletType, // 'shop' or 'loan'
+}) async {
+  final response = await http.post(
+    Uri.parse('$baseUrl/api/installments/$installmentId/pay'),
+    headers: {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: json.encode({
+      'method': 'wallet',
+      'type': walletType,
+      'reference': 'INSTALLMENT#$installmentId',
+    }),
+  );
+  
+  if (response.statusCode == 200) {
+    return json.decode(response.body);
+  } else {
+    final error = json.decode(response.body);
+    throw Exception(error['message'] ?? 'Payment failed');
+  }
+}
+```
+
+### Example 3: Pay Installment with Flutterwave
+```dart
+Future<Map<String, dynamic>> payInstallmentWithFlutterwave({
+  required int installmentId,
+  required double amount,
+  required String email,
+  required String phone,
+}) async {
+  // Step 1: Initialize Flutterwave payment
+  final flutterwaveResponse = await initializeFlutterwavePayment(
+    amount: amount,
+    email: email,
+    phone: phone,
+    txRef: 'INSTALLMENT#$installmentId-${DateTime.now().millisecondsSinceEpoch}',
+  );
+  
+  // Step 2: After successful payment, get transaction ID
+  final txId = flutterwaveResponse['data']['tx_ref'];
+  
+  // Step 3: Confirm payment with backend
+  final response = await http.post(
+    Uri.parse('$baseUrl/api/installments/$installmentId/pay'),
+    headers: {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: json.encode({
+      'method': 'card', // or 'bank' or 'transfer'
+      'tx_id': txId,
+      'reference': 'INSTALLMENT#$installmentId',
+      'title': 'Loan Installment Payment',
+    }),
+  );
+  
+  if (response.statusCode == 200) {
+    return json.decode(response.body);
+  } else {
+    final error = json.decode(response.body);
+    throw Exception(error['message'] ?? 'Payment confirmation failed');
+  }
+}
+
+// Helper function to initialize Flutterwave payment
+Future<Map<String, dynamic>> initializeFlutterwavePayment({
+  required double amount,
+  required String email,
+  required String phone,
+  required String txRef,
+}) async {
+  // Use Flutterwave SDK to initialize payment
+  // This is a placeholder - use actual Flutterwave SDK
+  return await FlutterwaveSDK.initializePayment(
+    amount: amount,
+    email: email,
+    phone: phone,
+    txRef: txRef,
+  );
+}
+```
+
+### Example 4: Get Installments with History
+```dart
+Future<Map<String, dynamic>> getInstallmentsWithHistory() async {
+  final response = await http.get(
+    Uri.parse('$baseUrl/api/installments/with-history'),
+    headers: {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+    },
+  );
+  
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    return data['data'];
+  } else {
+    throw Exception('Failed to load installments');
+  }
+}
+
+// Usage example
+void displayInstallments() async {
+  try {
+    final data = await getInstallmentsWithHistory();
+    
+    final currentMonth = data['current_month'] as List;
+    final history = data['history'] as List;
+    final hasOverdue = data['hasOverdue'] as bool;
+    final overdueAmount = data['overdueAmount'] as double;
+    
+    // Display current month installments
+    for (var installment in currentMonth) {
+      print('Amount: ${installment['amount']}');
+      print('Due Date: ${installment['payment_date']}');
+      print('Status: ${installment['status']}');
+      print('Overdue: ${installment['is_overdue']}');
+    }
+    
+    // Show overdue warning
+    if (hasOverdue) {
+      print('You have overdue payments: ₦$overdueAmount');
+    }
+  } catch (e) {
+    print('Error: $e');
+  }
+}
+```
+
+### Example 5: Complete Payment Flow Widget
+```dart
+class InstallmentPaymentWidget extends StatefulWidget {
+  final int installmentId;
+  final double amount;
+  final String dueDate;
+  
+  const InstallmentPaymentWidget({
+    Key? key,
+    required this.installmentId,
+    required this.amount,
+    required this.dueDate,
+  }) : super(key: key);
+  
+  @override
+  _InstallmentPaymentWidgetState createState() => _InstallmentPaymentWidgetState();
+}
+
+class _InstallmentPaymentWidgetState extends State<InstallmentPaymentWidget> {
+  String _selectedMethod = 'wallet';
+  String _walletType = 'shop';
+  bool _isLoading = false;
+  
+  Future<void> _payInstallment() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      Map<String, dynamic>? response;
+      
+      if (_selectedMethod == 'wallet') {
+        // Check wallet balance first
+        final wallet = await getWalletBalance();
+        final availableBalance = _walletType == 'shop' 
+            ? wallet['shop_balance'] 
+            : wallet['loan_balance'];
+            
+        if (availableBalance < widget.amount) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Insufficient ${_walletType} balance')),
+          );
+          return;
+        }
+        
+        response = await payInstallmentWithWallet(
+          installmentId: widget.installmentId,
+          walletType: _walletType,
+        );
+      } else {
+        // Initialize payment gateway
+        final txId = await initializePaymentGateway(
+          amount: widget.amount,
+          method: _selectedMethod,
+        );
+        
+        response = await payInstallmentWithGateway(
+          installmentId: widget.installmentId,
+          txId: txId,
+          method: _selectedMethod,
+        );
+      }
+      
+      if (response != null && response['status'] == 'success') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Payment successful!')),
+        );
+        Navigator.pop(context, true); // Return success
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Payment failed: ${e.toString()}')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Pay Installment')),
+      body: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Card(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Amount: ₦${widget.amount.toStringAsFixed(2)}'),
+                    SizedBox(height: 8),
+                    Text('Due Date: ${widget.dueDate}'),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 24),
+            Text('Payment Method:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            SizedBox(height: 8),
+            DropdownButton<String>(
+              value: _selectedMethod,
+              items: ['wallet', 'bank', 'card', 'transfer'].map((method) {
+                return DropdownMenuItem(
+                  value: method,
+                  child: Text(method.toUpperCase()),
+                );
+              }).toList(),
+              onChanged: (value) => setState(() => _selectedMethod = value!),
+            ),
+            if (_selectedMethod == 'wallet') ...[
+              SizedBox(height: 16),
+              Text('Wallet Type:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              DropdownButton<String>(
+                value: _walletType,
+                items: ['shop', 'loan'].map((type) {
+                  return DropdownMenuItem(
+                    value: type,
+                    child: Text(type.toUpperCase()),
+                  );
+                }).toList(),
+                onChanged: (value) => setState(() => _walletType = value!),
+              ),
+            ],
+            SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _isLoading ? null : _payInstallment,
+              child: _isLoading 
+                  ? CircularProgressIndicator() 
+                  : Text('Pay Installment'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+---
+
+## 🔄 Complete Repayment Payment Workflow
+
+### User Journey:
+1. **View BNPL Orders** → `GET /api/bnpl/orders`
+2. **Select Order** → `GET /api/bnpl/orders/{order_id}` (get repayment schedule)
+3. **View Installments** → See all installments with status, amounts, due dates
+4. **Select Installment to Pay** → Choose pending/overdue installment
+5. **Choose Payment Method** → Wallet (shop/loan) or Gateway (bank/card/transfer)
+6. **Process Payment**:
+   - **Wallet**: Direct deduction → `POST /api/installments/{id}/pay`
+   - **Gateway**: Initialize payment → Get tx_id → `POST /api/installments/{id}/pay`
+7. **Confirm Payment** → Check response for transaction details
+8. **Refresh Schedule** → `GET /api/bnpl/orders/{order_id}` to see updated status
+
+### Best Practices:
+- Always check installment status before attempting payment
+- Verify wallet balance before wallet payments
+- Store transaction IDs for reference
+- Handle payment failures gracefully
+- Show loading states during payment processing
+- Refresh repayment schedule after successful payment
 
 ---
 
