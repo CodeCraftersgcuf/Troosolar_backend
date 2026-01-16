@@ -220,9 +220,14 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     Route::get('/bnpl/applications', [BNPLController::class, 'getApplications']); // List all user's BNPL applications
     Route::post('/bnpl/apply', [BNPLController::class, 'apply']);
     Route::get('/bnpl/status/{application_id}', [BNPLController::class, 'getStatus']); // Get single application details
+    Route::get('/bnpl/applications/{application_id}/repayment-schedule', [BNPLController::class, 'getRepaymentSchedule']); // Get repayment schedule for application
     Route::post('/bnpl/guarantor/invite', [BNPLController::class, 'inviteGuarantor']);
     Route::post('/bnpl/guarantor/upload', [BNPLController::class, 'uploadGuarantorForm']);
     Route::post('/bnpl/counteroffer/accept', [BNPLController::class, 'acceptCounterOffer']);
+    
+    // BNPL Orders endpoints
+    Route::get('/bnpl/orders', [BNPLController::class, 'getOrders']); // List all user's BNPL orders
+    Route::get('/bnpl/orders/{order_id}', [BNPLController::class, 'getOrderDetails']); // Get single BNPL order with repayment details
     
     // Audit Request endpoints
     Route::post('/audit/request', [AuditController::class, 'submit']);
