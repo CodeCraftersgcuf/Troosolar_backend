@@ -45,6 +45,10 @@ use App\Http\Controllers\Api\Website\{
 use App\Http\Controllers\InstallmentController;
 use App\Http\Controllers\KycController;
 use App\Http\Controllers\ReferralController;
+use App\Http\Controllers\SeederController;
+use App\Http\Controllers\Api\Admin\MaterialCategoryController;
+use App\Http\Controllers\Api\Admin\MaterialController;
+use App\Http\Controllers\Api\Admin\BundleMaterialController;
 use Illuminate\Support\Facades\Artisan;
 
 /*
@@ -76,6 +80,12 @@ Route::get('/migrate/rollback', function () {
     return response()->json(['message' => 'Migration rollback successfully'], 200);
 });
 
+// Seeder routes (public - can be protected if needed)
+Route::get('/seed/all', [SeederController::class, 'runAllSeeders']);
+Route::post('/seed/run', [SeederController::class, 'runSeeder']);
+Route::get('/seed/bundles', [SeederController::class, 'runBundleSeeder']);
+Route::get('/seed/bundle-materials', [SeederController::class, 'runBundleMaterialSeeder']);
+
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/verify-otp/{user_id}', [UserController::class, 'verifyOtp']);
 Route::post('/login', [UserController::class, 'login']);
@@ -95,8 +105,26 @@ Route::get('/config/delivery-locations', [ConfigurationController::class, 'getDe
 // Public bundles endpoint (for Buy Now flow)
 Route::get('/bundles', [\App\Http\Controllers\Api\Website\BundleController::class, 'index']);
 
+// Bundle Selection endpoints (public for browsing, auth required for checkout)
+Route::get('/bundles/type/{type}', [\App\Http\Controllers\Api\Website\BundleSelectionController::class, 'getBundlesByType']);
+Route::get('/bundles/{id}/details', [\App\Http\Controllers\Api\Website\BundleSelectionController::class, 'getBundleDetails']);
+Route::get('/bundles/materials/category/{categoryId}', [\App\Http\Controllers\Api\Website\BundleSelectionController::class, 'getMaterialsByCategory']);
+
 // Public cart access via token (from email links - allows access before login)
 Route::get('/cart/access/{token}', [\App\Http\Controllers\Api\Website\CartController::class, 'accessCartViaToken']);
+
+// Test route to verify material routes are accessible (remove after testing)
+Route::get('/test-material-routes', function () {
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Routes are registered. Material routes require authentication.',
+        'routes' => [
+            'GET /api/material-categories (requires auth)',
+            'GET /api/materials (requires auth)',
+        ],
+        'note' => 'Please authenticate first using POST /api/admin-login, then use Bearer token in Authorization header'
+    ]);
+});
 
 // ================= PROTECTED ROUTES =================
 Route::middleware('auth:sanctum')->group(function () {
@@ -130,6 +158,20 @@ Route::middleware('auth:sanctum')->group(function () {
     // Accept POST /bundles/{bundle}/update as an alternative to PUT
 Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
      ->name('bundles.update.post');
+
+    // Bundle Materials Management
+    Route::get('bundles/{bundleId}/materials', [BundleMaterialController::class, 'index']);
+    Route::post('bundles/{bundleId}/materials', [BundleMaterialController::class, 'store']);
+    Route::post('bundles/{bundleId}/materials/bulk', [BundleMaterialController::class, 'bulkStore']);
+    Route::put('bundles/{bundleId}/materials/{id}', [BundleMaterialController::class, 'update']);
+    Route::delete('bundles/{bundleId}/materials/{id}', [BundleMaterialController::class, 'destroy']);
+
+    // Material Categories and Materials Management
+    Route::apiResource('material-categories', MaterialCategoryController::class);
+    Route::post('material-categories/{category}/update', [MaterialCategoryController::class, 'update']);
+    Route::apiResource('materials', MaterialController::class);
+    Route::post('materials/{material}/update', [MaterialController::class, 'update']);
+    Route::get('materials/category/{categoryId}', [MaterialController::class, 'getByCategory']);
 
 
     // Delivery address
@@ -194,6 +236,9 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     
     // Calendar/Scheduling endpoints
     Route::get('/calendar/slots', [CalendarController::class, 'getSlots']);
+
+    // Custom Bundle Builder endpoints (auth required)
+    Route::post('/bundles/custom/calculate', [\App\Http\Controllers\Api\Website\BundleSelectionController::class, 'calculateCustomBundle']);
     // Route::get('/get-currentmonth-installment', [InstallmentController::class, 'currentMonthInstallment'])
     Route::get('/installments/with-history', action: [InstallmentController::class, 'historyWithCurrentMonth']);
     Route::post('/installments/{installmentId}/pay',    [InstallmentController::class, 'payInstallment']);;

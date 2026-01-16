@@ -27,6 +27,11 @@ class Bundles extends Model
         return $this->hasMany(CustomService::class, 'bundle_id');
     }
 
+    public function bundleMaterials()
+    {
+        return $this->hasMany(BundleMaterial::class, 'bundle_id');
+    }
+
     public function getFeaturedImageUrlAttribute(): ?string
     {
         if (!$this->featured_image) return null;

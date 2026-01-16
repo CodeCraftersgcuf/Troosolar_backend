@@ -606,7 +606,7 @@ class OrderController extends Controller
                 $product = Product::findOrFail($productId);
                 $productPrice = $product->discount_price ?? $product->price ?? 0;
             } elseif ($bundleId) {
-                $bundle = Bundles::findOrFail($bundleId);
+                $bundle = Bundles::with('bundleMaterials.material')->findOrFail($bundleId);
                 $productPrice = $bundle->discount_price ?? $bundle->total_price ?? 0;
             } elseif ($amount) {
                 // If amount is provided directly, use it
@@ -615,10 +615,27 @@ class OrderController extends Controller
                 return ResponseHelper::error('Either product_id, bundle_id, or amount is required. Please provide one of them in your request.', 422);
             }
 
-            // Get delivery and installation fees from state/delivery location or use defaults
+            // Get delivery and installation fees
+            // For bundles, try to get from bundle materials first, then fallback to state/location
             $deliveryFee = 25000; // Default
             $installationFee = 50000; // Default
+            $inspectionFeeFromBundle = 0;
+
+            // If bundle, check for fees in bundle materials
+            if ($bundle && $bundle->bundleMaterials) {
+                foreach ($bundle->bundleMaterials as $bm) {
+                    $materialName = $bm->material->name ?? '';
+                    if (str_contains($materialName, 'Installation Fees')) {
+                        $installationFee = (float) ($bm->material->selling_rate ?? $bm->material->rate ?? $installationFee);
+                    } elseif (str_contains($materialName, 'Delivery Fees')) {
+                        $deliveryFee = (float) ($bm->material->selling_rate ?? $bm->material->rate ?? $deliveryFee);
+                    } elseif (str_contains($materialName, 'Inspection Fees')) {
+                        $inspectionFeeFromBundle = (float) ($bm->material->selling_rate ?? $bm->material->rate ?? 0);
+                    }
+                }
+            }
             
+            // If not found in bundle, try state/delivery location
             if (isset($data['delivery_location_id']) && $data['delivery_location_id']) {
                 $deliveryLocation = \App\Models\DeliveryLocation::find($data['delivery_location_id']);
                 if ($deliveryLocation) {
@@ -635,7 +652,7 @@ class OrderController extends Controller
 
             // Calculate fees
             $materialCost = 0;
-            $inspectionFee = 0;
+            $inspectionFee = $inspectionFeeFromBundle; // Use from bundle if available
             $insuranceFee = 0;
             $addOnsTotal = 0;
             $addOns = [];
@@ -643,15 +660,23 @@ class OrderController extends Controller
             // Installation fee (only if using Troosolar installer)
             $installerChoice = $data['installer_choice'] ?? null;
             if ($installerChoice === 'troosolar') {
-                $materialCost = 30000; // Material cost (cables, breakers, etc.)
+                // For bundles, material cost is included in bundle price
+                // For custom builds, calculate from materials
+                if (!$bundle) {
+                    $materialCost = 30000; // Material cost (cables, breakers, etc.)
+                }
                 
-                // Inspection fee (optional for Buy Now)
-                if ($data['include_inspection'] ?? false) {
+                // Inspection fee (optional for Buy Now, use bundle fee if available)
+                if ($data['include_inspection'] ?? false && !$inspectionFeeFromBundle) {
                     $inspectionFee = 15000;
                 }
             } else {
-                // If using own installer or no installer choice, no installation fee or material cost
+                // If using own installer, no installation fee
                 $installationFee = 0;
+                // But keep inspection fee if it was in bundle
+                if (!$inspectionFeeFromBundle) {
+                    $inspectionFee = 0;
+                }
             }
 
             // Insurance fee (optional for Buy Now, compulsory for BNPL)
