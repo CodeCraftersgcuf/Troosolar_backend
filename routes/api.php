@@ -85,6 +85,7 @@ Route::get('/seed/all', [SeederController::class, 'runAllSeeders']);
 Route::post('/seed/run', [SeederController::class, 'runSeeder']);
 Route::get('/seed/bundles', [SeederController::class, 'runBundleSeeder']);
 Route::get('/seed/bundle-materials', [SeederController::class, 'runBundleMaterialSeeder']);
+Route::get('/seed/products', [SeederController::class, 'runProductSeeder']);
 
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/verify-otp/{user_id}', [UserController::class, 'verifyOtp']);

@@ -29,36 +29,56 @@ class MaterialSeeder extends Seeder
             ['category' => 'A', 'name' => '530W Bi-Facial Power China Solar Panel', 'unit' => 'Nos', 'warranty' => 15],
             ['category' => 'A', 'name' => '550W Monofacial Power China Solar Panel', 'unit' => 'Nos', 'warranty' => 15],
             ['category' => 'A', 'name' => '550W Bi-Facial Power China Solar Panel', 'unit' => 'Nos', 'warranty' => 15],
+            ['category' => 'A', 'name' => '590W Monofacial Jinko Solar Panel', 'unit' => 'Nos', 'warranty' => 15],
+            ['category' => 'A', 'name' => '590W Bi-Facial Jinko Solar Panel', 'unit' => 'Nos', 'warranty' => 15],
             ['category' => 'A', 'name' => '600W Monofacial Power China Solar Panel', 'unit' => 'Nos', 'warranty' => 15],
             ['category' => 'A', 'name' => '600W Bi-Facial Power China Solar Panel', 'unit' => 'Nos', 'warranty' => 15],
+            ['category' => 'A', 'name' => '705W Bi-Facial Canadian Solar Panel', 'unit' => 'Nos', 'warranty' => 15],
+            ['category' => 'A', 'name' => 'HC 250W Monofacial Cworth Energy Solar Panel', 'unit' => 'Nos', 'warranty' => 10],
 
             // B. SOLAR HYBRID INVERTERS
             ['category' => 'B', 'name' => '1.5kW Itel Hybrid Inverter', 'unit' => 'Nos', 'warranty' => 2],
+            ['category' => 'B', 'name' => 'OG-1P1K2-T 12V 1.2kVA Yinergy Solar Hybrid Inverter', 'unit' => 'Nos', 'warranty' => 2],
+            ['category' => 'B', 'name' => 'CE-H1K2 1.2kVA Cworth Energy Solar Hybrid Inverter', 'unit' => 'Nos', 'warranty' => 2],
             ['category' => 'B', 'name' => '3kVA Felicity Solar Hybrid Inverter', 'unit' => 'Nos', 'warranty' => 3],
             ['category' => 'B', 'name' => '5kVA Felicity Solar Hybrid Inverter', 'unit' => 'Nos', 'warranty' => 3],
             ['category' => 'B', 'name' => '5kVA Power China Solar Hybrid Inverter', 'unit' => 'Nos', 'warranty' => 9],
+            ['category' => 'B', 'name' => 'ZKE-OG5K-LPEU 48V 5kVA Power China Solar Hybrid Inverter (Parallel Model)', 'unit' => 'Nos', 'warranty' => 5],
+            ['category' => 'B', 'name' => 'FL-VEM5048 48V 5KVA Felicity Solar Hybrid Inverter (Parallel Model)', 'unit' => 'Nos', 'warranty' => 3],
             ['category' => 'B', 'name' => '8kVA Power China Solar Hybrid Inverter', 'unit' => 'Nos', 'warranty' => 9],
             ['category' => 'B', 'name' => '10kVA Power China Solar Hybrid Inverter', 'unit' => 'Nos', 'warranty' => 9],
             ['category' => 'B', 'name' => '15kVA Power China Solar Hybrid Inverter', 'unit' => 'Nos', 'warranty' => 9],
             ['category' => 'B', 'name' => '20kVA Power China Solar Hybrid Inverter', 'unit' => 'Nos', 'warranty' => 9],
 
             // C. ALL IN ONE SYSTEMS
+            ['category' => 'C', 'name' => 'AI1.5 24V 1.2kVA+1.2kWh Sinadi All In One System', 'unit' => 'Nos', 'warranty' => 5],
             ['category' => 'C', 'name' => '1.5kVA+1.2kWh Smaidi All In One System', 'unit' => 'Nos', 'warranty' => 2],
+            ['category' => 'C', 'name' => 'AI3.8 48V 3.8kVA Sinadi All In One System', 'unit' => 'Nos', 'warranty' => 5],
+            ['category' => 'C', 'name' => 'ESS-2000 48V 2kVA+2kWh Yinergy All In One System', 'unit' => 'Nos', 'warranty' => 5],
             ['category' => 'C', 'name' => '3kVA+3kWh Felicity Solar All In One System', 'unit' => 'Nos', 'warranty' => 2],
             ['category' => 'C', 'name' => '5kVA+5kWh LFP Felicity Solar All In One System', 'unit' => 'Nos', 'warranty' => 5],
             ['category' => 'C', 'name' => '5kVA+10kWh LFP Felicity Solar All In One System', 'unit' => 'Nos', 'warranty' => 5],
+            ['category' => 'C', 'name' => 'AI8.0 48V 8.0kVA+10kWh LFP Felicity Solar All In One System', 'unit' => 'Nos', 'warranty' => 5],
             ['category' => 'C', 'name' => '10kVA+10kWh LFP Felicity Solar All In One System', 'unit' => 'Nos', 'warranty' => 5],
             ['category' => 'C', 'name' => '10kVA+20kWh LFP Felicity Solar All In One System', 'unit' => 'Nos', 'warranty' => 5],
 
             // D. WIFI STICKS
             ['category' => 'D', 'name' => 'Power China Solar Hybrid Inverter Wifi Stick', 'unit' => 'Nos', 'warranty' => 2],
+            ['category' => 'D', 'name' => 'Yinergy Solar Hybrid Inverter Wifi Stick', 'unit' => 'Nos', 'warranty' => 2],
             ['category' => 'D', 'name' => 'Felicity Solar Hybrid Inverter Wifi Stick', 'unit' => 'Nos', 'warranty' => 3],
+            ['category' => 'D', 'name' => 'Felicity Wifi Stick', 'unit' => 'Nos', 'warranty' => 2],
 
             // E. LITHIUM BATTERIES
+            ['category' => 'E', 'name' => 'ZKE-LW5120-0 51.2V 5.12kWh Power China Lithium Ion Battery', 'unit' => 'Nos', 'warranty' => 5],
             ['category' => 'E', 'name' => '5.12V 5.12kWh Power China Lithium Ion Battery', 'unit' => 'Nos', 'warranty' => 5],
+            ['category' => 'E', 'name' => 'GCL 12100 12V 1.3kWh Cworth Energy Lithium Ion Battery', 'unit' => 'Nos', 'warranty' => 3],
+            ['category' => 'E', 'name' => 'GCL 12200 12V 2.5kWh Cworth Energy Lithium Ion Battery', 'unit' => 'Nos', 'warranty' => 3],
+            ['category' => 'E', 'name' => 'GCL 12300 12V 3.8kWh Cworth Energy Lithium Ion Battery', 'unit' => 'Nos', 'warranty' => 3],
             ['category' => 'E', 'name' => '48V 10kWh Cworth Energy Lithium Ion Battery Wall Mount', 'unit' => 'Nos', 'warranty' => 7],
             ['category' => 'E', 'name' => '48V 10kWh Power China Lithium Ion Battery Wall Mount', 'unit' => 'Nos', 'warranty' => 5],
             ['category' => 'E', 'name' => '48V 10kWh Felicity Solar Lithium Ion Battery Wall Mount', 'unit' => 'Nos', 'warranty' => 5],
+            ['category' => 'E', 'name' => 'FL-LPBF48200 48V 10kWh Felicity Solar Lithium Ion Battery', 'unit' => 'Nos', 'warranty' => 5],
+            ['category' => 'E', 'name' => 'LDP 48400 48V 20kWh Cworth Energy Lithium Ion Battery', 'unit' => 'Nos', 'warranty' => 7],
             ['category' => 'E', 'name' => '48V 15kWh Power China Lithium Ion Battery Wall Mount', 'unit' => 'Nos', 'warranty' => 5],
             ['category' => 'E', 'name' => '48V 20kWh Power China Lithium Ion Battery Wall Mount', 'unit' => 'Nos', 'warranty' => 5],
             ['category' => 'E', 'name' => '48V 30kWh Power China Lithium Ion Battery Wall Mount', 'unit' => 'Nos', 'warranty' => 5],
@@ -66,6 +86,8 @@ class MaterialSeeder extends Seeder
             ['category' => 'E', 'name' => '48V 50kWh Power China Lithium Ion Battery Wall Mount', 'unit' => 'Nos', 'warranty' => 5],
 
             // F. MOUNTING STRUCTURE
+            ['category' => 'F', 'name' => 'Solar Panel Mounting Rails (for Aluminium Roofs) [1 Panel]', 'unit' => 'Nos', 'warranty' => 5],
+            ['category' => 'F', 'name' => 'Solar Panel Mounting Rails (for Concrete Roofs) [1 Panel]', 'unit' => 'Nos', 'warranty' => 5],
             ['category' => 'F', 'name' => 'Solar Panel Mounting Rails for Aluminum roofs (1 Panel)', 'unit' => 'Nos', 'warranty' => 1],
             ['category' => 'F', 'name' => 'Solar Panel Mounting Rails for Aluminum roofs (2 Panels)', 'unit' => 'Nos', 'warranty' => 1],
             ['category' => 'F', 'name' => 'Solar Panel Mounting Rails for Aluminum roofs (4 Panels)', 'unit' => 'Nos', 'warranty' => 1],
@@ -93,6 +115,9 @@ class MaterialSeeder extends Seeder
             ['category' => 'I', 'name' => '1C x 10mm Solar Panel Flexible Cable', 'unit' => 'Mtrs', 'warranty' => 1],
 
             // J. SURGE PROTECTORS
+            ['category' => 'J', 'name' => 'DC Surge Protector', 'unit' => 'Nos', 'warranty' => 2],
+            ['category' => 'J', 'name' => 'AC Surge Protector', 'unit' => 'Nos', 'warranty' => 2],
+            ['category' => 'J', 'name' => 'AC Surge Protector (3phase)', 'unit' => 'Nos', 'warranty' => 2],
             ['category' => 'J', 'name' => '1C Surge Protector', 'unit' => 'Nos', 'warranty' => 1],
             ['category' => 'J', 'name' => '2C Surge Protector', 'unit' => 'Nos', 'warranty' => 1],
             ['category' => 'J', 'name' => '4C (3 Phase) Surge Protector', 'unit' => 'Nos', 'warranty' => 1],
@@ -132,17 +157,20 @@ class MaterialSeeder extends Seeder
             ['category' => 'O', 'name' => '1C x 50mm AC Cable', 'unit' => 'Mtrs', 'warranty' => 1],
 
             // P. BUSBAR
+            ['category' => 'P', 'name' => 'DC Busbar', 'unit' => 'Nos', 'warranty' => 2],
+            ['category' => 'P', 'name' => 'AC Busbar', 'unit' => 'Nos', 'warranty' => 2],
+            ['category' => 'P', 'name' => '(3phase) AC Busbar', 'unit' => 'Nos', 'warranty' => 2],
             ['category' => 'P', 'name' => '1C AC Busbar', 'unit' => 'Nos', 'warranty' => 1],
             ['category' => 'P', 'name' => '2C AC Busbar', 'unit' => 'Nos', 'warranty' => 1],
             ['category' => 'P', 'name' => '3 Phase AC Busbar', 'unit' => 'Nos', 'warranty' => 1],
 
             // Q. EARTH ROD & EARTH CABLE
-            ['category' => 'Q', 'name' => 'Earthing Rod', 'unit' => 'Nos', 'warranty' => 1],
-            ['category' => 'Q', 'name' => '1C x 2.5mm Earth Cable', 'unit' => 'Mtrs', 'warranty' => 1],
-            ['category' => 'Q', 'name' => '1C x 4mm Earth Cable', 'unit' => 'Mtrs', 'warranty' => 1],
-            ['category' => 'Q', 'name' => '1C x 6mm Earth Cable', 'unit' => 'Mtrs', 'warranty' => 1],
-            ['category' => 'Q', 'name' => '1C x 10mm Earth Cable', 'unit' => 'Mtrs', 'warranty' => 1],
-            ['category' => 'Q', 'name' => '1C x 16mm Earth Cable', 'unit' => 'Mtrs', 'warranty' => 1],
+            ['category' => 'Q', 'name' => 'Earthing Rod', 'unit' => 'Nos', 'warranty' => 2],
+            ['category' => 'Q', 'name' => '1C x 2.5mm Earth Cable', 'unit' => 'Mtrs', 'warranty' => 2],
+            ['category' => 'Q', 'name' => '1C x 4mm Earth Cable', 'unit' => 'Mtrs', 'warranty' => 2],
+            ['category' => 'Q', 'name' => '1C x 6mm Earth Cable', 'unit' => 'Mtrs', 'warranty' => 2],
+            ['category' => 'Q', 'name' => '1C x 10mm Earth Cable', 'unit' => 'Mtrs', 'warranty' => 2],
+            ['category' => 'Q', 'name' => '1C x 16mm Earth Cable', 'unit' => 'Mtrs', 'warranty' => 2],
 
             // R. BYPASS SWITCH
             ['category' => 'R', 'name' => '32A By-Pass Switch', 'unit' => 'Nos', 'warranty' => 1],
@@ -192,8 +220,8 @@ class MaterialSeeder extends Seeder
                     'name' => $material['name'],
                     'unit' => $material['unit'],
                     'warranty' => $material['warranty'],
-                    'rate' => 0.00,
-                    'selling_rate' => 0.00,
+                    'rate' => 1000.00,
+                    'selling_rate' => 1000.00,
                     'profit' => 0.00,
                 ]);
             }

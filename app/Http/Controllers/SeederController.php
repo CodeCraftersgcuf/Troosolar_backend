@@ -37,6 +37,15 @@ class SeederController extends Controller
                 $results['materials'] = 'Already seeded (skipped)';
             }
 
+            // Check and run ProductSeeder
+            $productCount = DB::table('products')->where('price', 1000)->whereNotNull('featured_image')->count();
+            if ($productCount == 0) {
+                Artisan::call('db:seed', ['--class' => 'ProductSeeder']);
+                $results['products'] = 'Seeded successfully';
+            } else {
+                $results['products'] = 'Already seeded (skipped)';
+            }
+
             // Check and run BundleSeeder
             $bundleCount = DB::table('bundles')
                 ->whereIn('bundle_type', ['Inverter + Battery', 'Solar+Inverter+Battery'])
@@ -146,6 +155,40 @@ class SeederController extends Controller
             );
         } catch (Exception $e) {
             return ResponseHelper::error('Failed to run bundle material seeder: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Run ProductSeeder specifically
+     */
+    public function runProductSeeder()
+    {
+        try {
+            $productCount = DB::table('products')
+                ->where('price', 1000)
+                ->whereNotNull('featured_image')
+                ->count();
+            
+            if ($productCount > 0) {
+                return ResponseHelper::success(
+                    ['status' => 'Already seeded (skipped)', 'count' => $productCount],
+                    'Products from materials already exist. Skipping seeder.'
+                );
+            }
+
+            Artisan::call('db:seed', ['--class' => 'ProductSeeder']);
+            
+            $newCount = DB::table('products')
+                ->where('price', 1000)
+                ->whereNotNull('featured_image')
+                ->count();
+            
+            return ResponseHelper::success(
+                ['status' => 'Seeded successfully', 'count' => $newCount],
+                'Product seeder executed successfully'
+            );
+        } catch (Exception $e) {
+            return ResponseHelper::error('Failed to run product seeder: ' . $e->getMessage(), 500);
         }
     }
 }

@@ -22,7 +22,7 @@ class ProductController extends Controller
             $products = Product::with(['details', 'images','reviews'])->get();
             return ResponseHelper::success($products, 'Products fetched successfully.');
         } catch (Exception $e) {
-            return ResponseHelper::error('Failed to fetch products.', 500, $e->getMessage());
+            return ResponseHelper::error('Failed to fetch products.', 500);
         }
     }
     public function topProducts()
