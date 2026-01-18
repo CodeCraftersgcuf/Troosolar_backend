@@ -27,16 +27,16 @@ public function store(LoanCalculationRequest $request)
     try {
         $data = $request->validated();
 
-        // Validate minimum loan amount for BNPL (₦1,500,000)
-        $loanAmount = (float) ($data['loan_amount'] ?? 0);
-        $minLoanAmount = 1500000; // ₦1,500,000
-        
-        if ($loanAmount > 0 && $loanAmount < $minLoanAmount) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => "Your order total does not meet the minimum ₦" . number_format($minLoanAmount) . " amount required for credit financing. To qualify for Buy Now, Pay Later, please add more items to your cart. Thank you."
-            ], 422);
-        }
+        // Minimum loan amount validation removed - no minimum requirement
+        // $loanAmount = (float) ($data['loan_amount'] ?? 0);
+        // $minLoanAmount = 1500000; // ₦1,500,000
+        // 
+        // if ($loanAmount > 0 && $loanAmount < $minLoanAmount) {
+        //     return response()->json([
+        //         'status'  => 'error',
+        //         'message' => "Your order total does not meet the minimum ₦" . number_format($minLoanAmount) . " amount required for credit financing. To qualify for Buy Now, Pay Later, please add more items to your cart. Thank you."
+        //     ], 422);
+        // }
 
         // 0) Ensure we have an interest row
         $interestPercentage = InterestPercentage::latest()->first();

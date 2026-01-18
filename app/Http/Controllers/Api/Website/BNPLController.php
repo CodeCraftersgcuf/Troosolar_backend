@@ -19,8 +19,8 @@ use Illuminate\Support\Facades\Storage;
 
 class BNPLController extends Controller
 {
-    // Minimum loan amount for BNPL (configurable)
-    private const MIN_LOAN_AMOUNT = 1500000; // ₦1,500,000
+    // Minimum loan amount for BNPL (removed - no minimum requirement)
+    // private const MIN_LOAN_AMOUNT = 1500000; // ₦1,500,000
 
     /**
      * POST /api/bnpl/apply
@@ -73,7 +73,7 @@ class BNPLController extends Controller
             $validationRules = [
                 'customer_type' => 'required|in:residential,sme,commercial',
                 'product_category' => 'required|string',
-                'loan_amount' => 'required|numeric|min:1500000',
+                'loan_amount' => 'required|numeric|min:0',
                 'repayment_duration' => 'required|in:3,6,9,12',
                 'credit_check_method' => 'required|in:auto,manual',
                 'bank_statement' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
@@ -145,14 +145,14 @@ class BNPLController extends Controller
 
             $data = $request->validate($validationRules);
 
-            // Validate minimum loan amount
-            $loanAmount = (float) $data['loan_amount'];
-            if ($loanAmount < self::MIN_LOAN_AMOUNT) {
-                return ResponseHelper::error(
-                    "Your order total does not meet the minimum ₦" . number_format(self::MIN_LOAN_AMOUNT) . " amount required for credit financing. To qualify for Buy Now, Pay Later, please add more items to your cart. Thank you.",
-                    422
-                );
-            }
+            // Minimum loan amount validation removed - no minimum requirement
+            // $loanAmount = (float) $data['loan_amount'];
+            // if ($loanAmount < self::MIN_LOAN_AMOUNT) {
+            //     return ResponseHelper::error(
+            //         "Your order total does not meet the minimum ₦" . number_format(self::MIN_LOAN_AMOUNT) . " amount required for credit financing. To qualify for Buy Now, Pay Later, please add more items to your cart. Thank you.",
+            //         422
+            //     );
+            // }
 
             // Extract personal details (handle both formats)
             $personalDetails = $data['personal_details'] ?? [
