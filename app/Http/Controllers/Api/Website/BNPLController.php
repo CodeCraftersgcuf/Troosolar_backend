@@ -145,8 +145,10 @@ class BNPLController extends Controller
 
             $data = $request->validate($validationRules);
 
+            // Get loan amount (minimum validation removed - no minimum requirement)
+            $loanAmount = (float) $data['loan_amount'];
+            
             // Minimum loan amount validation removed - no minimum requirement
-            // $loanAmount = (float) $data['loan_amount'];
             // if ($loanAmount < self::MIN_LOAN_AMOUNT) {
             //     return ResponseHelper::error(
             //         "Your order total does not meet the minimum ₦" . number_format(self::MIN_LOAN_AMOUNT) . " amount required for credit financing. To qualify for Buy Now, Pay Later, please add more items to your cart. Thank you.",
