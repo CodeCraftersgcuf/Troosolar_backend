@@ -142,15 +142,91 @@ public function index(Request $request)
     public function show($id)
     {
         try {
-            $bundle = Bundles::with(['bundleItems.product', 'customServices'])->find($id);
+            $bundle = Bundles::with([
+                'bundleItems.product.category',
+                'customServices',
+                'bundleMaterials.material.category'
+            ])->find($id);
+            
             if (!$bundle) {
                 return ResponseHelper::error('Bundle not found.', 404);
             }
 
-            return ResponseHelper::success($bundle, 'Bundle found.');
+            // Format bundle items (from products)
+            $bundleItems = $bundle->bundleItems->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'product_id' => $item->product_id,
+                    'product' => $item->product ? [
+                        'id' => $item->product->id,
+                        'title' => $item->product->title,
+                        'price' => (float) ($item->product->price ?? 0),
+                        'discount_price' => $item->product->discount_price ? (float) $item->product->discount_price : null,
+                        'featured_image' => $item->product->featured_image_url ?? $item->product->featured_image ?? null,
+                        'category' => $item->product->category ? [
+                            'id' => $item->product->category->id,
+                            'title' => $item->product->category->title,
+                        ] : null,
+                    ] : null,
+                    'quantity' => $item->quantity ?? 1,
+                ];
+            });
+
+            // Format bundle materials (from materials table)
+            $bundleMaterials = $bundle->bundleMaterials->map(function ($bm) {
+                return [
+                    'id' => $bm->id,
+                    'material_id' => $bm->material_id,
+                    'material' => $bm->material ? [
+                        'id' => $bm->material->id,
+                        'name' => $bm->material->name,
+                        'unit' => $bm->material->unit,
+                        'rate' => (float) ($bm->material->rate ?? 0),
+                        'selling_rate' => (float) ($bm->material->selling_rate ?? 0),
+                        'warranty' => $bm->material->warranty,
+                        'category' => $bm->material->category ? [
+                            'id' => $bm->material->category->id,
+                            'name' => $bm->material->category->name,
+                            'code' => $bm->material->category->code,
+                        ] : null,
+                    ] : null,
+                    'quantity' => (float) ($bm->quantity ?? 1),
+                ];
+            });
+
+            // Format custom services
+            $customServices = $bundle->customServices->map(function ($service) {
+                return [
+                    'id' => $service->id,
+                    'title' => $service->title,
+                    'service_amount' => (float) ($service->service_amount ?? 0),
+                ];
+            });
+
+            // Build response
+            $response = [
+                'id' => $bundle->id,
+                'title' => $bundle->title,
+                'featured_image' => $bundle->featured_image,
+                'bundle_type' => $bundle->bundle_type,
+                'total_price' => (float) ($bundle->total_price ?? 0),
+                'discount_price' => $bundle->discount_price ? (float) $bundle->discount_price : null,
+                'discount_end_date' => $bundle->discount_end_date,
+                'total_load' => $bundle->total_load,
+                'inver_rating' => $bundle->inver_rating,
+                'total_output' => $bundle->total_output,
+                'created_at' => $bundle->created_at?->toIso8601String(),
+                'updated_at' => $bundle->updated_at?->toIso8601String(),
+                'featured_image_url' => $bundle->featured_image_url,
+                'bundle_items' => $bundleItems,
+                'bundle_materials' => $bundleMaterials,
+                'custom_services' => $customServices,
+            ];
+
+            return ResponseHelper::success($response, 'Bundle found.');
         } catch (Exception $e) {
             Log::error('Error fetching bundle: ' . $e->getMessage());
-            return ResponseHelper::error('Failed to fetch bundle.', 500, $e->getMessage());
+            return ResponseHelper::error('Failed to fetch bundle.', 500);
         }
     }
 
