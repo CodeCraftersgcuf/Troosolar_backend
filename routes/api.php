@@ -87,6 +87,10 @@ Route::get('/seed/bundles', [SeederController::class, 'runBundleSeeder']);
 Route::get('/seed/bundle-materials', [SeederController::class, 'runBundleMaterialSeeder']);
 Route::get('/seed/products', [SeederController::class, 'runProductSeeder']);
 
+// Email OTP routes (public - can be called from other applications)
+Route::post('/email-otp/send', [\App\Http\Controllers\Api\Website\EmailOtpController::class, 'sendOtp']);
+Route::post('/email-otp/verify', [\App\Http\Controllers\Api\Website\EmailOtpController::class, 'verifyOtp']);
+
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/verify-otp/{user_id}', [UserController::class, 'verifyOtp']);
 Route::post('/login', [UserController::class, 'login']);

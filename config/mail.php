@@ -39,7 +39,7 @@ return [
             'url' => env('MAIL_URL'),
             'host' => env('MAIL_HOST', 'smtp.mailgun.org'),
             'port' => env('MAIL_PORT', 587),
-            'encryption' => env('MAIL_ENCRYPTION', 'tls'),
+            'encryption' => env('MAIL_ENCRYPTION') ?: (env('MAIL_PORT') == 465 ? 'ssl' : 'tls'), // SSL for port 465, TLS for 587
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
             'timeout' => null,
