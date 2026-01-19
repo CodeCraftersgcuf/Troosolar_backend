@@ -3,30 +3,61 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 class OtpEmail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public $otp;
+    public $otpCode;
+    public $customSubject;
+    public $customMessage;
 
     /**
      * Create a new message instance.
      */
-    public function __construct($otp)
+    public function __construct($otpCode, $customSubject = null, $customMessage = null)
     {
-        $this->otp = $otp;
+        $this->otpCode = $otpCode;
+        $this->customSubject = $customSubject;
+        $this->customMessage = $customMessage;
     }
 
     /**
-     * Build the message.
+     * Get the message envelope.
      */
-    public function build()
+    public function envelope(): Envelope
     {
-        return $this->subject('Your OTP Code - Troosolar')
-                    ->view('emails.otp')
-                    ->with(['otp' => $this->otp]);
+        return new Envelope(
+            subject: $this->customSubject ?? 'Your OTP Code',
+        );
+    }
+
+    /**
+     * Get the message content definition.
+     */
+    public function content(): Content
+    {
+        return new Content(
+            view: 'emails.otp',
+            with: [
+                'otpCode' => $this->otpCode,
+                'customMessage' => $this->customMessage,
+            ],
+        );
+    }
+
+    /**
+     * Get the attachments for the message.
+     *
+     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
+     */
+    public function attachments(): array
+    {
+        return [];
     }
 }
