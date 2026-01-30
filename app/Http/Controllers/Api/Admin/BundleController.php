@@ -45,25 +45,42 @@ public function index(Request $request)
             return ResponseHelper::error('No bundles found.', 404);
         }
 
+        // Parse total_output to numeric (e.g. "3.8 kWh" -> 3.8, "1200 W" -> 1200); null/empty -> 0
+        $parseOutput = function ($value) {
+            if ($value === null || $value === '') {
+                return 0.0;
+            }
+            if (is_numeric($value)) {
+                return (float) $value;
+            }
+            if (preg_match('/^([\d.]+)/', (string) $value, $m)) {
+                return (float) $m[1];
+            }
+            return 0.0;
+        };
+
         // Find bundle with closest total_output to $q
-        $closestBundle = $bundles->sortBy(function ($bundle) use ($q) {
-            return abs($bundle->total_output - $q);
+        $closestBundle = $bundles->sortBy(function ($bundle) use ($q, $parseOutput) {
+            $num = $parseOutput($bundle->total_output);
+            return abs($num - $q);
         })->first();
 
-        // If there’s a bundle with total_output >= $q and closest to it
-        $closerOrAbove = $bundles
-            ->where('total_output', '>=', $q)
-            ->sortBy(function ($bundle) use ($q) {
-                return abs($bundle->total_output - $q);
-            })
-            ->first();
+        // If there's a bundle with total_output >= $q and closest to it
+        $closerOrAbove = $bundles->filter(function ($bundle) use ($q, $parseOutput) {
+            return $parseOutput($bundle->total_output) >= $q;
+        })->sortBy(function ($bundle) use ($q, $parseOutput) {
+            $num = $parseOutput($bundle->total_output);
+            return abs($num - $q);
+        })->first();
 
         return ResponseHelper::success(
             $closerOrAbove ?? $closestBundle,
             'Closest bundle fetched.'
         );
     } catch (Exception $e) {
-        Log::error('Error fetching bundles: ' . $e->getMessage());
+        Log::error('Error fetching bundles: ' . $e->getMessage(), [
+            'trace' => $e->getTraceAsString(),
+        ]);
         return ResponseHelper::error('Failed to fetch bundles.', 500);
     }
 }
