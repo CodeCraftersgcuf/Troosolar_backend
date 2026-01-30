@@ -18,7 +18,7 @@ class BundleRequest extends FormRequest
         return [
             'title' => 'nullable|string|max:255',
             'featured_image' => 'nullable|image|mimes:jpg,jpeg,png|max:3048',
-            'bundle_type' => 'nullable|string',
+            'bundle_type' => 'nullable|string|max:255',
             'total_price' => 'nullable|numeric|min:0',
             'discount_price' => 'nullable|numeric|min:0',
             'discount_end_date' => 'nullable|date',
@@ -27,14 +27,40 @@ class BundleRequest extends FormRequest
             'items.*' => 'nullable|exists:products,id',
 
             'custom_services' => 'nullable|array',
-            'custom_services.*.title' => 'required|string|max:255',
-            'custom_services.*.service_amount' => 'required|numeric|min:0',
-            'total_load' => 'nullable|string',
-            'inver_rating' => 'nullable|string',
-            'total_output' => 'nullable|string',
+            'custom_services.*.title' => 'required_with:custom_services|string|max:255',
+            'custom_services.*.service_amount' => 'required_with:custom_services|numeric|min:0',
+
+            'product_model' => 'nullable|string|max:255',
+            'system_capacity_display' => 'nullable|string|max:255',
+            'detailed_description' => 'nullable|string|max:65535',
+            'what_is_inside_bundle_text' => 'nullable|string|max:65535',
+            'what_bundle_powers_text' => 'nullable|string|max:65535',
+            'backup_time_description' => 'nullable|string|max:65535',
+
+            'total_load' => 'nullable|string|max:255',
+            'inver_rating' => 'nullable|string|max:255',
+            'total_output' => 'nullable|string|max:255',
+
+            'custom_appliances' => 'nullable', // JSON string or array
+            'custom_appliances.*.name' => 'required_with:custom_appliances|string|max:255',
+            'custom_appliances.*.wattage' => 'required_with:custom_appliances|numeric|min:0',
+            'custom_appliances.*.quantity' => 'nullable|integer|min:1',
+            'custom_appliances.*.estimated_daily_hours_usage' => 'nullable|numeric|min:0',
         ];
     }
-     protected function failedValidation(Validator $validator)
+
+    /**
+     * Prepare the data for validation (normalize custom_appliances from JSON string to array).
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->filled('custom_appliances') && is_string($this->custom_appliances)) {
+            $decoded = json_decode($this->custom_appliances, true);
+            $this->merge(['custom_appliances' => is_array($decoded) ? $decoded : []]);
+        }
+    }
+
+    protected function failedValidation(Validator $validator)
     {
         throw new HttpResponseException(
             response()->json([

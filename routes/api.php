@@ -49,6 +49,7 @@ use App\Http\Controllers\SeederController;
 use App\Http\Controllers\Api\Admin\MaterialCategoryController;
 use App\Http\Controllers\Api\Admin\MaterialController;
 use App\Http\Controllers\Api\Admin\BundleMaterialController;
+use App\Http\Controllers\Api\Admin\BundleCustomApplianceController;
 use Illuminate\Support\Facades\Artisan;
 
 /*
@@ -169,6 +170,12 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     Route::post('bundles/{bundleId}/materials/bulk', [BundleMaterialController::class, 'bulkStore']);
     Route::put('bundles/{bundleId}/materials/{id}', [BundleMaterialController::class, 'update']);
     Route::delete('bundles/{bundleId}/materials/{id}', [BundleMaterialController::class, 'destroy']);
+
+    // Bundle Custom Appliances (optional separate endpoints)
+    Route::get('bundles/{bundleId}/custom-appliances', [BundleCustomApplianceController::class, 'index']);
+    Route::post('bundles/{bundleId}/custom-appliances', [BundleCustomApplianceController::class, 'store']);
+    Route::put('bundles/{bundleId}/custom-appliances/{id}', [BundleCustomApplianceController::class, 'update']);
+    Route::delete('bundles/{bundleId}/custom-appliances/{id}', [BundleCustomApplianceController::class, 'destroy']);
 
     // Material Categories and Materials Management
     Route::apiResource('material-categories', MaterialCategoryController::class);

@@ -9,8 +9,21 @@ use Illuminate\Support\Str;
 class Bundles extends Model
 {
     protected $fillable = [
-        'title','total_price','discount_price','discount_end_date','featured_image','bundle_type',
-        'total_load','inver_rating','total_output'
+        'title',
+        'total_price',
+        'discount_price',
+        'discount_end_date',
+        'featured_image',
+        'bundle_type',
+        'product_model',
+        'system_capacity_display',
+        'detailed_description',
+        'what_is_inside_bundle_text',
+        'what_bundle_powers_text',
+        'backup_time_description',
+        'total_load',
+        'inver_rating',
+        'total_output',
     ];
 
     protected $appends = ['featured_image_url'];
@@ -30,6 +43,11 @@ class Bundles extends Model
     public function bundleMaterials()
     {
         return $this->hasMany(BundleMaterial::class, 'bundle_id');
+    }
+
+    public function customAppliances()
+    {
+        return $this->hasMany(BundleCustomAppliance::class, 'bundle_id');
     }
 
     public function getFeaturedImageUrlAttribute(): ?string
