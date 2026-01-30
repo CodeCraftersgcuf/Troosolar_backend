@@ -30,7 +30,7 @@ class BundleRequest extends FormRequest
             'custom_services.*.title' => 'required_with:custom_services|string|max:255',
             'custom_services.*.service_amount' => 'required_with:custom_services|numeric|min:0',
 
-            'product_model' => 'nullable|string|max:255',
+            'product_model' => 'nullable|string|max:65535',
             'system_capacity_display' => 'nullable|string|max:255',
             'detailed_description' => 'nullable|string|max:65535',
             'what_is_inside_bundle_text' => 'nullable|string|max:65535',
