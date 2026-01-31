@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Helpers\ResponseHelper;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -116,29 +117,60 @@ public function index(Request $request)
             $totalPrice = $data['total_price'] ?? $calculatedTotal;
             $discountPrice = $data['discount_price'] ?? ($totalPrice * 0.90); // 20% discount
 
-            $bundle = Bundles::create([
-                'title' => $data['title'] ?? null,
-                'featured_image' => $featuredImagePath,
-                'bundle_type' => $data['bundle_type'] ?? null,
-                'product_model' => isset($data['product_model']) ? trim($data['product_model']) : null,
-                'system_capacity_display' => isset($data['system_capacity_display']) ? trim($data['system_capacity_display']) : null,
-                'detailed_description' => isset($data['detailed_description']) ? trim($data['detailed_description']) : null,
-                'what_is_inside_bundle_text' => isset($data['what_is_inside_bundle_text']) ? trim($data['what_is_inside_bundle_text']) : null,
-                'what_bundle_powers_text' => isset($data['what_bundle_powers_text']) ? trim($data['what_bundle_powers_text']) : null,
-                'backup_time_description' => isset($data['backup_time_description']) ? trim($data['backup_time_description']) : null,
-                'total_load' => isset($data['total_load']) ? trim($data['total_load']) : null,
-                'inver_rating' => isset($data['inver_rating']) ? trim($data['inver_rating']) : null,
-                'total_output' => isset($data['total_output']) ? trim($data['total_output']) : null,
+            $safeTrim = function ($v) {
+                if ($v === null || $v === '') return $v === '' ? '' : null;
+                return is_string($v) ? trim($v) : $v;
+            };
+
+            $createData = [
+                'title' => $safeTrim($data['title'] ?? null),
                 'total_price' => $totalPrice,
                 'discount_price' => $discountPrice,
-                'discount_end_date' => $data['discount_end_date'] ?? null,
-            ]);
+                'discount_end_date' => isset($data['discount_end_date']) && $data['discount_end_date'] !== '' ? $data['discount_end_date'] : null,
+            ];
+            if (Schema::hasColumn('bundles', 'featured_image')) {
+                $createData['featured_image'] = $featuredImagePath;
+            }
+            if (Schema::hasColumn('bundles', 'bundle_type')) {
+                $createData['bundle_type'] = $safeTrim($data['bundle_type'] ?? null);
+            }
 
-            if (!empty($data['custom_appliances'])) {
+            if (Schema::hasColumn('bundles', 'product_model')) {
+                $createData['product_model'] = $safeTrim($data['product_model'] ?? null);
+            }
+            if (Schema::hasColumn('bundles', 'system_capacity_display')) {
+                $createData['system_capacity_display'] = $safeTrim($data['system_capacity_display'] ?? null);
+            }
+            if (Schema::hasColumn('bundles', 'detailed_description')) {
+                $createData['detailed_description'] = $safeTrim($data['detailed_description'] ?? null);
+            }
+            if (Schema::hasColumn('bundles', 'what_is_inside_bundle_text')) {
+                $createData['what_is_inside_bundle_text'] = $safeTrim($data['what_is_inside_bundle_text'] ?? null);
+            }
+            if (Schema::hasColumn('bundles', 'what_bundle_powers_text')) {
+                $createData['what_bundle_powers_text'] = $safeTrim($data['what_bundle_powers_text'] ?? null);
+            }
+            if (Schema::hasColumn('bundles', 'backup_time_description')) {
+                $createData['backup_time_description'] = $safeTrim($data['backup_time_description'] ?? null);
+            }
+            if (Schema::hasColumn('bundles', 'total_load')) {
+                $createData['total_load'] = $safeTrim($data['total_load'] ?? null);
+            }
+            if (Schema::hasColumn('bundles', 'inver_rating')) {
+                $createData['inver_rating'] = $safeTrim($data['inver_rating'] ?? null);
+            }
+            if (Schema::hasColumn('bundles', 'total_output')) {
+                $createData['total_output'] = $safeTrim($data['total_output'] ?? null);
+            }
+
+            $bundle = Bundles::create($createData);
+
+            if (!empty($data['custom_appliances']) && Schema::hasTable('bundle_custom_appliances')) {
                 foreach ($data['custom_appliances'] as $appliance) {
+                    $name = isset($appliance['name']) && is_string($appliance['name']) ? trim($appliance['name']) : '';
                     BundleCustomAppliance::create([
                         'bundle_id' => $bundle->id,
-                        'name' => trim($appliance['name'] ?? ''),
+                        'name' => $name,
                         'wattage' => (float) ($appliance['wattage'] ?? 0),
                         'quantity' => (int) ($appliance['quantity'] ?? 1),
                         'estimated_daily_hours_usage' => isset($appliance['estimated_daily_hours_usage']) ? (float) $appliance['estimated_daily_hours_usage'] : null,
@@ -166,14 +198,22 @@ public function index(Request $request)
             }
 
             DB::commit();
+            $relations = ['bundleItems.product.category', 'customServices', 'bundleMaterials.material.category'];
+            if (Schema::hasTable('bundle_custom_appliances')) {
+                $relations[] = 'customAppliances';
+            }
             return ResponseHelper::success(
-                $this->formatBundleResponse($bundle->load(['bundleItems.product.category', 'customServices', 'bundleMaterials.material.category', 'customAppliances'])),
+                $this->formatBundleResponse($bundle->load($relations)),
                 'Bundle created.',
                 201
             );
         } catch (Exception $e) {
             DB::rollBack();
-            Log::error('Error creating bundle: ' . $e->getMessage());
+            Log::error('Error creating bundle: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
             return ResponseHelper::error('Failed to create bundle.', 500);
         }
     }
@@ -350,13 +390,14 @@ public function index(Request $request)
                 'discount_end_date' => $data['discount_end_date'] ?? $bundle->discount_end_date,
             ]);
 
-            if (array_key_exists('custom_appliances', $data)) {
+            if (array_key_exists('custom_appliances', $data) && Schema::hasTable('bundle_custom_appliances')) {
                 BundleCustomAppliance::where('bundle_id', $bundle->id)->delete();
                 if (!empty($data['custom_appliances'])) {
                     foreach ($data['custom_appliances'] as $appliance) {
+                        $name = isset($appliance['name']) && is_string($appliance['name']) ? trim($appliance['name']) : '';
                         BundleCustomAppliance::create([
                             'bundle_id' => $bundle->id,
-                            'name' => trim($appliance['name'] ?? ''),
+                            'name' => $name,
                             'wattage' => (float) ($appliance['wattage'] ?? 0),
                             'quantity' => (int) ($appliance['quantity'] ?? 1),
                             'estimated_daily_hours_usage' => isset($appliance['estimated_daily_hours_usage']) ? (float) $appliance['estimated_daily_hours_usage'] : null,
@@ -387,7 +428,11 @@ public function index(Request $request)
             }
 
             DB::commit();
-            $bundle->loadMissing(['bundleItems.product.category', 'customServices', 'bundleMaterials.material.category', 'customAppliances']);
+            $updateRelations = ['bundleItems.product.category', 'customServices', 'bundleMaterials.material.category'];
+            if (Schema::hasTable('bundle_custom_appliances')) {
+                $updateRelations[] = 'customAppliances';
+            }
+            $bundle->loadMissing($updateRelations);
 
             return ResponseHelper::success(
                 $this->formatBundleResponse($bundle),
@@ -439,16 +484,18 @@ public function index(Request $request)
         $customServices = $bundle->customServices->map(function ($s) {
             return ['id' => $s->id, 'title' => $s->title, 'service_amount' => (float) ($s->service_amount ?? 0)];
         });
-        $customAppliances = $bundle->customAppliances->map(function ($a) {
-            return [
-                'id' => $a->id,
-                'bundle_id' => $a->bundle_id,
-                'name' => $a->name,
-                'wattage' => (float) $a->wattage,
-                'quantity' => (int) ($a->quantity ?? 1),
-                'estimated_daily_hours_usage' => $a->estimated_daily_hours_usage !== null ? (float) $a->estimated_daily_hours_usage : null,
-            ];
-        });
+        $customAppliances = Schema::hasTable('bundle_custom_appliances') && $bundle->relationLoaded('customAppliances')
+            ? $bundle->customAppliances->map(function ($a) {
+                return [
+                    'id' => $a->id,
+                    'bundle_id' => $a->bundle_id,
+                    'name' => $a->name,
+                    'wattage' => (float) $a->wattage,
+                    'quantity' => (int) ($a->quantity ?? 1),
+                    'estimated_daily_hours_usage' => $a->estimated_daily_hours_usage !== null ? (float) $a->estimated_daily_hours_usage : null,
+                ];
+            })
+            : collect([]);
         return [
             'id' => $bundle->id,
             'title' => $bundle->title,
