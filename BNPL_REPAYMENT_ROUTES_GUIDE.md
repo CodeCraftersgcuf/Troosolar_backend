@@ -18,7 +18,7 @@
 
 ## 🎯 Overview
 
-This guide covers all routes related to BNPL (Buy Now Pay Later) repayments. Users can:
+This guide covers all routes related to BNPL (Buy Now Pay Later) repayments. Users can
 - View their BNPL orders
 - Check repayment schedules
 - View installments (current and history)
