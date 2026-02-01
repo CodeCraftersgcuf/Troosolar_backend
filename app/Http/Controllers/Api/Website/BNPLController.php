@@ -631,6 +631,7 @@ class BNPLController extends Controller
             $request->validate([
                 'transaction_reference' => 'nullable|max:255', // accept string or number (Flutterwave may return numeric id)
                 'amount_paid' => 'nullable|numeric|min:0',
+                'delivery_address_id' => 'nullable|exists:delivery_addresses,id',
             ]);
 
             $application = LoanApplication::with('mono.loanCalculation')->where('id', $id)
@@ -679,6 +680,16 @@ class BNPLController extends Controller
                 $calc->save();
             }
 
+            $deliveryAddressId = $request->input('delivery_address_id');
+            if ($deliveryAddressId) {
+                $owned = \App\Models\DeliveryAddress::where('id', $deliveryAddressId)
+                    ->where('user_id', Auth::id())
+                    ->exists();
+                if (!$owned) {
+                    $deliveryAddressId = null;
+                }
+            }
+
             $order = \App\Models\Order::create([
                 'user_id' => Auth::id(),
                 'order_number' => strtoupper('BNPL-' . \Illuminate\Support\Str::random(8)),
@@ -688,6 +699,7 @@ class BNPLController extends Controller
                 'payment_method' => 'flutterwave',
                 'mono_calculation_id' => $mono->id,
                 'order_type' => 'bnpl',
+                'delivery_address_id' => $deliveryAddressId,
             ]);
 
             \App\Services\LoanInstallmentScheduler::generate($mono->id, null, false);
