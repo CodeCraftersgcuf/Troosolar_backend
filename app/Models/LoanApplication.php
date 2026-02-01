@@ -36,6 +36,9 @@ class LoanApplication extends Model
     'live_photo_path',
     'social_media_handle',
     'guarantor_id',
+    'admin_notes',
+    'counter_offer_min_deposit',
+    'counter_offer_min_tenor',
 ];
 
 // loan history

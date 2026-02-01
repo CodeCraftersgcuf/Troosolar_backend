@@ -6,6 +6,9 @@ use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Guarantor;
 use App\Models\LoanApplication;
+use App\Models\MonoLoanCalculation;
+use App\Models\LoanCalculation;
+use App\Models\Notification;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -78,6 +81,114 @@ class BNPLAdminController extends Controller
     }
 
     /**
+     * Update BNPL application (assign beneficiary email, name, phone – like loan flow)
+     * PUT /api/admin/bnpl/applications/{id}
+     */
+    public function updateApplication(Request $request, $id)
+    {
+        try {
+            $request->validate([
+                'beneficiary_email' => 'nullable|email|max:255',
+                'beneficiary_name' => 'nullable|string|max:255',
+                'beneficiary_phone' => 'nullable|string|max:20',
+                'beneficiary_relationship' => 'nullable|string|max:100',
+            ]);
+
+            $application = LoanApplication::find($id);
+            if (!$application) {
+                return ResponseHelper::error('BNPL application not found', 404);
+            }
+
+            if ($request->filled('beneficiary_email')) {
+                $application->beneficiary_email = $request->beneficiary_email;
+            }
+            if ($request->filled('beneficiary_name')) {
+                $application->beneficiary_name = $request->beneficiary_name;
+            }
+            if ($request->filled('beneficiary_phone')) {
+                $application->beneficiary_phone = $request->beneficiary_phone;
+            }
+            if ($request->filled('beneficiary_relationship')) {
+                $application->beneficiary_relationship = $request->beneficiary_relationship;
+            }
+            $application->save();
+
+            return ResponseHelper::success($application->fresh(['user', 'guarantor', 'mono']), 'BNPL application updated successfully');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (Exception $e) {
+            Log::error('BNPL Admin Update Application Error: ' . $e->getMessage());
+            return ResponseHelper::error('Failed to update BNPL application', 500);
+        }
+    }
+
+    /**
+     * Update loan offer (amount, down payment, tenor) for BNPL application
+     * PUT /api/admin/bnpl/applications/{id}/offer
+     */
+    public function updateLoanOffer(Request $request, $id)
+    {
+        try {
+            $request->validate([
+                'loan_amount' => 'nullable|numeric|min:0',
+                'down_payment' => 'nullable|numeric|min:0',
+                'repayment_duration' => 'nullable|integer|in:3,6,9,12',
+            ]);
+
+            $application = LoanApplication::with('mono.loanCalculation')->find($id);
+            if (!$application) {
+                return ResponseHelper::error('BNPL application not found', 404);
+            }
+
+            $mono = $application->mono;
+            if (!$mono) {
+                return ResponseHelper::error('No loan calculation linked to this application', 404);
+            }
+
+            $loanAmount = $request->filled('loan_amount') ? (float) $request->loan_amount : (float) $mono->loan_amount;
+            $downPayment = $request->filled('down_payment') ? (float) $request->down_payment : (float) $mono->down_payment;
+            $duration = $request->filled('repayment_duration') ? (int) $request->repayment_duration : (int) $mono->repayment_duration;
+
+            $interestRate = (float) ($mono->interest_rate ?? 0);
+            $totalAmount = $loanAmount + ($loanAmount * $interestRate);
+            $monthlyPayment = $duration > 0 ? round(($totalAmount - $downPayment) / $duration, 2) : 0;
+
+            $mono->loan_amount = $loanAmount;
+            $mono->down_payment = $downPayment;
+            $mono->repayment_duration = $duration;
+            $mono->total_amount = $totalAmount;
+            $mono->save();
+
+            $application->loan_amount = $loanAmount;
+            $application->repayment_duration = $duration;
+            $application->save();
+
+            if ($mono->loanCalculation) {
+                $mono->loanCalculation->loan_amount = $loanAmount;
+                $mono->loanCalculation->repayment_duration = $duration;
+                $mono->loanCalculation->monthly_payment = $monthlyPayment;
+                $mono->loanCalculation->repayment_date = $mono->loanCalculation->repayment_date ?? now()->addMonth();
+                $mono->loanCalculation->save();
+            }
+
+            return ResponseHelper::success($application->fresh(['user', 'mono', 'mono.loanCalculation']), 'Loan offer updated successfully');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (Exception $e) {
+            Log::error('BNPL Admin Update Offer Error: ' . $e->getMessage());
+            return ResponseHelper::error('Failed to update loan offer', 500);
+        }
+    }
+
+    /**
      * Update BNPL application status
      * PUT /api/admin/bnpl/applications/{id}/status
      */
@@ -91,7 +202,7 @@ class BNPLAdminController extends Controller
                 'admin_notes' => 'nullable|string|max:1000',
             ]);
 
-            $application = LoanApplication::find($id);
+            $application = LoanApplication::with('user')->find($id);
             if (!$application) {
                 return ResponseHelper::error('BNPL application not found', 404);
             }
@@ -102,16 +213,29 @@ class BNPLAdminController extends Controller
             }
             $application->save();
 
-            // If counter offer, store the counter offer details
             if ($request->status === 'counter_offer') {
-                // You might want to create a separate counter_offers table
-                // For now, we'll store it in the application
                 $application->counter_offer_min_deposit = $request->counter_offer_min_deposit;
                 $application->counter_offer_min_tenor = $request->counter_offer_min_tenor;
                 $application->save();
             }
 
-            return ResponseHelper::success($application, 'BNPL application status updated successfully');
+            // Notify user when admin sends offer or approves/rejects
+            $userId = $application->user_id;
+            $status = $request->status;
+            if ($userId && in_array($status, ['approved', 'counter_offer', 'rejected'])) {
+                $message = $status === 'approved'
+                    ? 'Your BNPL application has been approved. Please pay your initial down payment to complete the order.'
+                    : ($status === 'counter_offer'
+                        ? 'You have a counter offer on your BNPL application. Please review and accept or decline.'
+                        : 'We cannot process your BNPL application at this time. Thank you for choosing Troosolar.');
+                Notification::create([
+                    'user_id' => $userId,
+                    'message' => $message,
+                    'type' => 'bnpl_status',
+                ]);
+            }
+
+            return ResponseHelper::success($application->fresh(['user', 'guarantor', 'mono']), 'BNPL application status updated successfully');
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'status' => 'error',

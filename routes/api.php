@@ -235,6 +235,7 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     Route::post('/bnpl/guarantor/invite', [BNPLController::class, 'inviteGuarantor']);
     Route::post('/bnpl/guarantor/upload', [BNPLController::class, 'uploadGuarantorForm']);
     Route::post('/bnpl/counteroffer/accept', [BNPLController::class, 'acceptCounterOffer']);
+    Route::post('/bnpl/applications/{id}/confirm-down-payment', [BNPLController::class, 'confirmDownPayment']);
     
     // BNPL Orders endpoints
     Route::get('/bnpl/orders', [BNPLController::class, 'getOrders']); // List all user's BNPL orders
@@ -409,6 +410,8 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     Route::prefix('admin/bnpl')->group(function () {
         Route::get('/applications', [BNPLAdminController::class, 'index']);
         Route::get('/applications/{id}', [BNPLAdminController::class, 'show']);
+        Route::put('/applications/{id}', [BNPLAdminController::class, 'updateApplication']);
+        Route::put('/applications/{id}/offer', [BNPLAdminController::class, 'updateLoanOffer']);
         Route::put('/applications/{id}/status', [BNPLAdminController::class, 'updateStatus']);
         Route::get('/guarantors', [BNPLAdminController::class, 'getGuarantors']);
         Route::put('/guarantors/{id}/status', [BNPLAdminController::class, 'updateGuarantorStatus']);

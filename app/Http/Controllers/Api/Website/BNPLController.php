@@ -399,6 +399,9 @@ class BNPLController extends Controller
                 'loan_amount' => number_format((float) $application->loan_amount, 2),
                 'repayment_duration' => $application->repayment_duration,
                 'status' => $application->status, // pending, approved, rejected, counter_offer, counter_offer_accepted
+                'admin_notes' => $application->admin_notes,
+                'counter_offer_min_deposit' => $application->counter_offer_min_deposit !== null ? (float) $application->counter_offer_min_deposit : null,
+                'counter_offer_min_tenor' => $application->counter_offer_min_tenor,
                 'property_state' => $application->property_state,
                 'property_address' => $application->property_address,
                 'property_landmark' => $application->property_landmark,
@@ -527,7 +530,7 @@ class BNPLController extends Controller
 
     /**
      * POST /api/bnpl/counteroffer/accept
-     * Accept counteroffer from admin
+     * Accept counteroffer from admin – update Mono + LoanCalculation and set status.
      */
     public function acceptCounterOffer(Request $request)
     {
@@ -535,10 +538,11 @@ class BNPLController extends Controller
             $data = $request->validate([
                 'application_id' => 'required|exists:loan_applications,id',
                 'minimum_deposit' => 'required|numeric|min:0',
-                'minimum_tenor' => 'required|integer|min:3',
+                'minimum_tenor' => 'required|integer|in:3,6,9,12',
             ]);
 
-            $application = LoanApplication::where('id', $data['application_id'])
+            $application = LoanApplication::with('mono.loanCalculation')
+                ->where('id', $data['application_id'])
                 ->where('user_id', Auth::id())
                 ->first();
 
@@ -546,26 +550,147 @@ class BNPLController extends Controller
                 return ResponseHelper::error('Application not found', 404);
             }
 
-            // Update application with counteroffer details
+            if ($application->status !== 'counter_offer') {
+                return ResponseHelper::error('This application does not have a counter offer to accept', 422);
+            }
+
+            $mono = $application->mono;
+            if (!$mono) {
+                return ResponseHelper::error('Loan calculation not found for this application', 404);
+            }
+
+            $downPayment = (float) $data['minimum_deposit'];
+            $duration = (int) $data['minimum_tenor'];
+            $loanAmount = (float) $mono->loan_amount;
+            $interestRate = (float) ($mono->interest_rate ?? 0);
+            $totalAmount = $loanAmount + ($loanAmount * $interestRate);
+            $monthlyPayment = $duration > 0 ? round(($totalAmount - $downPayment) / $duration, 2) : 0;
+
+            $mono->down_payment = $downPayment;
+            $mono->repayment_duration = $duration;
+            $mono->total_amount = $totalAmount;
+            $mono->save();
+
+            $application->repayment_duration = $duration;
             $application->status = 'counter_offer_accepted';
             $application->save();
 
-            // Update loan calculation with new terms
-            $loanCalculation = LoanCalculation::where('id', $application->mono_loan_calculation)->first();
-            if ($loanCalculation) {
-                $loanCalculation->repayment_duration = $data['minimum_tenor'];
-                $loanCalculation->save();
+            if ($mono->loanCalculation) {
+                $mono->loanCalculation->repayment_duration = $duration;
+                $mono->loanCalculation->monthly_payment = $monthlyPayment;
+                $mono->loanCalculation->repayment_date = $mono->loanCalculation->repayment_date ?? now()->addMonth();
+                $mono->loanCalculation->save();
             }
 
             return ResponseHelper::success([
                 'application_id' => $application->id,
-                'minimum_deposit' => $data['minimum_deposit'],
-                'minimum_tenor' => $data['minimum_tenor'],
-            ], 'Counteroffer accepted successfully');
-
+                'minimum_deposit' => $downPayment,
+                'minimum_tenor' => $duration,
+                'down_payment' => $downPayment,
+                'repayment_duration' => $duration,
+                'total_amount' => $totalAmount,
+                'message' => 'Counter offer accepted. Please pay your initial down payment to complete the order.',
+            ], 'Counter offer accepted successfully');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
         } catch (Exception $e) {
             Log::error('Counteroffer Accept Error: ' . $e->getMessage());
-            return ResponseHelper::error('Failed to accept counteroffer: ' . $e->getMessage(), 500);
+            return ResponseHelper::error('Failed to accept counter offer: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * POST /api/bnpl/applications/{id}/confirm-down-payment
+     * After Flutterwave success: create BNPL order and installments, complete application flow.
+     */
+    public function confirmDownPayment(Request $request, $id)
+    {
+        try {
+            $request->validate([
+                'transaction_reference' => 'nullable|string|max:255',
+                'amount_paid' => 'nullable|numeric|min:0',
+            ]);
+
+            $application = LoanApplication::with('mono.loanCalculation')->where('id', $id)
+                ->where('user_id', Auth::id())
+                ->first();
+
+            if (!$application) {
+                return ResponseHelper::error('Application not found', 404);
+            }
+
+            $status = $application->status;
+            if (!in_array($status, ['approved', 'counter_offer_accepted'], true)) {
+                return ResponseHelper::error('Application must be approved or counter offer accepted before paying down payment', 422);
+            }
+
+            $mono = $application->mono;
+            if (!$mono) {
+                return ResponseHelper::error('Loan calculation not found for this application', 404);
+            }
+
+            // Check if order already created for this application (idempotent)
+            $existingOrder = \App\Models\Order::where('mono_calculation_id', $mono->id)
+                ->where('user_id', Auth::id())
+                ->where(function ($q) {
+                    $q->where('order_type', 'bnpl')->orWhereNull('order_type');
+                })
+                ->first();
+
+            if ($existingOrder) {
+                return ResponseHelper::success([
+                    'order_id' => $existingOrder->id,
+                    'order_number' => $existingOrder->order_number,
+                    'message' => 'Order already created for this application.',
+                ], 'Order already exists');
+            }
+
+            $calc = $mono->loanCalculation;
+            if ($calc) {
+                $duration = (int) $mono->repayment_duration;
+                $totalAmount = (float) $mono->total_amount;
+                $downPayment = (float) $mono->down_payment;
+                $monthlyPayment = $duration > 0 ? round(($totalAmount - $downPayment) / $duration, 2) : 0;
+                $calc->repayment_duration = $duration;
+                $calc->monthly_payment = $monthlyPayment;
+                $calc->repayment_date = $calc->repayment_date ?? now()->addMonth();
+                $calc->save();
+            }
+
+            $order = \App\Models\Order::create([
+                'user_id' => Auth::id(),
+                'order_number' => strtoupper('BNPL-' . \Illuminate\Support\Str::random(8)),
+                'total_price' => (float) $mono->total_amount,
+                'payment_status' => 'paid',
+                'order_status' => 'pending',
+                'payment_method' => 'flutterwave',
+                'mono_calculation_id' => $mono->id,
+                'order_type' => 'bnpl',
+            ]);
+
+            \App\Services\LoanInstallmentScheduler::generate($mono->id, null, false);
+
+            return ResponseHelper::success([
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'message' => 'Order completed. Your BNPL order has been placed successfully.',
+            ], 'Down payment confirmed, order created successfully');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (Exception $e) {
+            Log::error('BNPL Confirm Down Payment Error: ' . $e->getMessage(), [
+                'application_id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return ResponseHelper::error('Failed to confirm down payment: ' . $e->getMessage(), 500);
         }
     }
 
