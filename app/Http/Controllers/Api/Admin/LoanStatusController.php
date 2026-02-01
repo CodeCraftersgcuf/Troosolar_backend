@@ -148,15 +148,22 @@ class LoanStatusController extends Controller
                 'updated_at'            => $loanApp->updated_at,
             ];
 
-            // Loan status block
+            // Loan status block - use BNPL status from loan_applications for send_status
             $loanDetails['loan_status'] = $loanApp->loanStatus ? [
-                'send_status'         => $loanApp->loanStatus->send_status,
+                'send_status'         => $loanApp->status, // Use BNPL status from loan_applications (pending, approved, rejected, counter_offer, counter_offer_accepted)
                 'send_date'           => $loanApp->loanStatus->send_date,
                 'approval_status'     => $loanApp->loanStatus->approval_status,
                 'approval_date'       => $loanApp->loanStatus->approval_date,
                 'disbursement_status' => $loanApp->loanStatus->disbursement_status,
                 'disbursement_date'   => $loanApp->loanStatus->disbursement_date,
-            ] : null;
+            ] : [
+                'send_status'         => $loanApp->status, // Use BNPL status even if loanStatus doesn't exist
+                'send_date'           => null,
+                'approval_status'     => null,
+                'approval_date'       => null,
+                'disbursement_status' => null,
+                'disbursement_date'   => null,
+            ];
 
             // === New: Per-loan "this month" installments ===
             $monoId = optional($loanApp->mono)->id; // may be null if relation missing
