@@ -28,10 +28,10 @@ class MonoLoanCalculation extends Model
         return $this->belongsTo(LoanCalculation::class);
     }
 
-    // loan installment
+    // loan installment (table column is mono_calculation_id, not mono_loan_calculation_id)
     public function loanInstallments()
     {
-        return $this->hasMany(LoanInstallment::class);
+        return $this->hasMany(LoanInstallment::class, 'mono_calculation_id');
     }
 
     // loan repayment
