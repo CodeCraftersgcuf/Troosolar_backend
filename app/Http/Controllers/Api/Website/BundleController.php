@@ -12,20 +12,46 @@ use Illuminate\Support\Facades\Log;
 class BundleController extends Controller
 {
     /**
-     * Parse load/wattage string to numeric (e.g. "1200 W" -> 1200, "3.8 kWh" -> 3.8).
+     * Parse load/wattage string to numeric in watts.
+     * Handles: "1200 W" -> 1200, "3.8 kWh" -> 3800, "1.2" -> 1200 (assumes kW if no unit)
      */
-    private function parseLoadToNumber($value): float
+    private function parseLoadToWatts($value): float
     {
         if ($value === null || $value === '') {
             return 0.0;
         }
-        if (is_numeric($value)) {
-            return (float) $value;
+        
+        $valueStr = (string) $value;
+        $numericValue = 0.0;
+        
+        // Extract numeric value
+        if (is_numeric($valueStr)) {
+            $numericValue = (float) $valueStr;
+        } elseif (preg_match('/^([\d.]+)/', $valueStr, $m)) {
+            $numericValue = (float) $m[1];
+        } else {
+            return 0.0;
         }
-        if (preg_match('/^([\d.]+)/', (string) $value, $m)) {
-            return (float) $m[1];
+        
+        // Check for unit indicators and convert to watts
+        $lowerValue = strtolower($valueStr);
+        if (strpos($lowerValue, 'kw') !== false || strpos($lowerValue, 'kwh') !== false) {
+            // Value is in kW, convert to watts
+            return $numericValue * 1000;
+        } elseif (strpos($lowerValue, 'w') !== false) {
+            // Value is already in watts
+            return $numericValue;
+        } else {
+            // No unit specified - assume kW if value < 1000, otherwise assume watts
+            // But based on your data (0.6, 1.2), these are likely kW
+            if ($numericValue < 100) {
+                // Likely kW (e.g., 0.6, 1.2, 3.8)
+                return $numericValue * 1000;
+            } else {
+                // Likely already in watts
+                return $numericValue;
+            }
         }
-        return 0.0;
     }
 
     /**
@@ -46,23 +72,24 @@ class BundleController extends Controller
 
             // When q is provided (load in watts), filter by 30% headroom: require total_load >= q * 1.30
             if ($query !== null && $query !== '' && is_numeric($query)) {
-                $q = (float) $query;
+                $q = (float) $query; // q is in watts
                 $minCapacityWatts = (float) round($q * 1.30, 2); // 30% above passed wattage
 
                 $bundles = $bundles->map(function ($bundle) {
-                    $bundle->_parsed_load = $this->parseLoadToNumber($bundle->total_load);
+                    // Convert total_load to watts for comparison
+                    $bundle->_parsed_load_watts = $this->parseLoadToWatts($bundle->total_load);
                     return $bundle;
                 });
 
                 $matching = $bundles->filter(function ($bundle) use ($minCapacityWatts) {
-                    return $bundle->_parsed_load >= $minCapacityWatts;
+                    return $bundle->_parsed_load_watts >= $minCapacityWatts;
                 })->values();
 
                 // If none meet 30% headroom, return all sorted by total_load desc (best effort)
                 if ($matching->isEmpty()) {
-                    $bundles = $bundles->sortByDesc('_parsed_load')->values();
+                    $bundles = $bundles->sortByDesc('_parsed_load_watts')->values();
                 } else {
-                    $bundles = $matching->sortBy('_parsed_load')->values(); // smallest adequate first
+                    $bundles = $matching->sortBy('_parsed_load_watts')->values(); // smallest adequate first
                 }
             }
 
@@ -83,8 +110,8 @@ class BundleController extends Controller
                     'updated_at' => $bundle->updated_at?->toIso8601String(),
                 ];
                 // Remove temporary attribute if present
-                if (isset($bundle->_parsed_load)) {
-                    unset($bundle->_parsed_load);
+                if (isset($bundle->_parsed_load_watts)) {
+                    unset($bundle->_parsed_load_watts);
                 }
                 return $item;
             });
