@@ -23,7 +23,11 @@ class BNPLAdminController extends Controller
     {
         try {
             $query = LoanApplication::with(['user', 'guarantor', 'mono'])
-                ->whereNotNull('customer_type'); // Filter BNPL applications
+                ->where(function ($q) {
+                    // BNPL applications: have customer_type and/or product_category set
+                    $q->whereNotNull('customer_type')
+                      ->orWhereNotNull('product_category');
+                });
 
             // Filter by status
             if ($request->has('status')) {

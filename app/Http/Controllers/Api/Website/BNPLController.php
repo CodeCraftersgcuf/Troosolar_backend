@@ -611,7 +611,7 @@ class BNPLController extends Controller
     {
         try {
             $request->validate([
-                'transaction_reference' => 'nullable|string|max:255',
+                'transaction_reference' => 'nullable|max:255', // accept string or number (Flutterwave may return numeric id)
                 'amount_paid' => 'nullable|numeric|min:0',
             ]);
 
