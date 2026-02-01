@@ -25,7 +25,9 @@ class LoanInstallmentScheduler
         $calc = $mono->loanCalculation; // must exist
 
         $userId     = $calc->user_id;
-        $duration   = (int) $calc->repayment_duration;
+        // Use mono->repayment_duration as primary source (synced when counter offer accepted)
+        // Fallback to calc->repayment_duration if mono doesn't have it
+        $duration   = (int) ($mono->repayment_duration ?? $calc->repayment_duration);
         $perMonth   = (float) $calc->monthly_payment;
 
         if ($duration <= 0) {

@@ -206,7 +206,7 @@ class BNPLAdminController extends Controller
                 'admin_notes' => 'nullable|string|max:1000',
             ]);
 
-            $application = LoanApplication::with('user')->find($id);
+            $application = LoanApplication::with(['user', 'mono'])->find($id);
             if (!$application) {
                 return ResponseHelper::error('BNPL application not found', 404);
             }
@@ -221,6 +221,41 @@ class BNPLAdminController extends Controller
                 $application->counter_offer_min_deposit = $request->counter_offer_min_deposit;
                 $application->counter_offer_min_tenor = $request->counter_offer_min_tenor;
                 $application->save();
+            }
+
+            // When approving, sync counter offer terms to mono if they exist
+            if ($request->status === 'approved' && $application->mono) {
+                $mono = $application->mono;
+                $hasCounterOfferTerms = $application->counter_offer_min_deposit !== null && 
+                                       $application->counter_offer_min_tenor !== null;
+                
+                if ($hasCounterOfferTerms) {
+                    // Use counter offer terms
+                    $downPayment = (float) $application->counter_offer_min_deposit;
+                    $duration = (int) $application->counter_offer_min_tenor;
+                    $loanAmount = (float) $mono->loan_amount;
+                    $interestRate = (float) ($mono->interest_rate ?? 0);
+                    $totalAmount = $loanAmount + ($loanAmount * $interestRate);
+                    $monthlyPayment = $duration > 0 ? round(($totalAmount - $downPayment) / $duration, 2) : 0;
+
+                    // Update mono with counter offer terms
+                    $mono->down_payment = $downPayment;
+                    $mono->repayment_duration = $duration;
+                    $mono->total_amount = $totalAmount;
+                    $mono->save();
+
+                    // Update application repayment duration
+                    $application->repayment_duration = $duration;
+                    $application->save();
+
+                    // Update loan calculation if exists
+                    if ($mono->loanCalculation) {
+                        $mono->loanCalculation->repayment_duration = $duration;
+                        $mono->loanCalculation->monthly_payment = $monthlyPayment;
+                        $mono->loanCalculation->repayment_date = $mono->loanCalculation->repayment_date ?? now()->addMonth();
+                        $mono->loanCalculation->save();
+                    }
+                }
             }
 
             // Notify user when admin sends offer or approves/rejects

@@ -814,6 +814,22 @@ class BNPLController extends Controller
 
             \App\Services\LoanInstallmentScheduler::generate($mono->id, null, false);
 
+            // Update application status to 'approved' after down payment is confirmed
+            $application->status = 'approved';
+            $application->save();
+
+            // Add remaining loan balance to user's loan wallet
+            $remainingBalance = (float) $mono->total_amount - (float) $mono->down_payment;
+            if ($remainingBalance > 0) {
+                $wallet = \App\Models\Wallet::firstOrCreate(
+                    ['user_id' => Auth::id()],
+                    ['loan_balance' => 0, 'shop_balance' => 0]
+                );
+                $currentLoanBalance = (float) ($wallet->loan_balance ?? 0);
+                $wallet->loan_balance = $currentLoanBalance + $remainingBalance;
+                $wallet->save();
+            }
+
             return ResponseHelper::success([
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
