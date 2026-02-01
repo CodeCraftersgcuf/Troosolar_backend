@@ -288,6 +288,20 @@ class OrderController extends Controller
             $order = $query->findOrFail($id);
 
             $extras = [];
+            // BNPL orders: use application's property address when order has no delivery address
+            if (($order->order_type ?? null) === 'bnpl' && !$order->deliveryAddress && $order->mono_calculation_id) {
+                $bnplApplication = LoanApplication::where('mono_loan_calculation', $order->mono_calculation_id)
+                    ->where('user_id', $order->user_id)
+                    ->first();
+                if ($bnplApplication && ($bnplApplication->property_address || $bnplApplication->property_state)) {
+                    $extras['delivery_address'] = (object) [
+                        'address' => $bnplApplication->property_address ?? '',
+                        'state' => $bnplApplication->property_state ?? null,
+                        'title' => 'BNPL delivery',
+                        'phone_number' => $order->relationLoaded('user') && $order->user ? $order->user->phone : null,
+                    ];
+                }
+            }
             if ($order->payment_method === 'direct') {
                 $extras['installation'] = [
                     'technician_name'   => 'John Doe',

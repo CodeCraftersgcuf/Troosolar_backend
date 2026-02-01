@@ -690,6 +690,19 @@ class BNPLController extends Controller
                 }
             }
 
+            // If no delivery address provided, create one from the application's property address
+            if (!$deliveryAddressId && ($application->property_address || $application->property_state)) {
+                $user = Auth::user();
+                $deliveryAddress = \App\Models\DeliveryAddress::create([
+                    'user_id' => Auth::id(),
+                    'address' => $application->property_address ?? '',
+                    'state' => $application->property_state ?? null,
+                    'title' => 'BNPL delivery',
+                    'phone_number' => $user->phone ?? null,
+                ]);
+                $deliveryAddressId = $deliveryAddress->id;
+            }
+
             $order = \App\Models\Order::create([
                 'user_id' => Auth::id(),
                 'order_number' => strtoupper('BNPL-' . \Illuminate\Support\Str::random(8)),
@@ -864,11 +877,23 @@ class BNPLController extends Controller
             $pendingAmount = $totalAmount - $paidAmount;
 
             $orderData = $this->formatBnplOrder($order);
+            // For BNPL orders without a linked delivery address, use application's property address
+            if (!$orderData['delivery_address'] && $loanApplication) {
+                $user = Auth::user();
+                $orderData['delivery_address'] = (object) [
+                    'address' => $loanApplication->property_address ?? '',
+                    'state' => $loanApplication->property_state ?? null,
+                    'title' => 'BNPL delivery',
+                    'phone_number' => $user ? $user->phone : null,
+                ];
+            }
             $orderData['loan_application'] = $loanApplication ? [
                 'id' => $loanApplication->id,
                 'status' => $loanApplication->status,
                 'loan_amount' => (float) $loanApplication->loan_amount,
                 'repayment_duration' => $loanApplication->repayment_duration,
+                'property_address' => $loanApplication->property_address,
+                'property_state' => $loanApplication->property_state,
                 'guarantor' => $loanApplication->guarantor ? [
                     'id' => $loanApplication->guarantor->id,
                     'full_name' => $loanApplication->guarantor->full_name,
