@@ -39,7 +39,12 @@ class LoanApplication extends Model
     'admin_notes',
     'counter_offer_min_deposit',
     'counter_offer_min_tenor',
+    'order_items_snapshot',
 ];
+
+    protected $casts = [
+        'order_items_snapshot' => 'array',
+    ];
 
 // loan history
 public function loanHistories()

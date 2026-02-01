@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Api\Website;
 
 use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Controller;
+use App\Models\Bundles;
 use App\Models\Guarantor;
 use App\Models\LoanApplication;
 use App\Models\LoanCalculation;
 use App\Models\MonoLoanCalculation;
 use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Product;
 use App\Models\LoanInstallment;
 use App\Models\LoanRepayment;
 use Exception;
@@ -143,10 +146,46 @@ class BNPLController extends Controller
                 $validationRules['property_rooms'] = 'nullable|integer|min:1';
             }
 
-            $data = $request->validate($validationRules);
+            $data = $request->validate(array_merge($validationRules, [
+                'bundle_ids' => 'nullable|array',
+                'bundle_ids.*' => 'integer|exists:bundles,id',
+                'product_ids' => 'nullable|array',
+                'product_ids.*' => 'integer|exists:products,id',
+            ]));
 
             // Get loan amount (minimum validation removed - no minimum requirement)
             $loanAmount = (float) $data['loan_amount'];
+
+            // Build order_items_snapshot from bundle_ids and product_ids for creating order items when down payment is confirmed
+            $orderItemsSnapshot = [];
+            $bundleIds = $data['bundle_ids'] ?? [];
+            $productIds = $data['product_ids'] ?? [];
+            foreach ($bundleIds as $bundleId) {
+                $bundle = Bundles::find($bundleId);
+                if ($bundle) {
+                    $unitPrice = (float) ($bundle->discount_price ?? $bundle->total_price ?? 0);
+                    $orderItemsSnapshot[] = [
+                        'itemable_type' => Bundles::class,
+                        'itemable_id' => (int) $bundleId,
+                        'quantity' => 1,
+                        'unit_price' => $unitPrice,
+                        'subtotal' => $unitPrice,
+                    ];
+                }
+            }
+            foreach ($productIds as $productId) {
+                $product = Product::find($productId);
+                if ($product) {
+                    $unitPrice = (float) ($product->discount_price ?? $product->price ?? 0);
+                    $orderItemsSnapshot[] = [
+                        'itemable_type' => Product::class,
+                        'itemable_id' => (int) $productId,
+                        'quantity' => 1,
+                        'unit_price' => $unitPrice,
+                        'subtotal' => $unitPrice,
+                    ];
+                }
+            }
             
             // Minimum loan amount validation removed - no minimum requirement
             // if ($loanAmount < self::MIN_LOAN_AMOUNT) {
@@ -253,7 +292,7 @@ class BNPLController extends Controller
                 $loanCalculation->save();
             }
 
-            // Create loan application
+            // Create loan application (with optional order_items_snapshot for multi-item BNPL orders)
             $loanApplication = LoanApplication::create([
                 'user_id' => Auth::id(),
                 'mono_loan_calculation' => $monoLoanCalculationId, // Can be null if no loan calculation exists
@@ -275,6 +314,7 @@ class BNPLController extends Controller
                 'live_photo_path' => $livePhotoPath,
                 'social_media_handle' => $personalDetails['social_media'] ?? null,
                 'status' => 'pending',
+                'order_items_snapshot' => !empty($orderItemsSnapshot) ? $orderItemsSnapshot : null,
             ]);
 
             return ResponseHelper::success([
@@ -703,7 +743,7 @@ class BNPLController extends Controller
                 $deliveryAddressId = $deliveryAddress->id;
             }
 
-            $order = \App\Models\Order::create([
+            $order = Order::create([
                 'user_id' => Auth::id(),
                 'order_number' => strtoupper('BNPL-' . \Illuminate\Support\Str::random(8)),
                 'total_price' => (float) $mono->total_amount,
@@ -714,6 +754,28 @@ class BNPLController extends Controller
                 'order_type' => 'bnpl',
                 'delivery_address_id' => $deliveryAddressId,
             ]);
+
+            // Create order items from application snapshot (so order detail shows all bundles/products)
+            $snapshot = $application->order_items_snapshot;
+            if (!empty($snapshot) && is_array($snapshot)) {
+                foreach ($snapshot as $row) {
+                    $itemableType = $row['itemable_type'] ?? null;
+                    $itemableId = (int) ($row['itemable_id'] ?? 0);
+                    $quantity = (int) ($row['quantity'] ?? 1);
+                    $unitPrice = (float) ($row['unit_price'] ?? 0);
+                    $subtotal = (float) ($row['subtotal'] ?? $unitPrice * $quantity);
+                    if ($itemableType && $itemableId > 0) {
+                        OrderItem::create([
+                            'order_id' => $order->id,
+                            'itemable_type' => $itemableType,
+                            'itemable_id' => $itemableId,
+                            'quantity' => $quantity,
+                            'unit_price' => $unitPrice,
+                            'subtotal' => $subtotal,
+                        ]);
+                    }
+                }
+            }
 
             \App\Services\LoanInstallmentScheduler::generate($mono->id, null, false);
 
