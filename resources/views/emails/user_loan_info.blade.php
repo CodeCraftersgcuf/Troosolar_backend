@@ -12,14 +12,19 @@ Here is the information for user **{{ $user->first_name }}** and their loan appl
  <br>
  Phone: {{ $user->phone  }}
 <br>
-    Credit Check 
+    Credit Check
     <br>
+    @if($linkAccount)
     Account Number: {{ $linkAccount->account_number }}
     <br>
     Account Name: {{ $linkAccount->account_name }}
     <br>
     Bank Name: {{ $linkAccount->bank_name }}
     <br>
+    @else
+    No linked account for this user.
+    <br>
+    @endif
 
 ## Kyc Details
 <br>
