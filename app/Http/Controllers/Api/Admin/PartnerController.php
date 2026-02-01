@@ -108,12 +108,16 @@ class PartnerController extends Controller
         }
     }
 
-    // send to partner user details
+    // send to partner user details (works for both loan and BNPL applications)
   public function sendToPartner(Request $request, string $userId)
 {
     try {
+        $request->validate(['partner_id' => 'required|exists:partners,id']);
         $user            = User::findOrFail($userId);
         $loanApplication = LoanApplication::where('user_id', $userId)->latest()->first();
+        if (!$loanApplication) {
+            return ResponseHelper::error('No loan application found for this user.', 404);
+        }
         $linkAccount     = LinkAccount::where('user_id', $userId)->latest()->first();
         $partner         = Partner::findOrFail($request->partner_id);
 
@@ -122,13 +126,23 @@ class PartnerController extends Controller
             new SendUserLoanInfoToPartner($user, $loanApplication, $partner, $linkAccount)
         );
 
-        LoanStatus::where('loan_application_id', $loanApplication->id)->update([
-            'send_status' => 'active',
-            'send_date'   => now(),
-            'partner_id'  => $partner->id
-        ]);
+        // Only update LoanStatus if it exists (BNPL may not have a LoanStatus record)
+        $loanStatus = LoanStatus::where('loan_application_id', $loanApplication->id)->first();
+        if ($loanStatus) {
+            $loanStatus->update([
+                'send_status' => 'active',
+                'send_date'   => now(),
+                'partner_id'  => $partner->id
+            ]);
+        }
 
         return ResponseHelper::success('The email has been sent to the partner.');
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Validation failed',
+            'errors' => $e->errors()
+        ], 422);
     } catch (Exception $ex) {
         Log::error('Error sending email to partner: ' . $ex->getMessage());
         return ResponseHelper::error('The email could not be sent to the partner.'.$ex->getMessage());
