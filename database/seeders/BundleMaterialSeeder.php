@@ -36,8 +36,8 @@ class BundleMaterialSeeder extends Seeder
             return $material;
         };
 
-        // 1. Y1.2kVA+1.3kWh (Inverter + Battery) - First Image
-        $bundle1 = Bundles::where('title', 'Y1.2kVA+1.3kWh')->first();
+        // 1. LitePower1213 (Inverter + Battery)
+        $bundle1 = Bundles::where('title', 'LitePower1213')->first();
         if ($bundle1) {
             $materials1 = [
                 ['name' => '6-Way Combiner Box', 'quantity' => 1],
@@ -72,8 +72,8 @@ class BundleMaterialSeeder extends Seeder
             }
         }
 
-        // 2. Y1.2kWp+1.2kVA+2.5kWh (Solar+Inverter+Battery) - Second Image
-        $bundle2 = Bundles::where('title', 'Y1.2kWp+1.2kVA+2.5kW')->first();
+        // 2. SolarLitePower1225 (Solar+Inverter+Battery)
+        $bundle2 = Bundles::where('title', 'SolarLitePower1225')->first();
         if ($bundle2) {
             $materials2 = [
                 ['name' => '455W Monofacial Jinko Solar Panel', 'quantity' => 2],
@@ -115,8 +115,8 @@ class BundleMaterialSeeder extends Seeder
             }
         }
 
-        // 3. Y0.6kWp+1.2kVA+1.3kWh (Solar+Inverter+Battery) - Third Image
-        $bundle3 = Bundles::where('title', 'Y0.6kWp+1.2kVA+1.3kW')->first();
+        // 3. SolarLitePower1213 (Solar+Inverter+Battery)
+        $bundle3 = Bundles::where('title', 'SolarLitePower1213')->first();
         if ($bundle3) {
             $materials3 = [
                 ['name' => '590W Bi-Facial Jinko Solar Panel', 'quantity' => 1],
@@ -158,8 +158,8 @@ class BundleMaterialSeeder extends Seeder
             }
         }
 
-        // 4. Y1.2kWp+1.2kVA+3.8kWh (Solar+Inverter+Battery) - Fourth Image
-        $bundle4 = Bundles::where('title', 'Y1.2kWp+1.2kVA+3.8kW')->first();
+        // 4. SolarLitePower1238 (Solar+Inverter+Battery)
+        $bundle4 = Bundles::where('title', 'SolarLitePower1238')->first();
         if ($bundle4) {
             $materials4 = [
                 ['name' => '590W Bi-Facial Jinko Solar Panel', 'quantity' => 2],
@@ -201,8 +201,8 @@ class BundleMaterialSeeder extends Seeder
             }
         }
 
-        // 5. Y1.2kVA+3.8kWh (Inverter + Battery) - Fifth Image
-        $bundle5 = Bundles::where('title', 'Y1.2kVA+3.8kWh')->first();
+        // 5. LitePower1238 (Inverter + Battery)
+        $bundle5 = Bundles::where('title', 'LitePower1238')->first();
         if ($bundle5) {
             $materials5 = [
                 ['name' => '6-Way Combiner Box', 'quantity' => 1],
@@ -228,6 +228,42 @@ class BundleMaterialSeeder extends Seeder
                 if ($material) {
                     BundleMaterial::create([
                         'bundle_id' => $bundle5->id,
+                        'material_id' => $material->id,
+                        'quantity' => $mat['quantity'],
+                    ]);
+                } else {
+                    $this->command->warn("Material not found: {$mat['name']}");
+                }
+            }
+        }
+
+        // 6. LitePower1225 (Inverter + Battery) - 2.5kWh
+        $bundle6 = Bundles::where('title', 'LitePower1225')->first();
+        if ($bundle6) {
+            $materials6 = [
+                ['name' => '6-Way Combiner Box', 'quantity' => 1],
+                ['name' => 'GCL 12200 12V 2.5kWh Cworth Energy Lithium Ion Battery', 'quantity' => 1],
+                ['name' => 'Battery Rack (1 Battery)', 'quantity' => 2],
+                ['name' => '1C x 10mm Battery Flexible Cable', 'quantity' => 6],
+                ['name' => 'OG-1P1K2-T 12V 1.2kVA Yinergy Solar Hybrid Inverter', 'quantity' => 1],
+                ['name' => '150A DC Breaker', 'quantity' => 1],
+                ['name' => '32A AC Breaker', 'quantity' => 2],
+                ['name' => 'Voltage Regulator', 'quantity' => 1],
+                ['name' => 'Smart Metering', 'quantity' => 1],
+                ['name' => '1C x 2.5mm AC Cable', 'quantity' => 50],
+                ['name' => 'AC Surge Protector', 'quantity' => 1],
+                ['name' => '32A By-Pass Switch', 'quantity' => 1],
+                ['name' => 'Trunking, flex pipe, Cable lugs for 1.2kVA+2.5kWh System', 'quantity' => 1],
+                ['name' => 'Installation Fees for 1.2kVA+2.5kWh System', 'quantity' => 1],
+                ['name' => 'Delivery Fees for 1.2kVA+2.5kWh System', 'quantity' => 1],
+                ['name' => 'Inspection Fees', 'quantity' => 1],
+            ];
+
+            foreach ($materials6 as $mat) {
+                $material = $findMaterial($mat['name']);
+                if ($material) {
+                    BundleMaterial::create([
+                        'bundle_id' => $bundle6->id,
                         'material_id' => $material->id,
                         'quantity' => $mat['quantity'],
                     ]);
