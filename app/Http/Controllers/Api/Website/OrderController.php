@@ -372,6 +372,23 @@ class OrderController extends Controller
 
     private function formatOrder(Order $order, array $extras = []): array
     {
+        $items = $order->items->map(fn ($i) => $this->formatOrderItem($i))->all();
+        $totalPrice = (float) $order->total_price;
+        $totalQuantity = array_sum(array_map(fn ($i) => (int) ($i['quantity'] ?? 1), $items));
+        // When items have zero unit_price/subtotal (e.g. BNPL snapshot), distribute order total proportionally
+        if ($totalPrice > 0 && $totalQuantity > 0 && count($items) > 0) {
+            $unitPrice = $totalPrice / $totalQuantity;
+            foreach ($items as &$item) {
+                $qty = (int) ($item['quantity'] ?? 1);
+                $itemSubtotal = (float) ($item['subtotal'] ?? 0);
+                if ($itemSubtotal <= 0) {
+                    $item['unit_price'] = (string) round($unitPrice, 2);
+                    $item['subtotal'] = (string) round($unitPrice * $qty, 2);
+                }
+            }
+            unset($item);
+        }
+
         $baseData = [
             'id'               => $order->id,
             'order_number'     => $order->order_number,
@@ -384,7 +401,7 @@ class OrderController extends Controller
             'bundle_id'        => $order->bundle_id,
             'created_at'       => optional($order->created_at)->format('Y-m-d H:i:s'),
             'delivery_address' => $order->relationLoaded('deliveryAddress') ? $order->deliveryAddress : null,
-            'items'            => $order->items->map(fn ($i) => $this->formatOrderItem($i))->all(),
+            'items'            => $items,
         ];
 
         // Add user information if this is an admin request
