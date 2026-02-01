@@ -392,6 +392,21 @@ class BNPLController extends Controller
                 ];
             }
 
+            // If down payment was done, an order exists for this application's mono – return it so frontend can show order view
+            $orderInfo = null;
+            if ($application->mono_loan_calculation) {
+                $existingOrder = Order::where('mono_calculation_id', $application->mono_loan_calculation)
+                    ->where('user_id', Auth::id())
+                    ->first();
+                if ($existingOrder) {
+                    $orderInfo = [
+                        'order_id' => $existingOrder->id,
+                        'order_number' => $existingOrder->order_number,
+                        'down_payment_completed' => true,
+                    ];
+                }
+            }
+
             return ResponseHelper::success([
                 'id' => $application->id,
                 'customer_type' => $application->customer_type,
@@ -423,6 +438,9 @@ class BNPLController extends Controller
                     'status' => $application->guarantor->status,
                     'has_signed_form' => !empty($application->guarantor->signed_form_path),
                 ] : null,
+                'order_id' => $orderInfo ? $orderInfo['order_id'] : null,
+                'order_number' => $orderInfo ? $orderInfo['order_number'] : null,
+                'down_payment_completed' => $orderInfo ? $orderInfo['down_payment_completed'] : false,
                 'created_at' => $application->created_at->format('Y-m-d H:i:s'),
                 'updated_at' => $application->updated_at->format('Y-m-d H:i:s'),
             ], 'Application status retrieved successfully');
