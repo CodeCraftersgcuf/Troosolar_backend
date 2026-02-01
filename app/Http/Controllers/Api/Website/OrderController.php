@@ -638,10 +638,13 @@ class OrderController extends Controller
                 $productPrice = $product->discount_price ?? $product->price ?? 0;
             } elseif ($bundleId) {
                 $bundle = Bundles::with('bundleMaterials.material')->findOrFail($bundleId);
-                $productPrice = $bundle->discount_price ?? $bundle->total_price ?? 0;
-            } elseif ($amount) {
-                // If amount is provided directly, use it
-                $productPrice = $amount;
+                $productPrice = (float) ($bundle->discount_price ?? $bundle->total_price ?? 0);
+                // Use amount from request when bundle price is missing/zero (e.g. from bundle detail flow)
+                if ($productPrice <= 0 && $amount !== null) {
+                    $productPrice = (float) $amount;
+                }
+            } elseif ($amount !== null) {
+                $productPrice = (float) $amount;
             } else {
                 return ResponseHelper::error('Either product_id, bundle_id, or amount is required. Please provide one of them in your request.', 422);
             }
