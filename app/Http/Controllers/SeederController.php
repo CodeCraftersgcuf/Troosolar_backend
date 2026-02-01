@@ -99,30 +99,40 @@ class SeederController extends Controller
     }
 
     /**
-     * Run BundleSeeder specifically
+     * Run BundleSeeder specifically.
+     * By default replaces existing Inverter + Battery / Solar+Inverter+Battery bundles with the new data.
+     * Use ?force=0 to skip if bundles already exist.
      */
-    public function runBundleSeeder()
+    public function runBundleSeeder(Request $request)
     {
         try {
-            $bundleCount = DB::table('bundles')
-                ->whereIn('bundle_type', ['Inverter + Battery', 'Solar+Inverter+Battery'])
-                ->count();
-            
-            if ($bundleCount > 0) {
+            $force = filter_var($request->query('force', 1), FILTER_VALIDATE_BOOLEAN);
+            $bundleTypes = ['Inverter + Battery', 'Solar+Inverter+Battery'];
+
+            $bundleCount = DB::table('bundles')->whereIn('bundle_type', $bundleTypes)->count();
+
+            if ($bundleCount > 0 && !$force) {
                 return ResponseHelper::success(
-                    ['status' => 'Already seeded (skipped)', 'count' => $bundleCount],
+                    ['status' => 'Already seeded (skipped)', 'count' => $bundleCount, 'hint' => 'Add ?force=1 to replace with new bundle data'],
                     'Bundles already exist. Skipping seeder.'
                 );
             }
 
+            if ($force && $bundleCount > 0) {
+                $bundleIds = DB::table('bundles')->whereIn('bundle_type', $bundleTypes)->pluck('id');
+                DB::table('bundle_materials')->whereIn('bundle_id', $bundleIds)->delete();
+                DB::table('bundles')->whereIn('bundle_type', $bundleTypes)->delete();
+            }
+
             Artisan::call('db:seed', ['--class' => 'BundleSeeder']);
-            
-            $newCount = DB::table('bundles')
-                ->whereIn('bundle_type', ['Inverter + Battery', 'Solar+Inverter+Battery'])
-                ->count();
-            
+            $newCount = DB::table('bundles')->whereIn('bundle_type', $bundleTypes)->count();
+
+            if ($force && $newCount > 0) {
+                Artisan::call('db:seed', ['--class' => 'BundleMaterialSeeder']);
+            }
+
             return ResponseHelper::success(
-                ['status' => 'Seeded successfully', 'count' => $newCount],
+                ['status' => $force ? 'Re-seeded (replaced)' : 'Seeded successfully', 'count' => $newCount],
                 'Bundle seeder executed successfully'
             );
         } catch (Exception $e) {
