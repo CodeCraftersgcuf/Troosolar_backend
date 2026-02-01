@@ -447,6 +447,40 @@ class BNPLController extends Controller
                 }
             }
 
+            // Calculate counter offer details if status is counter_offer
+            $counterOfferDetails = null;
+            if ($application->status === 'counter_offer' && 
+                $application->counter_offer_min_deposit !== null && 
+                $application->counter_offer_min_tenor !== null) {
+                
+                $monoLoan = $application->mono;
+                if ($monoLoan) {
+                    $loanAmount = (float) $monoLoan->loan_amount;
+                    $interestRate = (float) ($monoLoan->interest_rate ?? 0);
+                } else {
+                    $loanAmount = (float) $application->loan_amount;
+                    $interestRate = 0;
+                }
+                
+                $downPayment = (float) $application->counter_offer_min_deposit;
+                $duration = (int) $application->counter_offer_min_tenor;
+                
+                // Calculate total amount: loan amount + interest (same logic as acceptCounterOffer)
+                $totalAmount = $loanAmount + ($loanAmount * $interestRate);
+                
+                // Calculate monthly payment: (total amount - down payment) / duration
+                $monthlyPayment = $duration > 0 ? round(($totalAmount - $downPayment) / $duration, 2) : 0;
+                
+                $counterOfferDetails = [
+                    'loan_amount' => number_format($loanAmount, 2),
+                    'down_payment' => number_format($downPayment, 2),
+                    'repayment_duration' => $duration,
+                    'interest_rate' => $interestRate > 0 ? $interestRate : null,
+                    'total_amount' => number_format($totalAmount, 2),
+                    'monthly_payment' => number_format($monthlyPayment, 2),
+                ];
+            }
+
             return ResponseHelper::success([
                 'id' => $application->id,
                 'customer_type' => $application->customer_type,
@@ -470,6 +504,7 @@ class BNPLController extends Controller
                 'bank_statement_path' => $application->bank_statement_path,
                 'live_photo_path' => $application->live_photo_path,
                 'loan_calculation' => $loanCalculationDetails,
+                'counter_offer_details' => $counterOfferDetails,
                 'guarantor' => $application->guarantor ? [
                     'id' => $application->guarantor->id,
                     'full_name' => $application->guarantor->full_name,
