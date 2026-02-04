@@ -126,26 +126,28 @@ class BrandController extends Controller
 
 
     public function getByCategory($categoryId)
-{
-    try {
-        // Verify category exists
-        $category = \App\Models\Category::find($categoryId);
-        if (!$category) {
-            return ResponseHelper::error('Category not found.', 404);
+    {
+        try {
+            // Verify category exists
+            $category = \App\Models\Category::find($categoryId);
+            if (!$category) {
+                return ResponseHelper::error('Category not found.', 404);
+            }
+
+            // Return brands that have at least one product in this category
+            // (so dropdown shows Jinko, Longi, etc. when they have products in the category)
+            $brands = Brand::whereHas('products', function ($q) use ($categoryId) {
+                $q->where('category_id', $categoryId);
+            })->get();
+
+            return ResponseHelper::success($brands, $brands->isEmpty()
+                ? 'No brands found for this category.'
+                : 'Brands fetched by category.');
+        } catch (Exception $e) {
+            \Log::error('Error fetching brands by category: ' . $e->getMessage());
+            return ResponseHelper::error('Failed to fetch brands by category.', 500);
         }
-
-        $brands = Brand::where('category_id', $categoryId)->get();
-
-        // Return empty array instead of error if no brands found
-        return ResponseHelper::success($brands, $brands->isEmpty() 
-            ? 'No brands found for this category.' 
-            : 'Brands fetched by category.');
-
-    } catch (Exception $e) {
-        \Log::error('Error fetching brands by category: ' . $e->getMessage());
-        return ResponseHelper::error('Failed to fetch brands by category.', 500);
     }
-}
 
 
 

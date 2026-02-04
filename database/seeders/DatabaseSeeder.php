@@ -12,11 +12,12 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Seed material categories first, then materials, then products, then bundles, then bundle materials
+        // Seed material categories first, then materials, then products, then brands, then bundles
         $this->call([
             MaterialCategorySeeder::class,
             MaterialSeeder::class,
             ProductSeeder::class,
+            BrandSeeder::class,
             BundleSeeder::class,
             BundleMaterialSeeder::class,
         ]);
