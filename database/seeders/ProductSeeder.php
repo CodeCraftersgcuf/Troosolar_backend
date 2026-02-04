@@ -83,10 +83,10 @@ class ProductSeeder extends Seeder
         $categoryMap = [];
         $materialCategoryMap = [
             'SOLAR PANELS' => 'Solar Panels',
-            'SOLAR HYBRID INVERTERS' => 'Inverters',
+            'SOLAR HYBRID INVERTERS' => 'Solar Inverters',
             'ALL IN ONE SYSTEMS' => 'All In One Systems',
             'WIFI STICKS' => 'Accessories',
-            'LITHIUM BATTERIES' => 'Batteries',
+            'LITHIUM BATTERIES' => 'Lithium Batteries',
             'MOUNTING STRUCTURE' => 'Mounting & Installation',
             'COMBINER BOX' => 'Electrical Components',
             'PV BREAKERS' => 'Electrical Components',

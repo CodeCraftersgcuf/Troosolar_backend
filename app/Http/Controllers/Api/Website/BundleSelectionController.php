@@ -101,6 +101,7 @@ class BundleSelectionController extends Controller
                 'what_bundle_powers_text' => $bundle->what_bundle_powers_text ?? null,
                 'backup_time_description' => $bundle->backup_time_description ?? null,
                 'system_capacity_display' => $bundle->system_capacity_display ?? null,
+                'specifications' => $bundle->specifications ?? null,
                 'featured_image' => $bundle->featured_image ?? null,
                 'featured_image_url' => $bundle->featured_image_url ?? null,
                 'fees' => [

@@ -46,6 +46,17 @@ class BundleRequest extends FormRequest
             'custom_appliances.*.wattage' => 'required_with:custom_appliances|numeric|min:0',
             'custom_appliances.*.quantity' => 'nullable|integer|min:1',
             'custom_appliances.*.estimated_daily_hours_usage' => 'nullable|numeric|min:0',
+
+            'specifications' => 'nullable|array',
+            'specifications.company_oem' => 'nullable|string|max:255',
+            'specifications.inverter_capacity_kva' => 'nullable|string|max:50',
+            'specifications.voltage' => 'nullable|string|max:50',
+            'specifications.battery_type' => 'nullable|string|max:255',
+            'specifications.battery_capacity_kwh' => 'nullable|string|max:50',
+            'specifications.inverter_warranty' => 'nullable|string|max:255',
+            'specifications.battery_warranty' => 'nullable|string|max:255',
+            'specifications.solar_panel_capacity_w' => 'nullable|string|max:50',
+            'specifications.backup_time_range' => 'nullable|string|max:255',
         ];
     }
 
@@ -57,6 +68,10 @@ class BundleRequest extends FormRequest
         if ($this->filled('custom_appliances') && is_string($this->custom_appliances)) {
             $decoded = json_decode($this->custom_appliances, true);
             $this->merge(['custom_appliances' => is_array($decoded) ? $decoded : []]);
+        }
+        if ($this->filled('specifications') && is_string($this->specifications)) {
+            $decoded = json_decode($this->specifications, true);
+            $this->merge(['specifications' => is_array($decoded) ? $decoded : []]);
         }
     }
 

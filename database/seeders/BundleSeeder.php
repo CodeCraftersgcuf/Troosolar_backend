@@ -24,6 +24,16 @@ class BundleSeeder extends Seeder
 
         $whatBundlePowers = '6-10 LED bulbs (7-10 W each), 1 LED TV (32-43"), 1 Decoder (DSTV/GOtv), 1 standing or ceiling fan, 1 Laptop or desktop computer, 1 Wi-Fi router / modem, Small speakers.';
 
+        // Specification tab structure (Yinergy/Cworth) – shared warranty/OEM
+        $specBase = [
+            'company_oem' => 'Yinergy/Cworth',
+            'inverter_capacity_kva' => '1.2',
+            'voltage' => '12V',
+            'battery_type' => 'Lithium Ion Battery',
+            'inverter_warranty' => '2 Years Warranty',
+            'battery_warranty' => '5 Years Warranty',
+        ];
+
         // Inverter + Battery Bundles (LitePower1213, LitePower1225, LitePower1238)
         $inverterBatteryBundles = [
             [
@@ -41,6 +51,11 @@ class BundleSeeder extends Seeder
                 'what_is_inside_bundle_text' => "1 unit of 1.2kVA Inverter\n1 unit of 1.3kWh Lithium Ion Battery\nInstallation Materials\nAccessories",
                 'what_bundle_powers_text' => $whatBundlePowers,
                 'backup_time_description' => '1 hour to 9 hours, depending on load. The battery provides backup from sunset to sunrise or during inclement weather if fully charged and grid power is insufficient.',
+                'specifications' => array_merge($specBase, [
+                    'battery_capacity_kwh' => '1.3',
+                    'solar_panel_capacity_w' => null,
+                    'backup_time_range' => '1 to 9 hours',
+                ]),
             ],
             [
                 'title' => 'LitePower1225',
@@ -57,6 +72,11 @@ class BundleSeeder extends Seeder
                 'what_is_inside_bundle_text' => "1 unit of 1.2kVA Inverter\n1 unit of 2.5kWh Lithium Ion Battery\nInstallation Materials\nAccessories",
                 'what_bundle_powers_text' => $whatBundlePowers,
                 'backup_time_description' => '2 hours to 17 hours, depending on load. The battery provides backup from sunset to sunrise or during inclement weather if fully charged and grid power is insufficient.',
+                'specifications' => array_merge($specBase, [
+                    'battery_capacity_kwh' => '2.5',
+                    'solar_panel_capacity_w' => null,
+                    'backup_time_range' => '2 to 17 hours',
+                ]),
             ],
             [
                 'title' => 'LitePower1238',
@@ -73,6 +93,11 @@ class BundleSeeder extends Seeder
                 'what_is_inside_bundle_text' => "1 unit of 1.2kVA Inverter\n1 unit of 3.8kWh Lithium Ion Battery\nInstallation Materials\nAccessories",
                 'what_bundle_powers_text' => $whatBundlePowers,
                 'backup_time_description' => '3 hours to 25 hours, depending on load. The battery provides backup from sunset to sunrise or during inclement weather if fully charged and grid power is insufficient.',
+                'specifications' => array_merge($specBase, [
+                    'battery_capacity_kwh' => '3.8',
+                    'solar_panel_capacity_w' => null,
+                    'backup_time_range' => '3 to 25 hours',
+                ]),
             ],
         ];
 
@@ -93,6 +118,11 @@ class BundleSeeder extends Seeder
                 'what_is_inside_bundle_text' => "1 unit of 590W Solar Panel\n1 unit of 1.2kVA Inverter\n1 unit of 1.3kWh Lithium Ion Battery\nInstallation Materials\nAccessories",
                 'what_bundle_powers_text' => $whatBundlePowers,
                 'backup_time_description' => 'Between 1 hour to 9 hours depending on your load throughout the back up time. The back-up time is what the battery will provide from sunset to sunrise or in extremely rainy/cloudy weather when the batteries are fully charged and when solar input or power from the grid is insufficient or unavailable.',
+                'specifications' => array_merge($specBase, [
+                    'battery_capacity_kwh' => '1.3',
+                    'solar_panel_capacity_w' => '600',
+                    'backup_time_range' => '1 to 9 hours',
+                ]),
             ],
             [
                 'title' => 'SolarLitePower1225',
@@ -109,6 +139,11 @@ class BundleSeeder extends Seeder
                 'what_is_inside_bundle_text' => "2 units of 590W Solar Panels\n1 unit of 1.2kVA Inverter\n1 unit of 2.5kWh Lithium Ion Battery\nInstallation Materials\nAccessories",
                 'what_bundle_powers_text' => $whatBundlePowers,
                 'backup_time_description' => 'Between 2 hours to 17 hours depending on your load throughout the back up time. The back-up time is what the battery will provide from sunset to sunrise or in extremely rainy/cloudy weather when the batteries are fully charged and when solar input or power from the grid is insufficient or unavailable.',
+                'specifications' => array_merge($specBase, [
+                    'battery_capacity_kwh' => '2.5',
+                    'solar_panel_capacity_w' => '1200',
+                    'backup_time_range' => '2 to 17 hours',
+                ]),
             ],
             [
                 'title' => 'SolarLitePower1238',
@@ -125,6 +160,11 @@ class BundleSeeder extends Seeder
                 'what_is_inside_bundle_text' => "2 units of 590W Solar Panels\n1 unit of 1.2kVA Inverter\n1 unit of 3.8kWh Lithium Ion Battery\nInstallation Materials\nAccessories",
                 'what_bundle_powers_text' => $whatBundlePowers,
                 'backup_time_description' => 'Between 3 hours to 25 hours depending on your load throughout the back up time. The back-up time is what the battery will provide from sunset to sunrise or in extremely rainy/cloudy weather when the batteries are fully charged and when solar input or power from the grid is insufficient or unavailable.',
+                'specifications' => array_merge($specBase, [
+                    'battery_capacity_kwh' => '3.8',
+                    'solar_panel_capacity_w' => '1200',
+                    'backup_time_range' => '3 to 25 hours',
+                ]),
             ],
         ];
 

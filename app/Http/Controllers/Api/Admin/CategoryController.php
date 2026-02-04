@@ -98,22 +98,28 @@ class CategoryController extends Controller
 
 
 
+/**
+ * Return products that belong to this category (by product.category_id).
+ * Previously used category->brands->products; now uses category->products so
+ * inverters show under Inverters, panels under Panels, etc.
+ */
 public function getProducts($id)
 {
     try {
-        $category = Category::with('brands.products.reviews')->find($id);
+        $category = Category::find($id);
 
         if (!$category) {
             return ResponseHelper::error('Category not found.', 404);
         }
 
-        $products = $category->brands->flatMap(function ($brand) {
-            return $brand->products;
-        });
+        $products = $category->products()
+            ->where('category_id', $category->id)
+            ->with(['details', 'images', 'reviews'])
+            ->get();
 
         return ResponseHelper::success($products, 'Products fetched by category.');
     } catch (\Exception $e) {
-        return ResponseHelper::error($e->getMessage(), 500); // TEMP for debugging
+        return ResponseHelper::error($e->getMessage(), 500);
     }
 }
 

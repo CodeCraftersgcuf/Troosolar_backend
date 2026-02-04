@@ -162,6 +162,9 @@ public function index(Request $request)
             if (Schema::hasColumn('bundles', 'total_output')) {
                 $createData['total_output'] = $safeTrim($data['total_output'] ?? null);
             }
+            if (Schema::hasColumn('bundles', 'specifications') && array_key_exists('specifications', $data)) {
+                $createData['specifications'] = is_array($data['specifications']) ? $data['specifications'] : null;
+            }
 
             $bundle = Bundles::create($createData);
 
@@ -313,6 +316,7 @@ public function index(Request $request)
                 'what_is_inside_bundle_text' => $bundle->what_is_inside_bundle_text,
                 'what_bundle_powers_text' => $bundle->what_bundle_powers_text,
                 'backup_time_description' => $bundle->backup_time_description,
+                'specifications' => $bundle->specifications ?? null,
                 'created_at' => $bundle->created_at?->toIso8601String(),
                 'updated_at' => $bundle->updated_at?->toIso8601String(),
                 'featured_image_url' => $bundle->featured_image_url,
@@ -389,6 +393,10 @@ public function index(Request $request)
                 'discount_price' => $discountPrice,
                 'discount_end_date' => $data['discount_end_date'] ?? $bundle->discount_end_date,
             ]);
+            if (Schema::hasColumn('bundles', 'specifications') && array_key_exists('specifications', $data)) {
+                $bundle->specifications = is_array($data['specifications']) ? $data['specifications'] : null;
+                $bundle->save();
+            }
 
             if (array_key_exists('custom_appliances', $data) && Schema::hasTable('bundle_custom_appliances')) {
                 BundleCustomAppliance::where('bundle_id', $bundle->id)->delete();
@@ -514,6 +522,7 @@ public function index(Request $request)
             'what_is_inside_bundle_text' => $bundle->what_is_inside_bundle_text,
             'what_bundle_powers_text' => $bundle->what_bundle_powers_text,
             'backup_time_description' => $bundle->backup_time_description,
+            'specifications' => $bundle->specifications ?? null,
             'created_at' => $bundle->created_at?->toIso8601String(),
             'updated_at' => $bundle->updated_at?->toIso8601String(),
             'bundle_items' => $bundleItems,

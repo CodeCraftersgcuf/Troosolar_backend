@@ -24,6 +24,11 @@ class Bundles extends Model
         'total_load',
         'inver_rating',
         'total_output',
+        'specifications',
+    ];
+
+    protected $casts = [
+        'specifications' => 'array',
     ];
 
     protected $appends = ['featured_image_url'];
