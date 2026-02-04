@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 class Bundles extends Model
 {
     protected $fillable = [
+        'brand_id',
         'title',
         'total_price',
         'discount_price',
@@ -34,6 +35,11 @@ class Bundles extends Model
     protected $appends = ['featured_image_url'];
 
     protected $table = 'bundles'; // <- avoids any pluralization surprises
+
+    public function brand()
+    {
+        return $this->belongsTo(\App\Models\Brand::class, 'brand_id');
+    }
 
     public function bundleItems()
     {

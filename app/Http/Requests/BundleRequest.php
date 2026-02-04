@@ -16,6 +16,7 @@ class BundleRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'brand_id' => 'nullable|exists:brands,id',
             'title' => 'nullable|string|max:255',
             'featured_image' => 'nullable|image|mimes:jpg,jpeg,png|max:3048',
             'bundle_type' => 'nullable|string|max:255',
@@ -77,6 +78,9 @@ class BundleRequest extends FormRequest
         if ($this->filled('specifications') && is_string($this->specifications)) {
             $decoded = json_decode($this->specifications, true);
             $this->merge(['specifications' => is_array($decoded) ? $decoded : []]);
+        }
+        if ($this->has('brand_id') && $this->input('brand_id') === '') {
+            $this->merge(['brand_id' => null]);
         }
     }
 

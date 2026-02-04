@@ -49,7 +49,15 @@ class ProductRequest extends FormRequest
 
         return $rules;
     }
-     protected function failedValidation(Validator $validator)
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('brand_id') && $this->input('brand_id') === '') {
+            $this->merge(['brand_id' => null]);
+        }
+    }
+
+    protected function failedValidation(Validator $validator)
     {
         throw new HttpResponseException(
             response()->json([

@@ -28,7 +28,7 @@ public function index(Request $request)
 
         // If no query parameter => return all bundles
         if (empty($query)) {
-            $bundles = Bundles::with(['bundleItems.product', 'customServices'])->get();
+            $bundles = Bundles::with(['bundleItems.product', 'customServices', 'brand'])->get();
             return ResponseHelper::success($bundles, 'Bundles fetched.');
         }
 
@@ -128,6 +128,9 @@ public function index(Request $request)
                 'discount_price' => $discountPrice,
                 'discount_end_date' => isset($data['discount_end_date']) && $data['discount_end_date'] !== '' ? $data['discount_end_date'] : null,
             ];
+            if (Schema::hasColumn('bundles', 'brand_id')) {
+                $createData['brand_id'] = isset($data['brand_id']) && $data['brand_id'] !== '' ? (int) $data['brand_id'] : null;
+            }
             if (Schema::hasColumn('bundles', 'featured_image')) {
                 $createData['featured_image'] = $featuredImagePath;
             }
@@ -201,7 +204,7 @@ public function index(Request $request)
             }
 
             DB::commit();
-            $relations = ['bundleItems.product.category', 'customServices', 'bundleMaterials.material.category'];
+            $relations = ['bundleItems.product.category', 'customServices', 'bundleMaterials.material.category', 'brand'];
             if (Schema::hasTable('bundle_custom_appliances')) {
                 $relations[] = 'customAppliances';
             }
@@ -229,6 +232,7 @@ public function index(Request $request)
                 'customServices',
                 'bundleMaterials.material.category',
                 'customAppliances',
+                'brand',
             ])->find($id);
             
             if (!$bundle) {
@@ -301,6 +305,8 @@ public function index(Request $request)
             // Build response
             $response = [
                 'id' => $bundle->id,
+                'brand_id' => $bundle->brand_id,
+                'brand' => $bundle->brand ? ['id' => $bundle->brand->id, 'title' => $bundle->brand->title] : null,
                 'title' => $bundle->title,
                 'featured_image' => $bundle->featured_image,
                 'bundle_type' => $bundle->bundle_type,
@@ -376,7 +382,7 @@ public function index(Request $request)
             $totalPrice = $data['total_price'] ?? $calculatedTotal;
             $discountPrice = $data['discount_price'] ?? ($totalPrice * 0.80);
 
-            $bundle->update([
+            $updatePayload = [
                 'title' => $data['title'] ?? $bundle->title,
                 'featured_image' => $data['featured_image'] ?? $bundle->featured_image,
                 'bundle_type' => $data['bundle_type'] ?? $bundle->bundle_type,
@@ -392,7 +398,13 @@ public function index(Request $request)
                 'total_price' => $totalPrice,
                 'discount_price' => $discountPrice,
                 'discount_end_date' => $data['discount_end_date'] ?? $bundle->discount_end_date,
-            ]);
+            ];
+            if (Schema::hasColumn('bundles', 'brand_id')) {
+                $updatePayload['brand_id'] = array_key_exists('brand_id', $data)
+                    ? ($data['brand_id'] === '' || $data['brand_id'] === null ? null : (int) $data['brand_id'])
+                    : $bundle->brand_id;
+            }
+            $bundle->update($updatePayload);
             if (Schema::hasColumn('bundles', 'specifications') && array_key_exists('specifications', $data)) {
                 $bundle->specifications = is_array($data['specifications']) ? $data['specifications'] : null;
                 $bundle->save();
@@ -436,7 +448,7 @@ public function index(Request $request)
             }
 
             DB::commit();
-            $updateRelations = ['bundleItems.product.category', 'customServices', 'bundleMaterials.material.category'];
+            $updateRelations = ['bundleItems.product.category', 'customServices', 'bundleMaterials.material.category', 'brand'];
             if (Schema::hasTable('bundle_custom_appliances')) {
                 $updateRelations[] = 'customAppliances';
             }
@@ -506,6 +518,10 @@ public function index(Request $request)
             : collect([]);
         return [
             'id' => $bundle->id,
+            'brand_id' => $bundle->brand_id ?? null,
+            'brand' => $bundle->relationLoaded('brand') && $bundle->brand
+                ? ['id' => $bundle->brand->id, 'title' => $bundle->brand->title]
+                : null,
             'title' => $bundle->title,
             'featured_image' => $bundle->featured_image,
             'featured_image_url' => $bundle->featured_image_url,
