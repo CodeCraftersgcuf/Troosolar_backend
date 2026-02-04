@@ -56,7 +56,12 @@ class BundleRequest extends FormRequest
             'specifications.inverter_warranty' => 'nullable|string|max:255',
             'specifications.battery_warranty' => 'nullable|string|max:255',
             'specifications.solar_panel_capacity_w' => 'nullable|string|max:50',
+            'specifications.solar_panel_capacity_kw' => 'nullable|string|max:50',
             'specifications.backup_time_range' => 'nullable|string|max:255',
+            // Solar+Inverter+Battery specification tab
+            'specifications.solar_panel_type' => 'nullable|string|max:255',
+            'specifications.solar_panels_wattage' => 'nullable|string|max:50',
+            'specifications.solar_panels_warranty' => 'nullable|string|max:255',
         ];
     }
 
