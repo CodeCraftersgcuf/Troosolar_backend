@@ -585,6 +585,7 @@ class BNPLController extends Controller
     /**
      * Minimal valid PDF used when guarantor-form.pdf is not present.
      * Replace public/documents/guarantor-form.pdf with the real form to serve it instead.
+     * Text strings use escaped parentheses \( \) so content displays correctly in viewers.
      */
     private function getGuarantorFormPlaceholderPdf(): string
     {
@@ -598,7 +599,21 @@ class BNPLController extends Controller
         $o4 = strlen($body);
         $body .= "4 0 obj\n<< /Font << /F1 6 0 R >> >>\nendobj\n";
         $o5 = strlen($body);
-        $streamContent = "BT\n/F1 14 Tf\n72 700 Td\n(Troosolar BNPL - Guarantor Form) Tj\n0 -18 Td\n/F1 10 Tf\n(Place your guarantor form at public/documents/guarantor-form.pdf) Tj\nET\n";
+        // PDF text: parentheses in strings must be escaped as \( and \)
+        $streamContent = "BT\n"
+            . "/F1 18 Tf\n72 720 Td\n"
+            . "\(Troosolar BNPL - Guarantor Form\) Tj\n"
+            . "0 -28 Td\n"
+            . "/F1 12 Tf\n"
+            . "\(This is a placeholder form.\) Tj\n"
+            . "0 -20 Td\n"
+            . "/F1 10 Tf\n"
+            . "\(To use your own form, place the PDF file at:\) Tj\n"
+            . "0 -16 Td\n"
+            . "\(public/documents/guarantor-form.pdf\) Tj\n"
+            . "0 -24 Td\n"
+            . "\(Signed guarantor documents and undated cheques will be collected on the day of installation.\) Tj\n"
+            . "ET\n";
         $body .= "5 0 obj\n<< /Length " . strlen($streamContent) . " >>\nstream\n" . $streamContent . "endstream\nendobj\n";
         $o6 = strlen($body);
         $body .= "6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n";
