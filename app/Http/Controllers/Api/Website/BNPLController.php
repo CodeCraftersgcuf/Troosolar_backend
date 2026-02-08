@@ -562,24 +562,29 @@ class BNPLController extends Controller
 
             $filename = 'Troosolar-BNPL-Guarantor-Form.pdf';
 
-            if (file_exists($fullPath) && is_readable($fullPath)) {
+            // Serve real file only if it exists, is readable, and has content (not empty)
+            if (file_exists($fullPath) && is_readable($fullPath) && filesize($fullPath) > 0) {
                 return response()->download($fullPath, $filename, [
                     'Content-Type' => 'application/pdf',
                 ]);
             }
 
-            // Fallback: serve a minimal placeholder PDF when file is missing (replace with real PDF at public/documents/guarantor-form.pdf)
-            Log::warning('Guarantor form file not found, serving placeholder', ['path' => $fullPath]);
+            // Fallback: write placeholder PDF to temp file and serve via download (same as real file – works with proxies/CORS)
+            Log::warning('Guarantor form file not found or empty, serving placeholder', ['path' => $fullPath]);
             $placeholderPdf = $this->getGuarantorFormPlaceholderPdf();
             if (strlen($placeholderPdf) === 0) {
                 $placeholderPdf = $this->getMinimalPdfFallback();
             }
-            // Stream as binary so no encoding/compression alters the body (fixes empty PDF over CORS/proxies)
-            return response()->streamDownload(function () use ($placeholderPdf) {
-                echo $placeholderPdf;
-            }, $filename, [
+            $tempPath = sys_get_temp_dir() . '/guarantor-form-' . uniqid() . '.pdf';
+            file_put_contents($tempPath, $placeholderPdf);
+            // Delete temp file after response is sent
+            app()->terminating(function () use ($tempPath) {
+                if (file_exists($tempPath)) {
+                    @unlink($tempPath);
+                }
+            });
+            return response()->download($tempPath, $filename, [
                 'Content-Type' => 'application/pdf',
-                'Cache-Control' => 'no-transform, no-cache',
             ]);
         } catch (Exception $e) {
             Log::error('Guarantor form download error: ' . $e->getMessage());
