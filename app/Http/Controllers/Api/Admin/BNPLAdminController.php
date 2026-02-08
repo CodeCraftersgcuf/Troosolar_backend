@@ -362,5 +362,47 @@ class BNPLAdminController extends Controller
             return ResponseHelper::error('Failed to update guarantor status', 500);
         }
     }
+
+    /**
+     * Upload BNPL guarantor form PDF (admin).
+     * This file is served when users download the guarantor form after loan approval.
+     * POST /api/admin/bnpl/guarantor-form
+     */
+    public function uploadGuarantorForm(Request $request)
+    {
+        try {
+            $request->validate([
+                'guarantor_form' => 'required|file|mimes:pdf|max:10240',
+            ], [
+                'guarantor_form.required' => 'Please select a PDF file.',
+                'guarantor_form.mimes' => 'The file must be a PDF.',
+                'guarantor_form.max' => 'The file may not be greater than 10MB.',
+            ]);
+
+            $relativePath = config('bnpl.guarantor_form_path', 'documents/guarantor-form.pdf');
+            $fullPath = public_path($relativePath);
+            $dir = dirname($fullPath);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+
+            $file = $request->file('guarantor_form');
+            $file->move($dir, basename($fullPath));
+
+            return ResponseHelper::success([
+                'path' => $relativePath,
+                'message' => 'Guarantor form updated. Users will download this file when they click Download Guarantor Form.',
+            ], 'Guarantor form uploaded successfully');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Exception $e) {
+            Log::error('BNPL Admin Upload Guarantor Form Error: ' . $e->getMessage());
+            return ResponseHelper::error('Failed to upload guarantor form: ' . $e->getMessage(), 500);
+        }
+    }
 }
 
