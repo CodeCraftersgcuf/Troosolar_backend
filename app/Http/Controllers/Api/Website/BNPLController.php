@@ -564,27 +564,28 @@ class BNPLController extends Controller
 
             // Serve real file only if it exists, is readable, and has content (not empty)
             if (file_exists($fullPath) && is_readable($fullPath) && filesize($fullPath) > 0) {
-                return response()->download($fullPath, $filename, [
+                $content = file_get_contents($fullPath);
+                return response($content, 200, [
                     'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                    'Content-Length' => (string) strlen($content),
+                    'Content-Transfer-Encoding' => 'binary',
+                    'Cache-Control' => 'no-transform, no-cache',
                 ]);
             }
 
-            // Fallback: write placeholder PDF to temp file and serve via download (same as real file – works with proxies/CORS)
+            // Fallback: serve placeholder PDF as raw binary (no temp file – avoids proxy/stream issues)
             Log::warning('Guarantor form file not found or empty, serving placeholder', ['path' => $fullPath]);
             $placeholderPdf = $this->getGuarantorFormPlaceholderPdf();
             if (strlen($placeholderPdf) === 0) {
                 $placeholderPdf = $this->getMinimalPdfFallback();
             }
-            $tempPath = sys_get_temp_dir() . '/guarantor-form-' . uniqid() . '.pdf';
-            file_put_contents($tempPath, $placeholderPdf);
-            // Delete temp file after response is sent
-            app()->terminating(function () use ($tempPath) {
-                if (file_exists($tempPath)) {
-                    @unlink($tempPath);
-                }
-            });
-            return response()->download($tempPath, $filename, [
+            return response($placeholderPdf, 200, [
                 'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Content-Length' => (string) strlen($placeholderPdf),
+                'Content-Transfer-Encoding' => 'binary',
+                'Cache-Control' => 'no-transform, no-cache',
             ]);
         } catch (Exception $e) {
             Log::error('Guarantor form download error: ' . $e->getMessage());
