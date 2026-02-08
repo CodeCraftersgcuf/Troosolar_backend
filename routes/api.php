@@ -232,6 +232,7 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     Route::post('/bnpl/apply', [BNPLController::class, 'apply']);
     Route::get('/bnpl/status/{application_id}', [BNPLController::class, 'getStatus']); // Get single application details
     Route::get('/bnpl/applications/{application_id}/repayment-schedule', [BNPLController::class, 'getRepaymentSchedule']); // Get repayment schedule for application
+    Route::get('/bnpl/guarantor/form', [BNPLController::class, 'downloadGuarantorForm']);
     Route::post('/bnpl/guarantor/invite', [BNPLController::class, 'inviteGuarantor']);
     Route::post('/bnpl/guarantor/upload', [BNPLController::class, 'uploadGuarantorForm']);
     Route::post('/bnpl/counteroffer/accept', [BNPLController::class, 'acceptCounterOffer']);

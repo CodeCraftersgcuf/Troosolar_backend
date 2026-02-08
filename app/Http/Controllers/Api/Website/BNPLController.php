@@ -533,6 +533,49 @@ class BNPLController extends Controller
     }
 
     /**
+     * GET /api/bnpl/guarantor/form
+     * Download the guarantor form PDF (for customers to give to their guarantor).
+     * Optional query: loan_application_id (to ensure user has an application).
+     */
+    public function downloadGuarantorForm(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['message' => 'Unauthenticated'], 401);
+            }
+
+            // Optional: ensure user has a BNPL application when loan_application_id is provided
+            $applicationId = $request->query('loan_application_id');
+            if ($applicationId) {
+                $application = LoanApplication::where('id', $applicationId)
+                    ->where('user_id', $user->id)
+                    ->first();
+                if (!$application) {
+                    return response()->json(['message' => 'Loan application not found'], 404);
+                }
+            }
+
+            // Form path: public/documents/guarantor-form.pdf or config
+            $relativePath = config('bnpl.guarantor_form_path', 'documents/guarantor-form.pdf');
+            $fullPath = public_path($relativePath);
+
+            if (!file_exists($fullPath) || !is_readable($fullPath)) {
+                Log::warning('Guarantor form file not found or not readable', ['path' => $fullPath]);
+                return response()->json(['message' => 'Guarantor form is not available'], 404);
+            }
+
+            $filename = 'Troosolar-BNPL-Guarantor-Form.pdf';
+            return response()->download($fullPath, $filename, [
+                'Content-Type' => 'application/pdf',
+            ]);
+        } catch (Exception $e) {
+            Log::error('Guarantor form download error: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to download guarantor form'], 500);
+        }
+    }
+
+    /**
      * POST /api/bnpl/guarantor/invite
      * Invite or add guarantor details
      */
