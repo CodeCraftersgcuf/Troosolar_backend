@@ -560,19 +560,59 @@ class BNPLController extends Controller
             $relativePath = config('bnpl.guarantor_form_path', 'documents/guarantor-form.pdf');
             $fullPath = public_path($relativePath);
 
-            if (!file_exists($fullPath) || !is_readable($fullPath)) {
-                Log::warning('Guarantor form file not found or not readable', ['path' => $fullPath]);
-                return response()->json(['message' => 'Guarantor form is not available'], 404);
+            $filename = 'Troosolar-BNPL-Guarantor-Form.pdf';
+
+            if (file_exists($fullPath) && is_readable($fullPath)) {
+                return response()->download($fullPath, $filename, [
+                    'Content-Type' => 'application/pdf',
+                ]);
             }
 
-            $filename = 'Troosolar-BNPL-Guarantor-Form.pdf';
-            return response()->download($fullPath, $filename, [
+            // Fallback: serve a minimal placeholder PDF when file is missing (replace with real PDF at public/documents/guarantor-form.pdf)
+            Log::warning('Guarantor form file not found, serving placeholder', ['path' => $fullPath]);
+            $placeholderPdf = $this->getGuarantorFormPlaceholderPdf();
+            return response($placeholderPdf, 200, [
                 'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Content-Length' => (string) strlen($placeholderPdf),
             ]);
         } catch (Exception $e) {
             Log::error('Guarantor form download error: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to download guarantor form'], 500);
         }
+    }
+
+    /**
+     * Minimal valid PDF used when guarantor-form.pdf is not present.
+     * Replace public/documents/guarantor-form.pdf with the real form to serve it instead.
+     */
+    private function getGuarantorFormPlaceholderPdf(): string
+    {
+        $body = "%PDF-1.4\n";
+        $o1 = strlen($body);
+        $body .= "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n";
+        $o2 = strlen($body);
+        $body .= "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n";
+        $o3 = strlen($body);
+        $body .= "3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources 4 0 R /MediaBox [0 0 612 792] /Contents 5 0 R >>\nendobj\n";
+        $o4 = strlen($body);
+        $body .= "4 0 obj\n<< /Font << /F1 6 0 R >> >>\nendobj\n";
+        $o5 = strlen($body);
+        $streamContent = "BT\n/F1 14 Tf\n72 700 Td\n(Troosolar BNPL - Guarantor Form) Tj\n0 -18 Td\n/F1 10 Tf\n(Place your guarantor form at public/documents/guarantor-form.pdf) Tj\nET\n";
+        $body .= "5 0 obj\n<< /Length " . strlen($streamContent) . " >>\nstream\n" . $streamContent . "endstream\nendobj\n";
+        $o6 = strlen($body);
+        $body .= "6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n";
+        $xref = strlen($body);
+        $body .= "xref\n0 7\n";
+        $body .= sprintf("%010d 65535 f \n", 0);
+        $body .= sprintf("%010d 00000 n \n", $o1);
+        $body .= sprintf("%010d 00000 n \n", $o2);
+        $body .= sprintf("%010d 00000 n \n", $o3);
+        $body .= sprintf("%010d 00000 n \n", $o4);
+        $body .= sprintf("%010d 00000 n \n", $o5);
+        $body .= sprintf("%010d 00000 n \n", $o6);
+        $body .= "trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n" . $xref . "\n%%EOF\n";
+        return $body;
     }
 
     /**
