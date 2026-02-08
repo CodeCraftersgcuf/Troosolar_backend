@@ -571,10 +571,15 @@ class BNPLController extends Controller
             // Fallback: serve a minimal placeholder PDF when file is missing (replace with real PDF at public/documents/guarantor-form.pdf)
             Log::warning('Guarantor form file not found, serving placeholder', ['path' => $fullPath]);
             $placeholderPdf = $this->getGuarantorFormPlaceholderPdf();
-            return response($placeholderPdf, 200, [
+            if (strlen($placeholderPdf) === 0) {
+                $placeholderPdf = $this->getMinimalPdfFallback();
+            }
+            // Stream as binary so no encoding/compression alters the body (fixes empty PDF over CORS/proxies)
+            return response()->streamDownload(function () use ($placeholderPdf) {
+                echo $placeholderPdf;
+            }, $filename, [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-                'Content-Length' => (string) strlen($placeholderPdf),
+                'Cache-Control' => 'no-transform, no-cache',
             ]);
         } catch (Exception $e) {
             Log::error('Guarantor form download error: ' . $e->getMessage());
@@ -628,6 +633,28 @@ class BNPLController extends Controller
         $body .= sprintf("%010d 00000 n \n", $o6);
         $body .= "trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n" . $xref . "\n%%EOF\n";
         return $body;
+    }
+
+    /**
+     * Smallest valid PDF (single blank page) used if placeholder generation ever returns empty.
+     */
+    private function getMinimalPdfFallback(): string
+    {
+        $b = "%PDF-1.4\n";
+        $o1 = strlen($b);
+        $b .= "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n";
+        $o2 = strlen($b);
+        $b .= "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n";
+        $o3 = strlen($b);
+        $b .= "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj\n";
+        $xref = strlen($b);
+        $b .= "xref\n0 4\n";
+        $b .= sprintf("%010d 65535 f \n", 0);
+        $b .= sprintf("%010d 00000 n \n", $o1);
+        $b .= sprintf("%010d 00000 n \n", $o2);
+        $b .= sprintf("%010d 00000 n \n", $o3);
+        $b .= "trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n" . $xref . "\n%%EOF\n";
+        return $b;
     }
 
     /**
