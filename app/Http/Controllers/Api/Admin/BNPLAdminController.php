@@ -404,5 +404,62 @@ class BNPLAdminController extends Controller
             return ResponseHelper::error('Failed to upload guarantor form: ' . $e->getMessage(), 500);
         }
     }
+
+    /**
+     * Set or update guarantor for a BNPL application (admin).
+     * User will only see download/upload in dashboard; no form for user to add guarantor.
+     * POST /api/admin/bnpl/applications/{id}/guarantor
+     */
+    public function setApplicationGuarantor(Request $request, $id)
+    {
+        try {
+            $request->validate([
+                'full_name' => 'required|string|max:255',
+                'phone' => 'required|string|max:20',
+                'email' => 'nullable|email|max:255',
+                'relationship' => 'nullable|string|max:100',
+            ]);
+
+            $application = LoanApplication::find($id);
+            if (!$application) {
+                return ResponseHelper::error('BNPL application not found', 404);
+            }
+
+            $guarantor = Guarantor::where('loan_application_id', $application->id)->first();
+            $data = [
+                'full_name' => $request->full_name,
+                'phone' => $request->phone,
+                'email' => $request->email ?? null,
+                'relationship' => $request->relationship ?? null,
+            ];
+
+            if ($guarantor) {
+                $guarantor->update($data);
+            } else {
+                $guarantor = Guarantor::create([
+                    'user_id' => $application->user_id,
+                    'loan_application_id' => $application->id,
+                    'full_name' => $data['full_name'],
+                    'phone' => $data['phone'],
+                    'email' => $data['email'],
+                    'relationship' => $data['relationship'],
+                    'status' => 'pending',
+                ]);
+                $application->guarantor_id = $guarantor->id;
+                $application->save();
+            }
+
+            return ResponseHelper::success($guarantor->fresh(), 'Guarantor saved. User can download the form and upload the signed copy.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Exception $e) {
+            Log::error('BNPL Admin Set Guarantor Error: ' . $e->getMessage());
+            return ResponseHelper::error('Failed to save guarantor: ' . $e->getMessage(), 500);
+        }
+    }
 }
 

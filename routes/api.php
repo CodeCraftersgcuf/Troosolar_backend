@@ -417,6 +417,7 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
         Route::get('/guarantors', [BNPLAdminController::class, 'getGuarantors']);
         Route::put('/guarantors/{id}/status', [BNPLAdminController::class, 'updateGuarantorStatus']);
         Route::post('/guarantor-form', [BNPLAdminController::class, 'uploadGuarantorForm']);
+        Route::post('/applications/{id}/guarantor', [BNPLAdminController::class, 'setApplicationGuarantor']);
     });
 
     // ================= AUDIT ADMIN ROUTES =================
