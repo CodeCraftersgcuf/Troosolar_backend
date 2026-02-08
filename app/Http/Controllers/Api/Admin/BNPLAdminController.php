@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Controller;
+use App\Mail\BNPLStatusEmail;
 use App\Models\Guarantor;
 use App\Models\LoanApplication;
 use App\Models\MonoLoanCalculation;
@@ -12,6 +13,7 @@ use App\Models\Notification;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class BNPLAdminController extends Controller
 {
@@ -258,7 +260,7 @@ class BNPLAdminController extends Controller
                 }
             }
 
-            // Notify user when admin sends offer or approves/rejects
+            // Notify user when admin sends offer or approves/rejects (in-app + email)
             $userId = $application->user_id;
             $status = $request->status;
             if ($userId && in_array($status, ['approved', 'counter_offer', 'rejected'])) {
@@ -272,6 +274,20 @@ class BNPLAdminController extends Controller
                     'message' => $message,
                     'type' => 'bnpl_status',
                 ]);
+
+                // Send email to customer so they know their loan status and can continue
+                $user = $application->user;
+                if ($user && !empty($user->email)) {
+                    try {
+                        Mail::to($user->email)->send(new BNPLStatusEmail($user, $application, $status));
+                    } catch (\Throwable $e) {
+                        Log::warning('BNPL status email failed: ' . $e->getMessage(), [
+                            'application_id' => $application->id,
+                            'user_id' => $userId,
+                            'status' => $status,
+                        ]);
+                    }
+                }
             }
 
             return ResponseHelper::success($application->fresh(['user', 'guarantor', 'mono']), 'BNPL application status updated successfully');
