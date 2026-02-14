@@ -518,7 +518,11 @@ class BNPLController extends Controller
                     'phone' => $application->guarantor->phone,
                     'status' => $application->guarantor->status,
                     'has_signed_form' => !empty($application->guarantor->signed_form_path),
+                    'signed_form_path' => $application->guarantor->signed_form_path,
                 ] : null,
+                'installation_requested_date' => $application->installation_requested_date?->format('Y-m-d'),
+                'installation_booking_status' => $application->installation_booking_status,
+                'installation_rejected_dates' => $application->installation_rejected_dates ?? [],
                 'order_id' => $orderInfo ? $orderInfo['order_id'] : null,
                 'order_number' => $orderInfo ? $orderInfo['order_number'] : null,
                 'down_payment_completed' => $orderInfo ? $orderInfo['down_payment_completed'] : false,
@@ -1151,6 +1155,9 @@ class BNPLController extends Controller
                     'signed_form_path' => $loanApplication->guarantor->signed_form_path,
                     'has_signed_form' => !empty($loanApplication->guarantor->signed_form_path),
                 ] : null,
+                'installation_requested_date' => $loanApplication->installation_requested_date?->format('Y-m-d'),
+                'installation_booking_status' => $loanApplication->installation_booking_status,
+                'installation_rejected_dates' => $loanApplication->installation_rejected_dates ?? [],
             ] : null;
             $orderData['repayment_schedule'] = $repaymentSchedule;
             $orderData['repayment_summary'] = [
@@ -1260,6 +1267,67 @@ class BNPLController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
             return ResponseHelper::error('Failed to retrieve repayment schedule: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * POST /api/bnpl/installation/book
+     * Book installation date. Date must be at least 72 hours from now and not a Sunday.
+     * Rejected dates (from admin) cannot be re-selected.
+     */
+    public function bookInstallationDate(Request $request)
+    {
+        try {
+            $userId = Auth::id();
+            $request->validate([
+                'order_id' => 'required_without:loan_application_id|nullable|integer|exists:orders,id',
+                'loan_application_id' => 'required_without:order_id|nullable|integer|exists:loan_applications,id',
+                'requested_date' => 'required|date|date_format:Y-m-d',
+            ]);
+            $requestedDate = \Carbon\Carbon::parse($request->requested_date)->startOfDay();
+            $minDate = now()->addHours(72)->startOfDay();
+            if ($requestedDate->lt($minDate)) {
+                return ResponseHelper::error('Installation date must be at least 72 hours from now.', 422);
+            }
+            if ($requestedDate->dayOfWeek === 0) {
+                return ResponseHelper::error('Sundays are not available for installation.', 422);
+            }
+            $loanApplication = null;
+            if ($request->loan_application_id) {
+                $loanApplication = LoanApplication::where('id', $request->loan_application_id)
+                    ->where('user_id', $userId)
+                    ->first();
+            } else {
+                $order = Order::where('id', $request->order_id)
+                    ->where('user_id', $userId)
+                    ->where('order_type', 'bnpl')
+                    ->first();
+                if (!$order || !$order->mono_calculation_id) {
+                    return ResponseHelper::error('Order not found or not linked to BNPL application.', 404);
+                }
+                $loanApplication = LoanApplication::where('mono_loan_calculation', $order->mono_calculation_id)
+                    ->where('user_id', $userId)
+                    ->first();
+            }
+            if (!$loanApplication) {
+                return ResponseHelper::error('Application not found.', 404);
+            }
+            $rejected = $loanApplication->installation_rejected_dates ?? [];
+            if (in_array($request->requested_date, $rejected)) {
+                return ResponseHelper::error('This date was previously rejected. Please choose another date.', 422);
+            }
+            $loanApplication->installation_requested_date = $requestedDate;
+            $loanApplication->installation_booking_status = 'pending';
+            $loanApplication->save();
+            return ResponseHelper::success([
+                'installation_requested_date' => $loanApplication->installation_requested_date->format('Y-m-d'),
+                'installation_booking_status' => $loanApplication->installation_booking_status,
+            ], 'Installation date request submitted. You will be notified once it is confirmed.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (Exception $e) {
+            Log::error('Book installation date error: ' . $e->getMessage());
+            return ResponseHelper::error('Failed to book installation date.', 500);
         }
     }
 

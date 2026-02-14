@@ -50,6 +50,10 @@ class BNPLStatusEmail extends Mailable
             $this->subjectLine = 'You have a counter offer on your BuyNowPayLater application – Troosolar';
             $this->headingText = 'Counter offer on your BuyNowPayLater application';
             $this->bodyText = 'We have sent you a counter offer on your BuyNowPayLater application. Please log in to review the terms and accept or decline.';
+        } elseif ($status === 'installation_date_rejected') {
+            $this->subjectLine = 'Installation date – please choose another date – Troosolar';
+            $this->headingText = 'Installation date could not be confirmed';
+            $this->bodyText = 'Your requested installation date could not be confirmed. Please log in to your BNPL loan page and book another date. Choose a date at least 72 hours from today; Sundays are not available.';
         } else {
             $this->subjectLine = 'Update on your BuyNowPayLater application – Troosolar';
             $this->headingText = 'Update on your BuyNowPayLater application';

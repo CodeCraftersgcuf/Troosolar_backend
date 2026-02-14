@@ -493,5 +493,72 @@ class BNPLAdminController extends Controller
             return ResponseHelper::error('Failed to save guarantor: ' . $e->getMessage(), 500);
         }
     }
+
+    /**
+     * Accept the requested installation date.
+     * PUT /api/admin/bnpl/applications/{id}/installation-date/accept
+     */
+    public function acceptInstallationDate($id)
+    {
+        try {
+            $application = LoanApplication::find($id);
+            if (!$application) {
+                return ResponseHelper::error('BNPL application not found', 404);
+            }
+            if ($application->installation_booking_status !== 'pending' || !$application->installation_requested_date) {
+                return ResponseHelper::error('No pending installation date to accept.', 422);
+            }
+            $application->installation_booking_status = 'accepted';
+            $application->save();
+            return ResponseHelper::success([
+                'installation_requested_date' => $application->installation_requested_date->format('Y-m-d'),
+                'installation_booking_status' => $application->installation_booking_status,
+            ], 'Installation date accepted.');
+        } catch (Exception $e) {
+            Log::error('BNPL Admin Accept Installation Date Error: ' . $e->getMessage());
+            return ResponseHelper::error('Failed to accept installation date.', 500);
+        }
+    }
+
+    /**
+     * Reject the requested installation date. User will be able to book another date (excluding this one).
+     * PUT /api/admin/bnpl/applications/{id}/installation-date/reject
+     */
+    public function rejectInstallationDate($id)
+    {
+        try {
+            $application = LoanApplication::with('user')->find($id);
+            if (!$application) {
+                return ResponseHelper::error('BNPL application not found', 404);
+            }
+            if ($application->installation_booking_status !== 'pending' || !$application->installation_requested_date) {
+                return ResponseHelper::error('No pending installation date to reject.', 422);
+            }
+            $rejectedDate = $application->installation_requested_date->format('Y-m-d');
+            $rejected = $application->installation_rejected_dates ?? [];
+            if (!in_array($rejectedDate, $rejected)) {
+                $rejected[] = $rejectedDate;
+            }
+            $application->installation_booking_status = 'rejected';
+            $application->installation_rejected_dates = $rejected;
+            $application->save();
+
+            try {
+                if ($application->user && $application->user->email) {
+                    Mail::to($application->user->email)->send(new BNPLStatusEmail($application->user, $application, 'installation_date_rejected'));
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Could not send installation date rejected email: ' . $e->getMessage());
+            }
+
+            return ResponseHelper::success([
+                'installation_booking_status' => $application->installation_booking_status,
+                'installation_rejected_dates' => $application->installation_rejected_dates,
+            ], 'Installation date rejected. User has been notified to book another date.');
+        } catch (Exception $e) {
+            Log::error('BNPL Admin Reject Installation Date Error: ' . $e->getMessage());
+            return ResponseHelper::error('Failed to reject installation date.', 500);
+        }
+    }
 }
 

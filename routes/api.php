@@ -241,6 +241,7 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     // BNPL Orders endpoints
     Route::get('/bnpl/orders', [BNPLController::class, 'getOrders']); // List all user's BNPL orders
     Route::get('/bnpl/orders/{order_id}', [BNPLController::class, 'getOrderDetails']); // Get single BNPL order with repayment details
+    Route::post('/bnpl/installation/book', [BNPLController::class, 'bookInstallationDate']);
     
     // Audit Request endpoints
     Route::post('/audit/request', [AuditController::class, 'submit']);
@@ -420,6 +421,8 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
         Route::put('/guarantors/{id}/status', [BNPLAdminController::class, 'updateGuarantorStatus']);
         Route::post('/guarantor-form', [BNPLAdminController::class, 'uploadGuarantorForm']);
         Route::post('/applications/{id}/guarantor', [BNPLAdminController::class, 'setApplicationGuarantor']);
+        Route::put('/applications/{id}/installation-date/accept', [BNPLAdminController::class, 'acceptInstallationDate']);
+        Route::put('/applications/{id}/installation-date/reject', [BNPLAdminController::class, 'rejectInstallationDate']);
     });
 
     // ================= AUDIT ADMIN ROUTES =================
