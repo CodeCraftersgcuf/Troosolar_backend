@@ -1148,6 +1148,8 @@ class BNPLController extends Controller
                     'id' => $loanApplication->guarantor->id,
                     'full_name' => $loanApplication->guarantor->full_name,
                     'status' => $loanApplication->guarantor->status,
+                    'signed_form_path' => $loanApplication->guarantor->signed_form_path,
+                    'has_signed_form' => !empty($loanApplication->guarantor->signed_form_path),
                 ] : null,
             ] : null;
             $orderData['repayment_schedule'] = $repaymentSchedule;

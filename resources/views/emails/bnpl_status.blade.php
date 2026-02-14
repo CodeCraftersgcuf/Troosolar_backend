@@ -30,30 +30,31 @@
             <div class="details">
                 <p><strong>Loan amount:</strong> ₦{{ number_format($loanAmount, 2) }}</p>
                 @if($downPayment !== null)
-                    <p><strong>Down payment required:</strong> ₦{{ number_format($downPayment, 2) }}</p>
+                    <p><strong>Initial deposit required:</strong> ₦{{ number_format($downPayment, 2) }}</p>
                 @endif
                 @if($repaymentDuration > 0)
                     <p><strong>Repayment period:</strong> {{ $repaymentDuration }} months</p>
                 @endif
             </div>
             <p>
-                <a href="{{ $continueUrl }}" class="btn">Continue to complete your order</a>
+                <a href="{{ $continueUrl }}" class="btn" target="_blank" rel="noopener noreferrer">Continue to complete your order</a>
             </p>
             <p style="font-size: 14px; color: #666;">
                 Or copy this link into your browser:<br>
-                <a href="{{ $continueUrl }}">{{ $continueUrl }}</a>
+                <a href="{{ $continueUrl }}" style="word-break: break-all; color: #273e8e;">{{ $continueUrl }}</a>
             </p>
         @elseif($status === 'counter_offer')
             <p>
-                <a href="{{ $continueUrl }}" class="btn">Review counter offer</a>
+                <a href="{{ $continueUrl }}" class="btn" target="_blank" rel="noopener noreferrer">Review counter offer</a>
             </p>
             <p style="font-size: 14px; color: #666;">
-                <a href="{{ $continueUrl }}">{{ $continueUrl }}</a>
+                Or copy this link into your browser:<br>
+                <a href="{{ $continueUrl }}" style="word-break: break-all; color: #273e8e;">{{ $continueUrl }}</a>
             </p>
         @endif
 
         <div class="footer">
-            <p>This is an automated message from Troosolar. Please do not reply to this email.</p>
+            <p>This is an automated message from Troosolar about your BuyNowPayLater application. Please do not reply to this email.</p>
         </div>
     </div>
 </body>
