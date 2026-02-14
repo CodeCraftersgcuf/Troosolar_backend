@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Controller;
 use App\Mail\BNPLStatusEmail;
+use App\Models\BnplSettings;
 use App\Models\Guarantor;
 use App\Models\LoanApplication;
 use App\Models\MonoLoanCalculation;
@@ -133,16 +134,24 @@ class BNPLAdminController extends Controller
     }
 
     /**
-     * Update loan offer (amount, down payment, tenor) for BNPL application
+     * Update loan offer (amount, down payment, tenor, interest & fees) for BNPL application.
+     * Uses global BnplSettings; optional per-application overrides for interest_rate, management_fee, legal_fee, insurance_fee.
      * PUT /api/admin/bnpl/applications/{id}/offer
      */
     public function updateLoanOffer(Request $request, $id)
     {
         try {
+            $settings = BnplSettings::get();
+            $allowedDurations = $settings->loan_durations ?? [3, 6, 9, 12];
+
             $request->validate([
                 'loan_amount' => 'nullable|numeric|min:0',
                 'down_payment' => 'nullable|numeric|min:0',
-                'repayment_duration' => 'nullable|integer|in:3,6,9,12',
+                'repayment_duration' => 'nullable|integer|in:' . implode(',', $allowedDurations),
+                'interest_rate' => 'nullable|numeric|min:0|max:100',
+                'management_fee_percentage' => 'nullable|numeric|min:0|max:100',
+                'legal_fee_percentage' => 'nullable|numeric|min:0|max:100',
+                'insurance_fee_percentage' => 'nullable|numeric|min:0|max:100',
             ]);
 
             $application = LoanApplication::with('mono.loanCalculation')->find($id);
@@ -159,14 +168,35 @@ class BNPLAdminController extends Controller
             $downPayment = $request->filled('down_payment') ? (float) $request->down_payment : (float) $mono->down_payment;
             $duration = $request->filled('repayment_duration') ? (int) $request->repayment_duration : (int) $mono->repayment_duration;
 
-            $interestRate = (float) ($mono->interest_rate ?? 0);
-            $totalAmount = $loanAmount + ($loanAmount * $interestRate);
-            $monthlyPayment = $duration > 0 ? round(($totalAmount - $downPayment) / $duration, 2) : 0;
+            $interestRate = $request->filled('interest_rate')
+                ? (float) $request->interest_rate
+                : (float) ($mono->interest_rate ?? $settings->interest_rate_percentage);
+            $mgmtFee = $request->filled('management_fee_percentage')
+                ? (float) $request->management_fee_percentage
+                : (float) ($mono->management_fee_percentage ?? $settings->management_fee_percentage);
+            $legalFee = $request->filled('legal_fee_percentage')
+                ? (float) $request->legal_fee_percentage
+                : (float) ($mono->legal_fee_percentage ?? $settings->legal_fee_percentage);
+            $insFee = $request->filled('insurance_fee_percentage')
+                ? (float) $request->insurance_fee_percentage
+                : (float) ($mono->insurance_fee_percentage ?? $settings->insurance_fee_percentage);
+
+            $totalAmount = $loanAmount + $downPayment;
+            $totalLoanAmount = $loanAmount;
+            $totalInterestAmount = round($totalLoanAmount * ($interestRate / 100), 2);
+            $feePercent = $mgmtFee + $legalFee + $insFee;
+            $totalFeeAmount = round($totalLoanAmount * ($feePercent / 100), 2);
+            $totalRepaymentAmount = $totalLoanAmount + $totalInterestAmount + $totalFeeAmount;
+            $monthlyPayment = $duration > 0 ? round($totalRepaymentAmount / $duration, 2) : 0;
 
             $mono->loan_amount = $loanAmount;
             $mono->down_payment = $downPayment;
             $mono->repayment_duration = $duration;
             $mono->total_amount = $totalAmount;
+            $mono->interest_rate = $interestRate;
+            $mono->management_fee_percentage = $mgmtFee;
+            $mono->legal_fee_percentage = $legalFee;
+            $mono->insurance_fee_percentage = $insFee;
             $mono->save();
 
             $application->loan_amount = $loanAmount;
@@ -201,10 +231,12 @@ class BNPLAdminController extends Controller
     public function updateStatus(Request $request, $id)
     {
         try {
+            $settings = BnplSettings::get();
+            $allowedDurations = $settings->loan_durations ?? [3, 6, 9, 12];
             $request->validate([
                 'status' => 'required|in:pending,approved,rejected,counter_offer',
                 'counter_offer_min_deposit' => 'required_if:status,counter_offer|numeric|min:0',
-                'counter_offer_min_tenor' => 'required_if:status,counter_offer|integer|in:3,6,9,12',
+                'counter_offer_min_tenor' => 'required_if:status,counter_offer|integer|in:' . implode(',', $allowedDurations),
                 'admin_notes' => 'nullable|string|max:1000',
             ]);
 

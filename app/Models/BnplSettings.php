@@ -1,0 +1,50 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class BnplSettings extends Model
+{
+    protected $table = 'bnpl_settings';
+
+    protected $fillable = [
+        'interest_rate_percentage',
+        'min_down_percentage',
+        'management_fee_percentage',
+        'legal_fee_percentage',
+        'insurance_fee_percentage',
+        'minimum_loan_amount',
+        'loan_durations',
+    ];
+
+    protected $casts = [
+        'interest_rate_percentage' => 'decimal:2',
+        'min_down_percentage' => 'decimal:2',
+        'management_fee_percentage' => 'decimal:2',
+        'legal_fee_percentage' => 'decimal:2',
+        'insurance_fee_percentage' => 'decimal:2',
+        'minimum_loan_amount' => 'decimal:2',
+        'loan_durations' => 'array',
+    ];
+
+    /**
+     * Get the single BNPL settings row (singleton).
+     */
+    public static function get(): self
+    {
+        $row = self::first();
+        if (!$row) {
+            $row = self::create([
+                'interest_rate_percentage' => 4,
+                'min_down_percentage' => 30,
+                'management_fee_percentage' => 1,
+                'legal_fee_percentage' => 0,
+                'insurance_fee_percentage' => 0.5,
+                'minimum_loan_amount' => 0,
+                'loan_durations' => [3, 6, 9, 12],
+            ]);
+        }
+        return $row;
+    }
+}

@@ -14,6 +14,7 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\LoanInstallment;
 use App\Models\LoanRepayment;
+use App\Models\BnplSettings;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -72,12 +73,14 @@ class BNPLController extends Controller
             // Merge normalized data back into request
             $request->merge($allInput);
 
+            $settings = BnplSettings::get();
+            $allowedDurations = $settings->loan_durations ?? [3, 6, 9, 12];
             // Validate required fields - handle both JSON and FormData formats
             $validationRules = [
                 'customer_type' => 'required|in:residential,sme,commercial',
                 'product_category' => 'required|string',
                 'loan_amount' => 'required|numeric|min:0',
-                'repayment_duration' => 'required|in:3,6,9,12',
+                'repayment_duration' => 'required|integer|in:' . implode(',', $allowedDurations),
                 'credit_check_method' => 'required|in:auto,manual',
                 'bank_statement' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
                 'live_photo' => 'required|file|mimes:jpg,jpeg,png|max:5120',
@@ -274,14 +277,17 @@ class BNPLController extends Controller
                 $monoLoanCalculation = MonoLoanCalculation::where('loan_calculation_id', $loanCalculation->id)->first();
                 
                 if (!$monoLoanCalculation) {
-                    // Create MonoLoanCalculation if it doesn't exist
                     $monoLoanCalculation = MonoLoanCalculation::create([
                         'loan_calculation_id' => $loanCalculation->id,
                         'loan_amount' => $loanAmount,
-                        'repayment_duration' => $data['repayment_duration'] ?? $loanCalculation->repayment_duration,
-                        'down_payment' => $loanAmount * 0.30, // 30% default
+                        'repayment_duration' => (int) ($data['repayment_duration'] ?? $loanCalculation->repayment_duration),
+                        'down_payment' => round($loanAmount * ((float) ($settings->min_down_percentage ?? 30) / 100), 2),
                         'total_amount' => $loanAmount,
                         'status' => 'pending',
+                        'interest_rate' => $settings->interest_rate_percentage,
+                        'management_fee_percentage' => $settings->management_fee_percentage,
+                        'legal_fee_percentage' => $settings->legal_fee_percentage,
+                        'insurance_fee_percentage' => $settings->insurance_fee_percentage,
                     ]);
                 }
                 

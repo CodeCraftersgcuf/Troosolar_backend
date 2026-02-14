@@ -409,6 +409,8 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
 
     // ================= BNPL ADMIN ROUTES =================
     Route::prefix('admin/bnpl')->group(function () {
+        Route::get('/settings', [\App\Http\Controllers\Api\Admin\BnplSettingsController::class, 'show']);
+        Route::put('/settings', [\App\Http\Controllers\Api\Admin\BnplSettingsController::class, 'update']);
         Route::get('/applications', [BNPLAdminController::class, 'index']);
         Route::get('/applications/{id}', [BNPLAdminController::class, 'show']);
         Route::put('/applications/{id}', [BNPLAdminController::class, 'updateApplication']);

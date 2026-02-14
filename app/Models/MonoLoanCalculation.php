@@ -19,6 +19,9 @@ class MonoLoanCalculation extends Model
         'loan_application_id',
         'interest_rate',
         'total_amount',
+        'management_fee_percentage',
+        'legal_fee_percentage',
+        'insurance_fee_percentage',
     ];
     // relations
 
