@@ -107,6 +107,9 @@ Route::get('/config/loan-configuration', [ConfigurationController::class, 'getLo
 Route::get('/config/add-ons', [ConfigurationController::class, 'getAddOns']);
 Route::get('/config/delivery-locations', [ConfigurationController::class, 'getDeliveryLocations']);
 
+// Site banner (public - dashboard home promo)
+Route::get('/site/banner', [\App\Http\Controllers\Api\Website\SiteBannerController::class, 'show']);
+
 // Public bundles endpoint (for Buy Now flow)
 Route::get('/bundles', [\App\Http\Controllers\Api\Website\BundleController::class, 'index']);
 
@@ -440,6 +443,13 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
         Route::put('/buy-now/{id}/status', [OrderController::class, 'updateBuyNowOrderStatus']);
         Route::get('/bnpl', [OrderController::class, 'getBnplOrders']);
         Route::get('/bnpl/{id}', [OrderController::class, 'getBnplOrder']);
+    });
+
+    // ================= SITE BANNER ADMIN ROUTES =================
+    Route::prefix('admin/site')->group(function () {
+        Route::get('/banner', [\App\Http\Controllers\Api\Admin\SiteBannerAdminController::class, 'show']);
+        Route::post('/banner', [\App\Http\Controllers\Api\Admin\SiteBannerAdminController::class, 'store']);
+        Route::delete('/banner', [\App\Http\Controllers\Api\Admin\SiteBannerAdminController::class, 'destroy']);
     });
 
     // ================= ADMIN CUSTOM ORDER ROUTES =================
