@@ -730,13 +730,23 @@ class BNPLController extends Controller
     {
         try {
             $data = $request->validate([
-                'guarantor_id' => 'required|exists:guarantors,id',
+                'guarantor_id' => 'nullable|exists:guarantors,id',
+                'loan_application_id' => 'nullable|exists:loan_applications,id',
                 'signed_form' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
             ]);
 
-            $guarantor = Guarantor::where('id', $data['guarantor_id'])
-                ->where('user_id', Auth::id())
-                ->first();
+            // Find guarantor: by guarantor_id first, then by loan_application_id
+            $guarantor = null;
+            if (!empty($data['guarantor_id'])) {
+                $guarantor = Guarantor::where('id', $data['guarantor_id'])
+                    ->where('user_id', Auth::id())
+                    ->first();
+            }
+            if (!$guarantor && !empty($data['loan_application_id'])) {
+                $guarantor = Guarantor::where('loan_application_id', $data['loan_application_id'])
+                    ->where('user_id', Auth::id())
+                    ->first();
+            }
 
             if (!$guarantor) {
                 return ResponseHelper::error('Guarantor not found', 404);
