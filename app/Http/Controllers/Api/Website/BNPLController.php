@@ -748,8 +748,27 @@ class BNPLController extends Controller
                     ->first();
             }
 
+            // If no guarantor record exists yet, create a placeholder so the signed form can be stored
+            if (!$guarantor && !empty($data['loan_application_id'])) {
+                $loanApp = LoanApplication::where('id', $data['loan_application_id'])
+                    ->where('user_id', Auth::id())
+                    ->first();
+                if (!$loanApp) {
+                    return ResponseHelper::error('Loan application not found', 404);
+                }
+                $user = Auth::user();
+                $guarantor = Guarantor::create([
+                    'user_id' => Auth::id(),
+                    'loan_application_id' => $data['loan_application_id'],
+                    'full_name' => $user->first_name . ' ' . ($user->last_name ?? ''),
+                    'email' => $user->email,
+                    'phone' => $user->phone ?? '',
+                    'status' => 'pending',
+                ]);
+            }
+
             if (!$guarantor) {
-                return ResponseHelper::error('Guarantor not found', 404);
+                return ResponseHelper::error('Could not process upload. Please provide a loan application ID.', 400);
             }
 
             $file = $request->file('signed_form');
