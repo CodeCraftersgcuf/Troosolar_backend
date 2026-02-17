@@ -48,13 +48,17 @@
 <body>
     <div class="container">
         <h2>Your OTP Code</h2>
+
+        @if(isset($first_name) && !empty($first_name))
+            <p>Hi {{ $first_name }},</p>
+        @endif
         
         @if(isset($customMessage) && !empty($customMessage))
             <div class="message">
                 {{ $customMessage }}
             </div>
         @else
-            <p>Please use the following OTP code to complete your verification:</p>
+            <p>Please use the following OTP code to complete your email verification:</p>
         @endif
         
         <div class="otp-code">
