@@ -97,6 +97,10 @@ class BundleRequest extends FormRequest
             $decoded = json_decode($this->materials_detail, true);
             $this->merge(['materials_detail' => is_array($decoded) ? $decoded : []]);
         }
+        if ($this->has('custom_services') && is_string($this->custom_services)) {
+            $decoded = json_decode($this->custom_services, true);
+            $this->merge(['custom_services' => is_array($decoded) ? $decoded : []]);
+        }
         if ($this->has('brand_id') && $this->input('brand_id') === '') {
             $this->merge(['brand_id' => null]);
         }
