@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\BundleRequest;
 use App\Models\Bundles;
 use App\Models\BundleItems;
+use App\Models\BundleMaterial;
 use App\Models\BundleCustomAppliance;
 use App\Models\CustomService;
 use App\Models\Product;
