@@ -23,11 +23,41 @@ class BundleMaterialSeeder extends Seeder
             return $material;
         };
 
-        $findProduct = function ($name) {
+        $findProduct = function ($name) use ($findMaterial) {
+            // 1. Exact match
             $product = Product::where('title', $name)->first();
             if ($product) return $product;
+
+            // 2. LIKE match
             $product = Product::where('title', 'like', '%' . $name . '%')->first();
-            return $product;
+            if ($product) return $product;
+
+            // 3. Reverse LIKE
+            $product = Product::whereRaw('? LIKE CONCAT("%", title, "%")', [$name])->first();
+            if ($product) return $product;
+
+            // 4. Case-insensitive match
+            $product = Product::whereRaw('LOWER(title) = ?', [strtolower($name)])->first();
+            if ($product) return $product;
+
+            // 5. Fallback: find matching material and auto-create product
+            $material = $findMaterial($name);
+            if ($material) {
+                $category = \App\Models\Category::first();
+                $brand    = \App\Models\Brand::first();
+                $product  = Product::create([
+                    'title'          => $material->name,
+                    'category_id'    => $category?->id,
+                    'brand_id'       => $brand?->id,
+                    'price'          => (float) ($material->selling_rate ?? $material->rate ?? 0),
+                    'discount_price' => (float) ($material->selling_rate ?? $material->rate ?? 0),
+                    'stock'          => 'In Stock',
+                    'featured_image' => 'https://troosolar.hmstech.org/storage/products/d5c7f116-57ed-46ef-a659-337c94c308a9.png',
+                ]);
+                return $product;
+            }
+
+            return null;
         };
 
         $bundleConfigs = $this->getBundleConfigs();
