@@ -57,14 +57,11 @@ class SeederController extends Controller
                 $results['bundles'] = 'Already seeded (skipped)';
             }
 
-            // Check and run BundleMaterialSeeder
-            $bundleMaterialCount = DB::table('bundle_materials')->count();
-            if ($bundleMaterialCount == 0) {
-                Artisan::call('db:seed', ['--class' => 'BundleMaterialSeeder']);
-                $results['bundle_materials'] = 'Seeded successfully';
-            } else {
-                $results['bundle_materials'] = 'Already seeded (skipped)';
-            }
+            // Always run BundleMaterialSeeder (it clears and re-seeds per bundle)
+            Artisan::call('db:seed', ['--class' => 'BundleMaterialSeeder']);
+            $results['bundle_materials'] = 'Seeded successfully';
+            $results['bundle_items'] = DB::table('bundle_items')->count() . ' items';
+            $results['custom_services'] = DB::table('custom_services')->count() . ' services';
 
             return ResponseHelper::success($results, 'Seeders executed successfully');
         } catch (Exception $e) {
@@ -141,26 +138,25 @@ class SeederController extends Controller
     }
 
     /**
-     * Run BundleMaterialSeeder specifically
+     * Run BundleMaterialSeeder specifically.
+     * Always re-seeds (clears old data per bundle and re-creates).
      */
     public function runBundleMaterialSeeder()
     {
         try {
-            $bundleMaterialCount = DB::table('bundle_materials')->count();
-            
-            if ($bundleMaterialCount > 0) {
-                return ResponseHelper::success(
-                    ['status' => 'Already seeded (skipped)', 'count' => $bundleMaterialCount],
-                    'Bundle materials already exist. Skipping seeder.'
-                );
-            }
-
             Artisan::call('db:seed', ['--class' => 'BundleMaterialSeeder']);
-            
-            $newCount = DB::table('bundle_materials')->count();
-            
+
+            $materialsCount = DB::table('bundle_materials')->count();
+            $itemsCount     = DB::table('bundle_items')->count();
+            $servicesCount  = DB::table('custom_services')->count();
+
             return ResponseHelper::success(
-                ['status' => 'Seeded successfully', 'count' => $newCount],
+                [
+                    'status'           => 'Seeded successfully',
+                    'bundle_materials' => $materialsCount,
+                    'bundle_items'     => $itemsCount,
+                    'custom_services'  => $servicesCount,
+                ],
                 'Bundle material seeder executed successfully'
             );
         } catch (Exception $e) {
