@@ -117,7 +117,9 @@ class SeederController extends Controller
 
             if ($force && $bundleCount > 0) {
                 $bundleIds = DB::table('bundles')->whereIn('bundle_type', $bundleTypes)->pluck('id');
+                DB::table('bundle_items')->whereIn('bundle_id', $bundleIds)->delete();
                 DB::table('bundle_materials')->whereIn('bundle_id', $bundleIds)->delete();
+                DB::table('custom_services')->whereIn('bundle_id', $bundleIds)->delete();
                 DB::table('bundles')->whereIn('bundle_type', $bundleTypes)->delete();
             }
 
@@ -129,7 +131,13 @@ class SeederController extends Controller
             }
 
             return ResponseHelper::success(
-                ['status' => $force ? 'Re-seeded (replaced)' : 'Seeded successfully', 'count' => $newCount],
+                [
+                    'status'           => $force ? 'Re-seeded (replaced)' : 'Seeded successfully',
+                    'bundles'          => $newCount,
+                    'bundle_items'     => DB::table('bundle_items')->count(),
+                    'bundle_materials' => DB::table('bundle_materials')->count(),
+                    'custom_services'  => DB::table('custom_services')->count(),
+                ],
                 'Bundle seeder executed successfully'
             );
         } catch (Exception $e) {

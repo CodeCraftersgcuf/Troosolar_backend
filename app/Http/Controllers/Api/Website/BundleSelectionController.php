@@ -63,28 +63,80 @@ class BundleSelectionController extends Controller
     public function getBundleDetails($id)
     {
         try {
-            $bundle = Bundles::with(['bundleMaterials.material.category'])
-                ->find($id);
+            $bundle = Bundles::with([
+                'bundleItems.product.category',
+                'bundleMaterials.material.category',
+                'customServices',
+            ])->find($id);
 
             if (!$bundle) {
                 return ResponseHelper::error('Bundle not found.', 404);
             }
 
-            // Get installation and delivery fees from materials
+            // Get installation and delivery fees from custom_services
             $installationFee = 0;
             $deliveryFee = 0;
             $inspectionFee = 0;
 
-            foreach ($bundle->bundleMaterials as $bm) {
-                $materialName = $bm->material->name;
-                if (str_contains($materialName, 'Installation Fees')) {
-                    $installationFee = (float) ($bm->material->selling_rate ?? $bm->material->rate ?? 0);
-                } elseif (str_contains($materialName, 'Delivery Fees')) {
-                    $deliveryFee = (float) ($bm->material->selling_rate ?? $bm->material->rate ?? 0);
-                } elseif (str_contains($materialName, 'Inspection Fees')) {
-                    $inspectionFee = (float) ($bm->material->selling_rate ?? $bm->material->rate ?? 0);
+            foreach ($bundle->customServices as $svc) {
+                $svcTitle = $svc->title ?? '';
+                if (str_contains($svcTitle, 'Installation Fees')) {
+                    $installationFee = (float) ($svc->service_amount ?? 0);
+                } elseif (str_contains($svcTitle, 'Delivery Fees')) {
+                    $deliveryFee = (float) ($svc->service_amount ?? 0);
+                } elseif (str_contains($svcTitle, 'Inspection Fees')) {
+                    $inspectionFee = (float) ($svc->service_amount ?? 0);
                 }
             }
+
+            $bundleItems = $bundle->bundleItems->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'product_id' => $item->product_id,
+                    'product' => $item->product ? [
+                        'id' => $item->product->id,
+                        'title' => $item->product->title,
+                        'price' => (float) ($item->product->price ?? 0),
+                        'discount_price' => $item->product->discount_price ? (float) $item->product->discount_price : null,
+                        'featured_image' => $item->product->featured_image_url ?? $item->product->featured_image ?? null,
+                        'category' => $item->product->category ? [
+                            'id' => $item->product->category->id,
+                            'title' => $item->product->category->title,
+                        ] : null,
+                    ] : null,
+                    'quantity' => $item->quantity ?? 1,
+                    'rate_override' => $item->rate_override !== null ? (float) $item->rate_override : null,
+                ];
+            });
+
+            $bundleMaterials = $bundle->bundleMaterials->map(function ($bm) {
+                return [
+                    'id' => $bm->id,
+                    'material_id' => $bm->material_id,
+                    'material' => $bm->material ? [
+                        'id' => $bm->material->id,
+                        'name' => $bm->material->name,
+                        'unit' => $bm->material->unit,
+                        'rate' => (float) ($bm->material->rate ?? 0),
+                        'selling_rate' => (float) ($bm->material->selling_rate ?? 0),
+                        'warranty' => $bm->material->warranty,
+                        'category' => $bm->material->category ? [
+                            'id' => $bm->material->category->id,
+                            'name' => $bm->material->category->name,
+                        ] : null,
+                    ] : null,
+                    'quantity' => (float) ($bm->quantity ?? 1),
+                    'rate_override' => $bm->rate_override !== null ? (float) $bm->rate_override : null,
+                ];
+            });
+
+            $customServices = $bundle->customServices->map(function ($service) {
+                return [
+                    'id' => $service->id,
+                    'title' => $service->title,
+                    'service_amount' => (float) ($service->service_amount ?? 0),
+                ];
+            });
 
             $response = [
                 'id' => $bundle->id,
@@ -109,6 +161,9 @@ class BundleSelectionController extends Controller
                     'delivery_fee' => $deliveryFee,
                     'inspection_fee' => $inspectionFee,
                 ],
+                'bundle_items' => $bundleItems,
+                'bundle_materials' => $bundleMaterials,
+                'custom_services' => $customServices,
                 'materials' => $bundle->bundleMaterials->map(function ($bm) {
                     return [
                         'id' => $bm->material->id,
