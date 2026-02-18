@@ -9,7 +9,12 @@ class BundleItems extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['bundle_id', 'product_id'];
+    protected $fillable = ['bundle_id', 'product_id', 'quantity', 'rate_override'];
+
+    protected $casts = [
+        'quantity'      => 'integer',
+        'rate_override' => 'decimal:2',
+    ];
 
   public function customServices()
 {

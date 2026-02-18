@@ -13,10 +13,12 @@ class BundleMaterial extends Model
         'bundle_id',
         'material_id',
         'quantity',
+        'rate_override',
     ];
 
     protected $casts = [
-        'quantity' => 'decimal:2',
+        'quantity'      => 'decimal:2',
+        'rate_override' => 'decimal:2',
     ];
 
     /**

@@ -184,10 +184,19 @@ public function index(Request $request)
                 }
             }
 
-            if (!empty($data['items'])) {
+            if (!empty($data['items_detail'])) {
+                foreach ($data['items_detail'] as $itemDetail) {
+                    BundleItems::create([
+                        'bundle_id'     => $bundle->id,
+                        'product_id'    => $itemDetail['product_id'],
+                        'quantity'      => $itemDetail['quantity'] ?? 1,
+                        'rate_override' => isset($itemDetail['rate_override']) && $itemDetail['rate_override'] !== '' ? $itemDetail['rate_override'] : null,
+                    ]);
+                }
+            } elseif (!empty($data['items'])) {
                 foreach ($data['items'] as $productId) {
                     BundleItems::create([
-                        'bundle_id' => $bundle->id,
+                        'bundle_id'  => $bundle->id,
                         'product_id' => $productId,
                     ]);
                 }
@@ -256,6 +265,7 @@ public function index(Request $request)
                         ] : null,
                     ] : null,
                     'quantity' => $item->quantity ?? 1,
+                    'rate_override' => $item->rate_override !== null ? (float) $item->rate_override : null,
                 ];
             });
 
@@ -278,6 +288,7 @@ public function index(Request $request)
                         ] : null,
                     ] : null,
                     'quantity' => (float) ($bm->quantity ?? 1),
+                    'rate_override' => $bm->rate_override !== null ? (float) $bm->rate_override : null,
                 ];
             });
 
@@ -426,12 +437,34 @@ public function index(Request $request)
                 }
             }
 
-            if (isset($data['items'])) {
+            if (isset($data['items_detail'])) {
+                BundleItems::where('bundle_id', $bundle->id)->delete();
+                foreach ($data['items_detail'] as $itemDetail) {
+                    BundleItems::create([
+                        'bundle_id'     => $bundle->id,
+                        'product_id'    => $itemDetail['product_id'],
+                        'quantity'      => $itemDetail['quantity'] ?? 1,
+                        'rate_override' => isset($itemDetail['rate_override']) && $itemDetail['rate_override'] !== '' ? $itemDetail['rate_override'] : null,
+                    ]);
+                }
+            } elseif (isset($data['items'])) {
                 BundleItems::where('bundle_id', $bundle->id)->delete();
                 foreach ($data['items'] as $productId) {
                     BundleItems::create([
-                        'bundle_id' => $bundle->id,
+                        'bundle_id'  => $bundle->id,
                         'product_id' => $productId,
+                    ]);
+                }
+            }
+
+            if (isset($data['materials_detail'])) {
+                BundleMaterial::where('bundle_id', $bundle->id)->delete();
+                foreach ($data['materials_detail'] as $matDetail) {
+                    BundleMaterial::create([
+                        'bundle_id'     => $bundle->id,
+                        'material_id'   => $matDetail['material_id'],
+                        'quantity'      => $matDetail['quantity'] ?? 1,
+                        'rate_override' => isset($matDetail['rate_override']) && $matDetail['rate_override'] !== '' ? $matDetail['rate_override'] : null,
                     ]);
                 }
             }
@@ -483,6 +516,7 @@ public function index(Request $request)
                     'category' => $item->product->category ? ['id' => $item->product->category->id, 'title' => $item->product->category->title] : null,
                 ] : null,
                 'quantity' => $item->quantity ?? 1,
+                'rate_override' => $item->rate_override !== null ? (float) $item->rate_override : null,
             ];
         });
         $bundleMaterials = $bundle->bundleMaterials->map(function ($bm) {
@@ -499,6 +533,7 @@ public function index(Request $request)
                     'category' => $bm->material->category ? ['id' => $bm->material->category->id, 'name' => $bm->material->category->name, 'code' => $bm->material->category->code] : null,
                 ] : null,
                 'quantity' => (float) ($bm->quantity ?? 1),
+                'rate_override' => $bm->rate_override !== null ? (float) $bm->rate_override : null,
             ];
         });
         $customServices = $bundle->customServices->map(function ($s) {

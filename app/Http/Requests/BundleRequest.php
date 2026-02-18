@@ -27,6 +27,16 @@ class BundleRequest extends FormRequest
             'items' => 'nullable|array',
             'items.*' => 'nullable|exists:products,id',
 
+            'items_detail' => 'nullable|array',
+            'items_detail.*.product_id' => 'required_with:items_detail|exists:products,id',
+            'items_detail.*.quantity' => 'nullable|integer|min:1',
+            'items_detail.*.rate_override' => 'nullable|numeric|min:0',
+
+            'materials_detail' => 'nullable|array',
+            'materials_detail.*.material_id' => 'required_with:materials_detail|exists:materials,id',
+            'materials_detail.*.quantity' => 'nullable|numeric|min:0',
+            'materials_detail.*.rate_override' => 'nullable|numeric|min:0',
+
             'custom_services' => 'nullable|array',
             'custom_services.*.title' => 'required_with:custom_services|string|max:255',
             'custom_services.*.service_amount' => 'required_with:custom_services|numeric|min:0',
@@ -78,6 +88,14 @@ class BundleRequest extends FormRequest
         if ($this->filled('specifications') && is_string($this->specifications)) {
             $decoded = json_decode($this->specifications, true);
             $this->merge(['specifications' => is_array($decoded) ? $decoded : []]);
+        }
+        if ($this->filled('items_detail') && is_string($this->items_detail)) {
+            $decoded = json_decode($this->items_detail, true);
+            $this->merge(['items_detail' => is_array($decoded) ? $decoded : []]);
+        }
+        if ($this->filled('materials_detail') && is_string($this->materials_detail)) {
+            $decoded = json_decode($this->materials_detail, true);
+            $this->merge(['materials_detail' => is_array($decoded) ? $decoded : []]);
         }
         if ($this->has('brand_id') && $this->input('brand_id') === '') {
             $this->merge(['brand_id' => null]);
