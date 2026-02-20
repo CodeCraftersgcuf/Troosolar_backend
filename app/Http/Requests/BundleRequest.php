@@ -58,21 +58,9 @@ class BundleRequest extends FormRequest
             'custom_appliances.*.quantity' => 'nullable|integer|min:1',
             'custom_appliances.*.estimated_daily_hours_usage' => 'nullable|numeric|min:0',
 
+            // Accept any key-value pairs under specifications (user-defined dynamic fields)
             'specifications' => 'nullable|array',
-            'specifications.company_oem' => 'nullable|string|max:255',
-            'specifications.inverter_capacity_kva' => 'nullable|string|max:50',
-            'specifications.voltage' => 'nullable|string|max:50',
-            'specifications.battery_type' => 'nullable|string|max:255',
-            'specifications.battery_capacity_kwh' => 'nullable|string|max:50',
-            'specifications.inverter_warranty' => 'nullable|string|max:255',
-            'specifications.battery_warranty' => 'nullable|string|max:255',
-            'specifications.solar_panel_capacity_w' => 'nullable|string|max:50',
-            'specifications.solar_panel_capacity_kw' => 'nullable|string|max:50',
-            'specifications.backup_time_range' => 'nullable|string|max:255',
-            // Solar+Inverter+Battery specification tab
-            'specifications.solar_panel_type' => 'nullable|string|max:255',
-            'specifications.solar_panels_wattage' => 'nullable|string|max:50',
-            'specifications.solar_panels_warranty' => 'nullable|string|max:255',
+            'specifications.*' => 'nullable|string|max:1000',
         ];
     }
 
