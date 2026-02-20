@@ -29,8 +29,9 @@ public function index(Request $request)
 
         // If no query parameter => return all bundles
         if (empty($query)) {
-            $bundles = Bundles::with(['bundleItems.product', 'customServices', 'brand'])->get();
-            return ResponseHelper::success($bundles, 'Bundles fetched.');
+            $bundles = Bundles::with(['bundleItems.product.category', 'bundleMaterials.material.category', 'customServices', 'brand'])->get();
+            $formatted = $bundles->map(fn($b) => $this->formatBundleResponse($b))->values();
+            return ResponseHelper::success($formatted, 'Bundles fetched.');
         }
 
         // Ensure query is a number

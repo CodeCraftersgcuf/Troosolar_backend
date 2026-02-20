@@ -104,7 +104,18 @@ class BundleMaterialSeeder extends Seeder
                 }
             }
 
-            // Seed custom_services (fees for the Invoice)
+            // Seed custom_services:
+            //   [OL] prefix = Order List items (shown on Order Summary)
+            //   No prefix   = Invoice Fees only
+            if (!empty($config['order_list'])) {
+                foreach ($config['order_list'] as $ol) {
+                    CustomService::create([
+                        'bundle_id'      => $bundle->id,
+                        'title'          => '[OL]' . $ol['title'],
+                        'service_amount' => $ol['amount'] ?? 0,
+                    ]);
+                }
+            }
             foreach ($config['services'] as $svc) {
                 CustomService::create([
                     'bundle_id'      => $bundle->id,
@@ -140,6 +151,12 @@ class BundleMaterialSeeder extends Seeder
                     ['name' => '32A By-Pass Switch', 'quantity' => 1],
                     ['name' => 'Trunking, flex pipe, Cable lugs for 1.2kVA+1.3kWh System', 'quantity' => 1],
                 ],
+                // ORDER LIST items — shown on customer Order Summary (prefixed [OL] in DB)
+                'order_list' => [
+                    ['title' => 'OG-1P1K2-T 12V 1.2kVA Yinergy Solar Hybrid Inverter', 'amount' => 0],
+                    ['title' => 'GCL 12100 12V 1.3kWh Cworth Energy Lithium Ion Battery', 'amount' => 0],
+                ],
+                // INVOICE FEES — shown only on Invoice (no prefix)
                 'services' => [
                     ['title' => 'Installation Fees for 1.2kVA+1.3kWh System', 'amount' => 0],
                     ['title' => 'Delivery Fees for 1.2kVA+1.3kWh System', 'amount' => 0],
@@ -174,6 +191,11 @@ class BundleMaterialSeeder extends Seeder
                     ['name' => '32A By-Pass Switch', 'quantity' => 1],
                     ['name' => 'Trunking, flex pipe, Cable lugs for 0.6kWp+1.2kVA+1.3kWh System', 'quantity' => 1],
                 ],
+                'order_list' => [
+                    ['title' => '590W Bi-Facial Jinko Solar Panel', 'amount' => 0],
+                    ['title' => 'OG-1P1K2-T 12V 1.2kVA Yinergy Solar Hybrid Inverter', 'amount' => 0],
+                    ['title' => 'GCL 12100 12V 1.3kWh Cworth Energy Lithium Ion Battery', 'amount' => 0],
+                ],
                 'services' => [
                     ['title' => 'Installation Fees for 0.6kWp+1.2kVA+1.3kWh System', 'amount' => 0],
                     ['title' => 'Delivery Fees for 0.6kWp+1.2kVA+1.3kWh System', 'amount' => 0],
@@ -200,6 +222,10 @@ class BundleMaterialSeeder extends Seeder
                     ['name' => 'AC Surge Protector', 'quantity' => 1],
                     ['name' => '32A By-Pass Switch', 'quantity' => 1],
                     ['name' => 'Trunking, flex pipe, Cable lugs for 1.2kVA+2.5kWh System', 'quantity' => 1],
+                ],
+                'order_list' => [
+                    ['title' => 'OG-1P1K2-T 12V 1.2kVA Yinergy Solar Hybrid Inverter', 'amount' => 0],
+                    ['title' => 'GCL 12200 12V 2.5kWh Cworth Energy Lithium Ion Battery', 'amount' => 0],
                 ],
                 'services' => [
                     ['title' => 'Installation Fees for 1.2kVA+2.5kWh System', 'amount' => 0],
@@ -235,6 +261,11 @@ class BundleMaterialSeeder extends Seeder
                     ['name' => '32A By-Pass Switch', 'quantity' => 1],
                     ['name' => 'Trunking, flex pipe, Cable lugs for 1.2kWp+1.2kVA+2.5kWh System', 'quantity' => 1],
                 ],
+                'order_list' => [
+                    ['title' => '455W Monofacial Jinko Solar Panel', 'amount' => 0],
+                    ['title' => 'OG-1P1K2-T 12V 1.2kVA Yinergy Solar Hybrid Inverter', 'amount' => 0],
+                    ['title' => 'GCL 12200 12V 2.5kWh Cworth Energy Lithium Ion Battery', 'amount' => 0],
+                ],
                 'services' => [
                     ['title' => 'Installation Fees for 1.2kWp+1.2kVA+2.5kWh System', 'amount' => 0],
                     ['title' => 'Delivery Fees for 1.2kWp+1.2kVA+2.5kWh System', 'amount' => 0],
@@ -261,6 +292,10 @@ class BundleMaterialSeeder extends Seeder
                     ['name' => 'Earthing Rod', 'quantity' => 1],
                     ['name' => '32A By-Pass Switch', 'quantity' => 1],
                     ['name' => 'Trunking, flex pipe, Cable lugs for 1.2kVA+3.8kWh System', 'quantity' => 1],
+                ],
+                'order_list' => [
+                    ['title' => 'OG-1P1K2-T 12V 1.2kVA Yinergy Solar Hybrid Inverter', 'amount' => 0],
+                    ['title' => 'GCL 12300 12V 3.8kWh Cworth Energy Lithium Ion Battery', 'amount' => 0],
                 ],
                 'services' => [
                     ['title' => 'Installation Fees for 1.2kVA+3.8kWh System', 'amount' => 0],
@@ -295,6 +330,11 @@ class BundleMaterialSeeder extends Seeder
                     ['name' => 'Earthing Rod', 'quantity' => 1],
                     ['name' => '32A By-Pass Switch', 'quantity' => 1],
                     ['name' => 'Trunking, flex pipe, Cable lugs for 1.2kWp+1.2kVA+3.8kWh System', 'quantity' => 1],
+                ],
+                'order_list' => [
+                    ['title' => '590W Bi-Facial Jinko Solar Panel', 'amount' => 0],
+                    ['title' => 'OG-1P1K2-T 12V 1.2kVA Yinergy Solar Hybrid Inverter', 'amount' => 0],
+                    ['title' => 'GCL 12300 12V 3.8kWh Cworth Energy Lithium Ion Battery', 'amount' => 0],
                 ],
                 'services' => [
                     ['title' => 'Installation Fees for 1.2kWp+1.2kVA+3.8kWh System', 'amount' => 0],
