@@ -134,10 +134,12 @@ class BrandController extends Controller
                 return ResponseHelper::error('Category not found.', 404);
             }
 
-            // Return brands that have at least one product in this category
-            // (so dropdown shows Jinko, Longi, etc. when they have products in the category)
-            $brands = Brand::whereHas('products', function ($q) use ($categoryId) {
-                $q->where('category_id', $categoryId);
+            // Return brands that belong to this category directly OR have a product in this category
+            $brands = Brand::where(function ($q) use ($categoryId) {
+                $q->where('category_id', $categoryId)
+                  ->orWhereHas('products', function ($pq) use ($categoryId) {
+                      $pq->where('category_id', $categoryId);
+                  });
             })->get();
 
             return ResponseHelper::success($brands, $brands->isEmpty()
