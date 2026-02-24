@@ -12,30 +12,31 @@ use Illuminate\Support\Facades\Log;
 class BundleController extends Controller
 {
     /**
-     * Parse load/wattage string to numeric in watts.
-     * Handles: "1200 W" -> 1200, "3.8 kWh" -> 3800, "1.2" -> 1200 (assumes kW if no unit)
+     * Parse load/rating string to numeric in watts.
+     * Handles: "1200 W" -> 1200, "3.8 kW" -> 3800, "1.2 kVA" -> 1200, "1.2" -> 1200.
      */
     private function parseLoadToWatts($value): float
     {
         if ($value === null || $value === '') {
             return 0.0;
         }
-        
-        $valueStr = (string) $value;
+
+        $valueStr = trim((string) $value);
         $numericValue = 0.0;
-        
+
         // Extract numeric value
-        if (is_numeric($valueStr)) {
-            $numericValue = (float) $valueStr;
-        } elseif (preg_match('/^([\d.]+)/', $valueStr, $m)) {
+        $normalized = preg_replace('/[,\s]+/', '', $valueStr);
+        if ($normalized !== null && is_numeric($normalized)) {
+            $numericValue = (float) $normalized;
+        } elseif (preg_match('/([\d.]+)/', $valueStr, $m)) {
             $numericValue = (float) $m[1];
         } else {
             return 0.0;
         }
-        
+
         // Check for unit indicators and convert to watts
         $lowerValue = strtolower($valueStr);
-        if (strpos($lowerValue, 'kw') !== false || strpos($lowerValue, 'kwh') !== false) {
+        if (strpos($lowerValue, 'kva') !== false || strpos($lowerValue, 'kw') !== false || strpos($lowerValue, 'kwh') !== false) {
             // Value is in kW, convert to watts
             return $numericValue * 1000;
         } elseif (strpos($lowerValue, 'w') !== false) {
@@ -52,6 +53,20 @@ class BundleController extends Controller
                 return $numericValue;
             }
         }
+    }
+
+    /**
+     * Resolve bundle usable capacity in watts.
+     * Prefer total_load, fallback to inverter rating when total_load is missing/zero.
+     */
+    private function resolveBundleCapacityWatts($bundle): float
+    {
+        $fromTotalLoad = $this->parseLoadToWatts($bundle->total_load ?? null);
+        if ($fromTotalLoad > 0) {
+            return $fromTotalLoad;
+        }
+
+        return $this->parseLoadToWatts($bundle->inver_rating ?? null);
     }
 
     /**
@@ -76,8 +91,8 @@ class BundleController extends Controller
                 $minCapacityWatts = (float) round($q * 1.30, 2); // 30% above passed wattage
 
                 $bundles = $bundles->map(function ($bundle) {
-                    // Convert total_load to watts for comparison
-                    $bundle->_parsed_load_watts = $this->parseLoadToWatts($bundle->total_load);
+                    // Convert configured capacity to watts for comparison (total_load or inverter rating)
+                    $bundle->_parsed_load_watts = $this->resolveBundleCapacityWatts($bundle);
                     return $bundle;
                 });
 
