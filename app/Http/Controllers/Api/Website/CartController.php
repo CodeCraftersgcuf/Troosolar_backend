@@ -237,6 +237,15 @@ class CartController extends Controller
             }
 
             $model = $resolvedType::findOrFail($itemableId);
+            if ($resolvedType === Product::class) {
+                $availableStock = (int) ($model->stock ?? 0);
+                if ($availableStock <= 0) {
+                    return ResponseHelper::error('This product is out of stock.', 422);
+                }
+                if ((int) $quantity > $availableStock) {
+                    return ResponseHelper::error("Only {$availableStock} unit(s) left in stock.", 422);
+                }
+            }
 
             $price = $model->discount_price ?? $model->price ?? $model->total_price;
             $subtotal = $price * $quantity;
@@ -266,6 +275,15 @@ class CartController extends Controller
             $quantity = $request->quantity;
 
             $model = $cartItem->itemable;
+            if ($cartItem->itemable_type === Product::class && $model) {
+                $availableStock = (int) ($model->stock ?? 0);
+                if ($availableStock <= 0) {
+                    return ResponseHelper::error('This product is out of stock.', 422);
+                }
+                if ((int) $quantity > $availableStock) {
+                    return ResponseHelper::error("Only {$availableStock} unit(s) left in stock.", 422);
+                }
+            }
             $price = $model->discount_price ?? $model->price ?? $model->total_price;
 
             $cartItem->quantity = $quantity;

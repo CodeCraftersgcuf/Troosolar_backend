@@ -22,6 +22,7 @@ class CalculatorSettingsController extends Controller
             return ResponseHelper::success([
                 'inverter_ranges' => $settings->inverter_ranges ?: $defaults['inverter_ranges'],
                 'solar_savings_profiles' => $settings->solar_savings_profiles ?: $defaults['solar_savings_profiles'],
+                'bundle_types' => $settings->bundle_types ?: $defaults['bundle_types'],
                 'solar_maintenance_5_years' => (float) ($settings->solar_maintenance_5_years ?? $defaults['solar_maintenance_5_years']),
             ], 'Calculator settings retrieved successfully');
         } catch (\Exception $e) {
@@ -48,6 +49,9 @@ class CalculatorSettingsController extends Controller
             'solar_savings_profiles.*.cost_of_solar_system' => 'required_with:solar_savings_profiles|numeric|min:0',
             'solar_savings_profiles.*.fuel_cost_per_litre' => 'nullable|numeric|min:0',
 
+            'bundle_types' => 'nullable|array|min:1',
+            'bundle_types.*' => 'required_with:bundle_types|string|max:255',
+
             'solar_maintenance_5_years' => 'nullable|numeric|min:0',
         ]);
 
@@ -69,6 +73,14 @@ class CalculatorSettingsController extends Controller
             if ($request->has('solar_savings_profiles')) {
                 $payload['solar_savings_profiles'] = array_values($request->input('solar_savings_profiles'));
             }
+            if ($request->has('bundle_types')) {
+                $payload['bundle_types'] = collect($request->input('bundle_types'))
+                    ->map(fn ($v) => is_string($v) ? trim($v) : '')
+                    ->filter(fn ($v) => $v !== '')
+                    ->unique()
+                    ->values()
+                    ->all();
+            }
             if ($request->has('solar_maintenance_5_years')) {
                 $payload['solar_maintenance_5_years'] = (float) $request->input('solar_maintenance_5_years');
             }
@@ -78,6 +90,7 @@ class CalculatorSettingsController extends Controller
             return ResponseHelper::success([
                 'inverter_ranges' => $settings->inverter_ranges ?: $defaults['inverter_ranges'],
                 'solar_savings_profiles' => $settings->solar_savings_profiles ?: $defaults['solar_savings_profiles'],
+                'bundle_types' => $settings->bundle_types ?: $defaults['bundle_types'],
                 'solar_maintenance_5_years' => (float) ($settings->solar_maintenance_5_years ?? $defaults['solar_maintenance_5_years']),
             ], 'Calculator settings updated successfully');
         } catch (\Exception $e) {

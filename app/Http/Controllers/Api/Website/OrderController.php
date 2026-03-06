@@ -185,6 +185,20 @@ class OrderController extends Controller
             $qty      = max(1, (int) $ci->quantity);
             $subtotal = (int) ($ci->subtotal ?? ($unit * $qty));
 
+            if ($itemable instanceof Product) {
+                $availableStock = (int) ($itemable->stock ?? 0);
+                if ($availableStock <= 0) {
+                    throw ValidationException::withMessages([
+                        'stock' => ["{$itemable->title} is out of stock."],
+                    ]);
+                }
+                if ($qty > $availableStock) {
+                    throw ValidationException::withMessages([
+                        'stock' => ["Only {$availableStock} unit(s) available for {$itemable->title}."],
+                    ]);
+                }
+            }
+
             OrderItem::create([
                 'order_id'      => $order->id,
                 'itemable_type' => $fqcn,
@@ -200,6 +214,10 @@ class OrderController extends Controller
             }
             if ($fqcn === Bundles::class && ! $primaryBundleId) {
                 $primaryBundleId = $ci->itemable_id;
+            }
+
+            if ($itemable instanceof Product) {
+                $itemable->decrement('stock', $qty);
             }
 
             $total += $subtotal;

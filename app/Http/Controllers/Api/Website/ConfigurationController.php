@@ -165,6 +165,7 @@ class ConfigurationController extends Controller
             return ResponseHelper::success([
                 'inverter_ranges' => $settings->inverter_ranges ?: $defaults['inverter_ranges'],
                 'solar_savings_profiles' => $settings->solar_savings_profiles ?: $defaults['solar_savings_profiles'],
+                'bundle_types' => $settings->bundle_types ?: $defaults['bundle_types'],
                 'solar_maintenance_5_years' => (float) ($settings->solar_maintenance_5_years ?? $defaults['solar_maintenance_5_years']),
             ], 'Calculator settings retrieved successfully');
         } catch (\Exception $e) {

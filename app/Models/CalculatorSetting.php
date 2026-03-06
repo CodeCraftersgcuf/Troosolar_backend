@@ -12,6 +12,7 @@ class CalculatorSetting extends Model
     protected $fillable = [
         'inverter_ranges',
         'solar_savings_profiles',
+        'bundle_types',
         'solar_maintenance_5_years',
         'is_active',
     ];
@@ -19,6 +20,7 @@ class CalculatorSetting extends Model
     protected $casts = [
         'inverter_ranges' => 'array',
         'solar_savings_profiles' => 'array',
+        'bundle_types' => 'array',
         'solar_maintenance_5_years' => 'decimal:2',
         'is_active' => 'boolean',
     ];
@@ -55,6 +57,10 @@ class CalculatorSetting extends Model
                 ['key' => '10kva', 'label' => '10kVA', 'hourly_fuel_l' => 6.25, 'default_monthly_service' => 20000, 'default_monthly_phcn' => 5000, 'default_cost_of_generator' => 0, 'cost_of_solar_system' => 11000000, 'fuel_cost_per_litre' => 750],
                 ['key' => '11kva', 'label' => '11kVA', 'hourly_fuel_l' => 6.25, 'default_monthly_service' => 20000, 'default_monthly_phcn' => 5000, 'default_cost_of_generator' => 0, 'cost_of_solar_system' => 11000000, 'fuel_cost_per_litre' => 750],
                 ['key' => '12kva-diesel', 'label' => '12kVA - Diesel', 'hourly_fuel_l' => 2.9, 'default_monthly_service' => 20000, 'default_monthly_phcn' => 5000, 'default_cost_of_generator' => 0, 'cost_of_solar_system' => 14000000, 'fuel_cost_per_litre' => 1000],
+            ],
+            'bundle_types' => [
+                'Inverter + Battery',
+                'Solar+Inverter+Battery',
             ],
             'solar_maintenance_5_years' => 150000,
         ];

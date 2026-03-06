@@ -26,6 +26,7 @@ public function index(Request $request)
 {
     try {
         $query = $request->query('q'); // accept ?q=1080 or any number
+        $bundleType = $request->query('bundle_type');
         $includeUnavailable = $request->boolean('include_unavailable', false);
         $isAdmin = strtolower((string) (auth()->user()->role ?? '')) === 'admin';
 
@@ -34,6 +35,9 @@ public function index(Request $request)
             $bundlesQuery = Bundles::with(['bundleItems.product.category', 'bundleMaterials.material.category', 'customServices', 'brand']);
             if (Schema::hasColumn('bundles', 'is_available') && !($includeUnavailable && $isAdmin)) {
                 $bundlesQuery->where('is_available', true);
+            }
+            if (!empty($bundleType)) {
+                $bundlesQuery->where('bundle_type', $bundleType);
             }
             $bundles = $bundlesQuery->get();
             $formatted = $bundles->map(fn($b) => $this->formatBundleResponse($b))->values();

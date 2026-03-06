@@ -9,6 +9,7 @@ use App\Helpers\ResponseHelper;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use App\Models\Product;
 use Exception;
 
 class BrandController extends Controller
@@ -134,11 +135,16 @@ class BrandController extends Controller
                 return ResponseHelper::error('Category not found.', 404);
             }
 
+            // Auto-sync missing brand tags for products in this category.
+            // This prevents brand filter from breaking when product.brand_id is null.
+            $this->syncMissingBrandTagsForCategory((int) $categoryId);
+
             // Return brands that belong to this category directly OR have a product in this category
             $brands = Brand::where(function ($q) use ($categoryId) {
                 $q->where('category_id', $categoryId)
                   ->orWhereHas('products', function ($pq) use ($categoryId) {
-                      $pq->where('category_id', $categoryId);
+                      $pq->where('category_id', $categoryId)
+                         ->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0');
                   });
             })->get();
 
@@ -146,8 +152,40 @@ class BrandController extends Controller
                 ? 'No brands found for this category.'
                 : 'Brands fetched by category.');
         } catch (Exception $e) {
-            \Log::error('Error fetching brands by category: ' . $e->getMessage());
+            Log::error('Error fetching brands by category: ' . $e->getMessage());
             return ResponseHelper::error('Failed to fetch brands by category.', 500);
+        }
+    }
+
+    private function syncMissingBrandTagsForCategory(int $categoryId): void
+    {
+        $brands = Brand::query()->select(['id', 'title'])->get();
+        if ($brands->isEmpty()) {
+            return;
+        }
+
+        $products = Product::query()
+            ->where('category_id', $categoryId)
+            ->whereNull('brand_id')
+            ->get(['id', 'title']);
+
+        foreach ($products as $product) {
+            $title = strtolower((string) $product->title);
+            if ($title === '') {
+                continue;
+            }
+
+            $matchedBrand = $brands
+                ->sortByDesc(fn ($b) => strlen((string) $b->title))
+                ->first(function ($brand) use ($title) {
+                    $needle = trim(strtolower((string) $brand->title));
+                    return $needle !== '' && str_contains($title, $needle);
+                });
+
+            if ($matchedBrand) {
+                $product->brand_id = $matchedBrand->id;
+                $product->save();
+            }
         }
     }
 

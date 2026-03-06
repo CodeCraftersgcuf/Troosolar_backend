@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Website;
 
 use App\Http\Controllers\Controller;
 use App\Models\Bundles;
+use App\Models\CalculatorSetting;
 use App\Models\Material;
 use App\Models\BundleMaterial;
 use App\Helpers\ResponseHelper;
@@ -20,9 +21,23 @@ class BundleSelectionController extends Controller
     public function getBundlesByType($type)
     {
         try {
-            $bundleType = $type === 'inverter-battery' 
-                ? 'Inverter + Battery' 
-                : 'Solar+Inverter+Battery';
+            $slugify = function (string $value): string {
+                return trim(preg_replace('/[^a-z0-9]+/i', '-', strtolower($value)), '-');
+            };
+
+            $defaults = CalculatorSetting::defaults();
+            $configuredTypes = (CalculatorSetting::where('is_active', true)->first()?->bundle_types)
+                ?: ($defaults['bundle_types'] ?? []);
+
+            $bundleType = collect($configuredTypes)->first(function ($configuredType) use ($type, $slugify) {
+                return is_string($configuredType) && $slugify($configuredType) === $type;
+            });
+
+            if (!$bundleType) {
+                $bundleType = $type === 'inverter-battery'
+                    ? 'Inverter + Battery'
+                    : 'Solar+Inverter+Battery';
+            }
 
             $bundles = Bundles::where('bundle_type', $bundleType)
                 ->when(Schema::hasColumn('bundles', 'is_available'), function ($q) {

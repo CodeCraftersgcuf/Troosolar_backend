@@ -118,6 +118,7 @@ public function getProducts($id)
             ->when(Schema::hasColumn('products', 'is_available'), function ($q) {
                 $q->where('is_available', true);
             })
+            ->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0')
             ->with(['details', 'images', 'reviews'])
             ->get();
 
