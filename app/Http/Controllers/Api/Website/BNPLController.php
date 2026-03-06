@@ -20,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use App\Services\ReferralRewardService;
 
 class BNPLController extends Controller
 {
@@ -999,6 +1000,14 @@ class BNPLController extends Controller
                 $wallet->loan_balance = $currentLoanBalance + $remainingBalance;
                 $wallet->save();
             }
+
+            // Reward referrer when user has successfully paid BNPL down payment.
+            app(ReferralRewardService::class)->award(
+                Auth::user(),
+                (float) ($mono->down_payment ?? 0),
+                'bnpl_down_payment',
+                $order
+            );
 
             return ResponseHelper::success([
                 'order_id' => $order->id,

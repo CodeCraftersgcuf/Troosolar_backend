@@ -25,6 +25,9 @@ class ReferralAdminController extends Controller
             return ResponseHelper::success([
                 'commission_percentage' => (float) $settings->commission_percentage,
                 'minimum_withdrawal' => (float) $settings->minimum_withdrawal,
+                'outright_discount_percentage' => (float) ($settings->outright_discount_percentage ?? 0),
+                'referral_reward_type' => (string) ($settings->referral_reward_type ?? 'percentage'),
+                'referral_reward_value' => (float) ($settings->referral_reward_value ?? 0),
             ], 'Referral settings retrieved successfully');
         } catch (\Exception $e) {
             return ResponseHelper::error('Failed to retrieve referral settings: ' . $e->getMessage(), 500);
@@ -41,6 +44,9 @@ class ReferralAdminController extends Controller
             $validator = Validator::make($request->all(), [
                 'commission_percentage' => 'nullable|numeric|min:0|max:100',
                 'minimum_withdrawal' => 'nullable|numeric|min:0',
+                'outright_discount_percentage' => 'nullable|numeric|min:0|max:100',
+                'referral_reward_type' => 'nullable|in:percentage,fixed',
+                'referral_reward_value' => 'nullable|numeric|min:0',
             ]);
 
             if ($validator->fails()) {
@@ -54,6 +60,25 @@ class ReferralAdminController extends Controller
             if ($request->has('minimum_withdrawal')) {
                 $data['minimum_withdrawal'] = $request->minimum_withdrawal;
             }
+            if ($request->has('outright_discount_percentage')) {
+                $data['outright_discount_percentage'] = $request->outright_discount_percentage;
+            }
+            if ($request->has('referral_reward_type')) {
+                $data['referral_reward_type'] = $request->referral_reward_type;
+            }
+            if ($request->has('referral_reward_value')) {
+                $data['referral_reward_value'] = $request->referral_reward_value;
+            }
+
+            // Backward compatibility with older admin UI that sends commission_percentage only.
+            if ($request->has('commission_percentage') && !$request->has('referral_reward_value')) {
+                $data['referral_reward_type'] = 'percentage';
+                $data['referral_reward_value'] = $request->commission_percentage;
+            }
+            // Keep legacy field in sync where reward type is percentage.
+            if (($data['referral_reward_type'] ?? null) === 'percentage' && array_key_exists('referral_reward_value', $data)) {
+                $data['commission_percentage'] = $data['referral_reward_value'];
+            }
 
             if (empty($data)) {
                 return ResponseHelper::error('No data provided to update', 400);
@@ -64,6 +89,9 @@ class ReferralAdminController extends Controller
             return ResponseHelper::success([
                 'commission_percentage' => (float) $settings->commission_percentage,
                 'minimum_withdrawal' => (float) $settings->minimum_withdrawal,
+                'outright_discount_percentage' => (float) ($settings->outright_discount_percentage ?? 0),
+                'referral_reward_type' => (string) ($settings->referral_reward_type ?? 'percentage'),
+                'referral_reward_value' => (float) ($settings->referral_reward_value ?? 0),
             ], 'Referral settings updated successfully');
         } catch (\Exception $e) {
             return ResponseHelper::error('Failed to update referral settings: ' . $e->getMessage(), 500);

@@ -14,11 +14,16 @@ class ReferralSettings extends Model
     protected $fillable = [
         'commission_percentage',
         'minimum_withdrawal',
+        'outright_discount_percentage',
+        'referral_reward_type',
+        'referral_reward_value',
     ];
 
     protected $casts = [
         'commission_percentage' => 'decimal:2',
         'minimum_withdrawal' => 'decimal:2',
+        'outright_discount_percentage' => 'decimal:2',
+        'referral_reward_value' => 'decimal:2',
     ];
 
     /**
@@ -29,6 +34,9 @@ class ReferralSettings extends Model
         return static::first() ?? static::create([
             'commission_percentage' => 0.00,
             'minimum_withdrawal' => 0.00,
+            'outright_discount_percentage' => 0.00,
+            'referral_reward_type' => 'percentage',
+            'referral_reward_value' => 0.00,
         ]);
     }
 

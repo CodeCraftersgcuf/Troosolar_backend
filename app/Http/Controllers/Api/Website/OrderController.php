@@ -23,6 +23,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Exception;
+use App\Models\ReferralSettings;
+use App\Services\ReferralRewardService;
 
 class OrderController extends Controller
 {
@@ -526,6 +528,18 @@ class OrderController extends Controller
         "transacted_at"=>now()
         ]);
 
+        // Apply referral reward only once when Buy Now payment completes.
+        $isBuyNowOrder = (($order->order_type ?? null) === 'buy_now')
+            || (($order->order_type ?? null) === null
+                && ($order->payment_method ?? null) === 'direct'
+                && empty($order->mono_calculation_id));
+        if ($isBuyNowOrder) {
+            $rewardBase = Schema::hasColumn('orders', 'product_price')
+                ? (float) ($order->product_price ?? $order->total_price ?? 0)
+                : (float) ($order->total_price ?? 0);
+            app(ReferralRewardService::class)->award(Auth::user(), $rewardBase, 'buy_now_completed', $order);
+        }
+
         return ResponseHelper::success([
             'order_id' => $order->id,
             'payment_status' => 'confirmed',
@@ -667,6 +681,14 @@ class OrderController extends Controller
                 return ResponseHelper::error('Either product_id, bundle_id, or amount is required. Please provide one of them in your request.', 422);
             }
 
+            $settings = ReferralSettings::getSettings();
+            $outrightDiscountPercentage = (float) ($settings->outright_discount_percentage ?? 0);
+            $outrightDiscountAmount = 0.0;
+            if ($outrightDiscountPercentage > 0 && $productPrice > 0) {
+                $outrightDiscountAmount = round(($productPrice * $outrightDiscountPercentage) / 100, 2);
+                $productPrice = max(0, $productPrice - $outrightDiscountAmount);
+            }
+
             // Get delivery and installation fees
             // For bundles, try to get from bundle materials first, then fallback to state/location
             $deliveryFee = 25000; // Default
@@ -797,6 +819,8 @@ class OrderController extends Controller
             $invoice = [
                 'order_id' => $order->id,
                 'product_price' => $productPrice,
+                'outright_discount_percentage' => $outrightDiscountPercentage,
+                'outright_discount_amount' => $outrightDiscountAmount,
                 'product_breakdown' => $productBreakdown,
                 'installation_fee' => $installationFee,
                 'material_cost' => $materialCost,
