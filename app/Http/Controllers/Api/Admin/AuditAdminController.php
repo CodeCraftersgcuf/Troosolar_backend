@@ -151,6 +151,8 @@ class AuditAdminController extends Controller
                         'status' => $request->status,
                         'property_state' => $request->property_state,
                         'property_address' => $request->property_address,
+                        'contact_name' => $request->contact_name,
+                        'contact_phone' => $request->contact_phone,
                         'property_floors' => $request->property_floors,
                         'property_rooms' => $request->property_rooms,
                         'is_gated_estate' => $request->is_gated_estate,
@@ -231,7 +233,9 @@ class AuditAdminController extends Controller
                             ->orWhere('email', 'like', "%{$search}%");
                     })
                         ->orWhere('property_address', 'like', "%{$search}%")
-                        ->orWhere('property_state', 'like', "%{$search}%");
+                        ->orWhere('property_state', 'like', "%{$search}%")
+                        ->orWhere('contact_name', 'like', "%{$search}%")
+                        ->orWhere('contact_phone', 'like', "%{$search}%");
                 });
             }
 
@@ -253,6 +257,8 @@ class AuditAdminController extends Controller
                     ] : null,
                     'property_state' => $request->property_state,
                     'property_address' => $request->property_address,
+                    'contact_name' => $request->contact_name,
+                    'contact_phone' => $request->contact_phone,
                     'property_landmark' => $request->property_landmark,
                     'property_floors' => $request->property_floors,
                     'property_rooms' => $request->property_rooms,
@@ -321,6 +327,8 @@ class AuditAdminController extends Controller
                 'customer_type' => $auditRequest->customer_type,
                 'property_state' => $auditRequest->property_state,
                 'property_address' => $auditRequest->property_address,
+                'contact_name' => $auditRequest->contact_name,
+                'contact_phone' => $auditRequest->contact_phone,
                 'property_landmark' => $auditRequest->property_landmark,
                 'property_floors' => $auditRequest->property_floors,
                 'property_rooms' => $auditRequest->property_rooms,
@@ -361,12 +369,20 @@ class AuditAdminController extends Controller
             $data = $request->validate([
                 'status' => 'required|in:approved,rejected,completed',
                 'admin_notes' => 'nullable|string|max:1000',
+                'property_state' => 'nullable|string|max:255',
+                'property_address' => 'nullable|string',
+                'contact_name' => 'nullable|string|max:255',
+                'contact_phone' => 'nullable|string|max:30',
             ]);
 
             $auditRequest = AuditRequest::findOrFail($id);
 
             $auditRequest->status = $data['status'];
             $auditRequest->admin_notes = $data['admin_notes'] ?? $auditRequest->admin_notes;
+            $auditRequest->property_state = $data['property_state'] ?? $auditRequest->property_state;
+            $auditRequest->property_address = $data['property_address'] ?? $auditRequest->property_address;
+            $auditRequest->contact_name = $data['contact_name'] ?? $auditRequest->contact_name;
+            $auditRequest->contact_phone = $data['contact_phone'] ?? $auditRequest->contact_phone;
 
             if ($data['status'] === 'approved' || $data['status'] === 'completed') {
                 $auditRequest->approved_by = Auth::id();
@@ -379,6 +395,10 @@ class AuditAdminController extends Controller
                 'id' => $auditRequest->id,
                 'status' => $auditRequest->status,
                 'admin_notes' => $auditRequest->admin_notes,
+                'property_state' => $auditRequest->property_state,
+                'property_address' => $auditRequest->property_address,
+                'contact_name' => $auditRequest->contact_name,
+                'contact_phone' => $auditRequest->contact_phone,
                 'approved_by' => $auditRequest->approver ? [
                     'id' => $auditRequest->approver->id,
                     'name' => $auditRequest->approver->first_name . ' ' . $auditRequest->approver->sur_name,

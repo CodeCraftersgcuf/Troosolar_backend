@@ -19,6 +19,8 @@ class AuditRequest extends Model
         'property_landmark',
         'property_floors',
         'property_rooms',
+        'contact_name',
+        'contact_phone',
         'is_gated_estate',
         'estate_name',
         'estate_address',
