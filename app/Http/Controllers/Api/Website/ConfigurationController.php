@@ -147,4 +147,28 @@ class ConfigurationController extends Controller
             return ResponseHelper::success([], 'No delivery locations available');
         }
     }
+
+    /**
+     * Get calculator settings for inverter selection + solar savings calculator.
+     * GET /api/config/calculator-settings
+     */
+    public function getCalculatorSettings()
+    {
+        try {
+            $defaults = \App\Models\CalculatorSetting::defaults();
+            $settings = \App\Models\CalculatorSetting::where('is_active', true)->first();
+
+            if (!$settings) {
+                return ResponseHelper::success($defaults, 'Calculator settings retrieved successfully (defaults)');
+            }
+
+            return ResponseHelper::success([
+                'inverter_ranges' => $settings->inverter_ranges ?: $defaults['inverter_ranges'],
+                'solar_savings_profiles' => $settings->solar_savings_profiles ?: $defaults['solar_savings_profiles'],
+                'solar_maintenance_5_years' => (float) ($settings->solar_maintenance_5_years ?? $defaults['solar_maintenance_5_years']),
+            ], 'Calculator settings retrieved successfully');
+        } catch (\Exception $e) {
+            return ResponseHelper::error('Failed to retrieve calculator settings', 500);
+        }
+    }
 }

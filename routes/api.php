@@ -20,7 +20,8 @@ use App\Http\Controllers\Api\Admin\{
     LoanDistributedController,
     InterestPercentageController,
     AnalyticController,
-    BNPLAdminController
+    BNPLAdminController,
+    CalculatorSettingsController
 };
 use App\Http\Controllers\Api\Website\{
     CartController,
@@ -106,6 +107,7 @@ Route::get('/config/states', [ConfigurationController::class, 'getStates']);
 Route::get('/config/loan-configuration', [ConfigurationController::class, 'getLoanConfiguration']);
 Route::get('/config/add-ons', [ConfigurationController::class, 'getAddOns']);
 Route::get('/config/delivery-locations', [ConfigurationController::class, 'getDeliveryLocations']);
+Route::get('/config/calculator-settings', [ConfigurationController::class, 'getCalculatorSettings']);
 
 // Site banner (public - dashboard home promo)
 Route::get('/site/banner', [\App\Http\Controllers\Api\Website\SiteBannerController::class, 'show']);
@@ -450,6 +452,12 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
         Route::get('/banner', [\App\Http\Controllers\Api\Admin\SiteBannerAdminController::class, 'show']);
         Route::post('/banner', [\App\Http\Controllers\Api\Admin\SiteBannerAdminController::class, 'store']);
         Route::delete('/banner', [\App\Http\Controllers\Api\Admin\SiteBannerAdminController::class, 'destroy']);
+    });
+
+    // ================= CALCULATOR SETTINGS ADMIN ROUTES =================
+    Route::prefix('admin')->group(function () {
+        Route::get('/calculator-settings', [CalculatorSettingsController::class, 'show']);
+        Route::put('/calculator-settings', [CalculatorSettingsController::class, 'update']);
     });
 
     // ================= ADMIN CUSTOM ORDER ROUTES =================

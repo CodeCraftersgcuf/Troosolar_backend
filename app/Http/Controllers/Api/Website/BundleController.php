@@ -72,8 +72,8 @@ class BundleController extends Controller
     /**
      * GET /api/bundles
      * Get all active bundles (Public endpoint for Buy Now flow).
-     * When ?q={wattage} is present: return bundles that can handle load with 30% headroom
-     * (i.e. bundles where total_load >= q * 1.30). If none, returns best-effort (highest capacity first).
+     * When ?q={wattage} is present: treat q as target inverter capacity (in watts),
+     * return exact-capacity matches first; if none, return closest-capacity bundles.
      */
     public function index(Request $request)
     {
@@ -83,12 +83,9 @@ class BundleController extends Controller
                 ->orderBy('created_at', 'desc');
             $bundles = $bundlesQuery->get();
 
-            $minCapacityWatts = null;
-
-            // When q is provided (load in watts), filter by 30% headroom: require total_load >= q * 1.30
+            // When q is provided (target capacity in watts), find exact/closest capacity bundles.
             if ($query !== null && $query !== '' && is_numeric($query)) {
-                $q = (float) $query; // q is in watts
-                $minCapacityWatts = (float) round($q * 1.30, 2); // 30% above passed wattage
+                $targetCapacityWatts = (float) $query;
 
                 $bundles = $bundles->map(function ($bundle) {
                     // Convert configured capacity to watts for comparison (total_load or inverter rating)
@@ -96,15 +93,28 @@ class BundleController extends Controller
                     return $bundle;
                 });
 
-                $matching = $bundles->filter(function ($bundle) use ($minCapacityWatts) {
-                    return $bundle->_parsed_load_watts >= $minCapacityWatts;
+                // Prefer exact match first (allow tiny float tolerance).
+                $exact = $bundles->filter(function ($bundle) use ($targetCapacityWatts) {
+                    return abs(((float) ($bundle->_parsed_load_watts ?? 0)) - $targetCapacityWatts) < 0.0001;
                 })->values();
 
-                // If none meet 30% headroom, return all sorted by total_load desc (best effort)
-                if ($matching->isEmpty()) {
-                    $bundles = $bundles->sortByDesc('_parsed_load_watts')->values();
+                if (!$exact->isEmpty()) {
+                    $bundles = $exact->sortBy('_parsed_load_watts')->values();
                 } else {
-                    $bundles = $matching->sortBy('_parsed_load_watts')->values(); // smallest adequate first
+                    // No exact match: return bundles at the closest capacity.
+                    $closestDelta = $bundles
+                        ->map(function ($bundle) use ($targetCapacityWatts) {
+                            return abs(((float) ($bundle->_parsed_load_watts ?? 0)) - $targetCapacityWatts);
+                        })
+                        ->min();
+
+                    $bundles = $bundles
+                        ->filter(function ($bundle) use ($targetCapacityWatts, $closestDelta) {
+                            $delta = abs(((float) ($bundle->_parsed_load_watts ?? 0)) - $targetCapacityWatts);
+                            return abs($delta - $closestDelta) < 0.0001;
+                        })
+                        ->sortBy('_parsed_load_watts')
+                        ->values();
                 }
             }
 
