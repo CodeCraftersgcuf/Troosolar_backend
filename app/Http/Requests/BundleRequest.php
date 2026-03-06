@@ -20,6 +20,7 @@ class BundleRequest extends FormRequest
             'title' => 'nullable|string|max:255',
             'featured_image' => 'nullable|image|mimes:jpg,jpeg,png|max:3048',
             'bundle_type' => 'nullable|string|max:255',
+            'is_available' => 'nullable|boolean',
             'total_price' => 'nullable|numeric|min:0',
             'discount_price' => 'nullable|numeric|min:0',
             'discount_end_date' => 'nullable|date',

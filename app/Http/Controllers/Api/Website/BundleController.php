@@ -8,6 +8,7 @@ use App\Models\Bundles;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class BundleController extends Controller
 {
@@ -81,6 +82,9 @@ class BundleController extends Controller
             $query = $request->query('q');
             $bundlesQuery = Bundles::with(['bundleItems.product', 'customServices', 'bundleMaterials.material.category'])
                 ->orderBy('created_at', 'desc');
+            if (Schema::hasColumn('bundles', 'is_available')) {
+                $bundlesQuery->where('is_available', true);
+            }
             $bundles = $bundlesQuery->get();
 
             // When q is provided (target capacity in watts), find exact/closest capacity bundles.
@@ -128,6 +132,7 @@ class BundleController extends Controller
                     'discount_price' => $bundle->discount_price ? (float) $bundle->discount_price : null,
                     'description' => $bundle->description ?? $bundle->detailed_description ?? null,
                     'is_active' => true,
+                    'is_available' => (bool) ($bundle->is_available ?? true),
                     'total_load' => $bundle->total_load,
                     'total_output' => $bundle->total_output,
                     'inver_rating' => $bundle->inver_rating,

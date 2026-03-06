@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Helpers\ResponseHelper;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Schema;
 use Exception;
 
 class CategoryController extends Controller
@@ -114,6 +115,9 @@ public function getProducts($id)
 
         $products = $category->products()
             ->where('category_id', $category->id)
+            ->when(Schema::hasColumn('products', 'is_available'), function ($q) {
+                $q->where('is_available', true);
+            })
             ->with(['details', 'images', 'reviews'])
             ->get();
 

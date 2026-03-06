@@ -16,6 +16,7 @@ class Bundles extends Model
         'discount_end_date',
         'featured_image',
         'bundle_type',
+        'is_available',
         'product_model',
         'system_capacity_display',
         'detailed_description',
@@ -30,6 +31,7 @@ class Bundles extends Model
 
     protected $casts = [
         'specifications' => 'array',
+        'is_available' => 'boolean',
     ];
 
     protected $appends = ['featured_image_url'];

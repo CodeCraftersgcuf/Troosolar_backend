@@ -11,15 +11,22 @@ use App\Models\Product;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $products = Product::with(['details', 'images','reviews'])->get();
+            $query = Product::with(['details', 'images','reviews']);
+            $includeUnavailable = $request->boolean('include_unavailable', false);
+            $isAdmin = strtolower((string) (auth()->user()->role ?? '')) === 'admin';
+            if (Schema::hasColumn('products', 'is_available') && !($includeUnavailable && $isAdmin)) {
+                $query->where('is_available', true);
+            }
+            $products = $query->get();
             return ResponseHelper::success($products, 'Products fetched successfully.');
         } catch (Exception $e) {
             return ResponseHelper::error('Failed to fetch products.', 500);
@@ -28,17 +35,28 @@ class ProductController extends Controller
     public function topProducts()
     {
         try {
-            $products =Product::where('top_deal', true)->with(['details', 'images','reviews'])->get();
+            $products = Product::where('top_deal', true)
+                ->when(Schema::hasColumn('products', 'is_available'), function ($q) {
+                    $q->where('is_available', true);
+                })
+                ->with(['details', 'images','reviews'])
+                ->get();
             return ResponseHelper::success($products, 'Top products fetched successfully.');
         } catch (Exception $e) {
             return ResponseHelper::error('Failed to fetch top products.', 500, $e->getMessage());
         }
     }
 
-  public function show($id)
+  public function show(Request $request, $id)
 {
     try {
-        $product = Product::with(['details', 'images', 'reviews'])->find($id);
+        $includeUnavailable = $request->boolean('include_unavailable', false);
+        $isAdmin = strtolower((string) (auth()->user()->role ?? '')) === 'admin';
+        $product = Product::with(['details', 'images', 'reviews'])
+            ->when(Schema::hasColumn('products', 'is_available') && !($includeUnavailable && $isAdmin), function ($q) {
+                $q->where('is_available', true);
+            })
+            ->find($id);
 
         return $product
             ? ResponseHelper::success($product, 'Product fetched successfully.')
@@ -177,7 +195,12 @@ public function getProductsByBrand($ids)
         // Convert comma-separated IDs into array
         $brandIds = explode(',', $ids);
 
-        $brands = Brand::with('products.reviews')->whereIn('id', $brandIds)->get();
+        $brands = Brand::with(['products' => function ($query) {
+            if (Schema::hasColumn('products', 'is_available')) {
+                $query->where('is_available', true);
+            }
+            $query->with('reviews');
+        }])->whereIn('id', $brandIds)->get();
 
         if ($brands->isEmpty()) {
             return ResponseHelper::error('No brands found.', 404);
@@ -200,6 +223,9 @@ public function showProductByBrand($brandIds, $productId)
 
         $product = Product::whereIn('brand_id', $brandIds)
                           ->where('id', $productId)
+                          ->when(Schema::hasColumn('products', 'is_available'), function ($q) {
+                              $q->where('is_available', true);
+                          })
                           ->with(['details', 'images','reviews'])
                           ->first();
 
@@ -225,6 +251,9 @@ public function showProductByCategory(
         $query = Product::where('category_id', $categoryId)
                     //   ->where('brand_id', $brandIds)
                         ->where('id', $productId)
+                        ->when(Schema::hasColumn('products', 'is_available'), function ($q) {
+                            $q->where('is_available', true);
+                        })
                         ->with(['details', 'images', 'reviews']);
 
         if ($brandIds) {
@@ -251,6 +280,9 @@ public function showProductByCategoryBrand(
     try {
         $query = Product::where('category_id', $categoryId)
                         ->where('id', $productId)
+                        ->when(Schema::hasColumn('products', 'is_available'), function ($q) {
+                            $q->where('is_available', true);
+                        })
                         ->with(['details', 'images', 'reviews']);
 
         $product = $query->first();

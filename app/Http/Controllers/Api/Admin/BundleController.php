@@ -26,10 +26,16 @@ public function index(Request $request)
 {
     try {
         $query = $request->query('q'); // accept ?q=1080 or any number
+        $includeUnavailable = $request->boolean('include_unavailable', false);
+        $isAdmin = strtolower((string) (auth()->user()->role ?? '')) === 'admin';
 
         // If no query parameter => return all bundles
         if (empty($query)) {
-            $bundles = Bundles::with(['bundleItems.product.category', 'bundleMaterials.material.category', 'customServices', 'brand'])->get();
+            $bundlesQuery = Bundles::with(['bundleItems.product.category', 'bundleMaterials.material.category', 'customServices', 'brand']);
+            if (Schema::hasColumn('bundles', 'is_available') && !($includeUnavailable && $isAdmin)) {
+                $bundlesQuery->where('is_available', true);
+            }
+            $bundles = $bundlesQuery->get();
             $formatted = $bundles->map(fn($b) => $this->formatBundleResponse($b))->values();
             return ResponseHelper::success($formatted, 'Bundles fetched.');
         }
@@ -42,7 +48,11 @@ public function index(Request $request)
         $q = (float) $query;
 
         // Fetch all bundles with relations
-        $bundles = Bundles::with(['bundleItems.product', 'customServices'])->get();
+        $bundlesQuery = Bundles::with(['bundleItems.product', 'customServices']);
+        if (Schema::hasColumn('bundles', 'is_available') && !($includeUnavailable && $isAdmin)) {
+            $bundlesQuery->where('is_available', true);
+        }
+        $bundles = $bundlesQuery->get();
 
         if ($bundles->isEmpty()) {
             return ResponseHelper::error('No bundles found.', 404);
@@ -138,6 +148,11 @@ public function index(Request $request)
             }
             if (Schema::hasColumn('bundles', 'bundle_type')) {
                 $createData['bundle_type'] = $safeTrim($data['bundle_type'] ?? null);
+            }
+            if (Schema::hasColumn('bundles', 'is_available')) {
+                $createData['is_available'] = array_key_exists('is_available', $data)
+                    ? (bool) $data['is_available']
+                    : true;
             }
 
             if (Schema::hasColumn('bundles', 'product_model')) {
@@ -323,6 +338,7 @@ public function index(Request $request)
                 'title' => $bundle->title,
                 'featured_image' => $bundle->featured_image,
                 'bundle_type' => $bundle->bundle_type,
+                'is_available' => $bundle->is_available,
                 'total_price' => (float) ($bundle->total_price ?? 0),
                 'discount_price' => $bundle->discount_price ? (float) $bundle->discount_price : null,
                 'discount_end_date' => $bundle->discount_end_date,
@@ -399,6 +415,7 @@ public function index(Request $request)
                 'title' => $data['title'] ?? $bundle->title,
                 'featured_image' => $data['featured_image'] ?? $bundle->featured_image,
                 'bundle_type' => $data['bundle_type'] ?? $bundle->bundle_type,
+                'is_available' => array_key_exists('is_available', $data) ? (bool) $data['is_available'] : $bundle->is_available,
                 'product_model' => array_key_exists('product_model', $data) ? trim($data['product_model'] ?? '') : $bundle->product_model,
                 'system_capacity_display' => array_key_exists('system_capacity_display', $data) ? trim($data['system_capacity_display'] ?? '') : $bundle->system_capacity_display,
                 'detailed_description' => array_key_exists('detailed_description', $data) ? trim($data['detailed_description'] ?? '') : $bundle->detailed_description,
@@ -563,6 +580,7 @@ public function index(Request $request)
             'featured_image' => $bundle->featured_image,
             'featured_image_url' => $bundle->featured_image_url,
             'bundle_type' => $bundle->bundle_type,
+            'is_available' => $bundle->is_available,
             'total_price' => (float) ($bundle->total_price ?? 0),
             'discount_price' => $bundle->discount_price ? (float) $bundle->discount_price : null,
             'discount_end_date' => $bundle->discount_end_date,

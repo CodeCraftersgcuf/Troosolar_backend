@@ -22,7 +22,10 @@ class Product extends Model
         'installation_price',
         'top_deal',
         'installation_compulsory',
+        'is_available',
         'featured_image',
+        'description',
+        'specifications',
         'old_quantity',
         // ❌ This line does nothing in $fillable and also conflicts with relation name:
         // 'images' => 'array',
@@ -32,6 +35,7 @@ class Product extends Model
         'discount_end_date' => 'date',
         'top_deal' => 'boolean',
         'installation_compulsory' => 'boolean',
+        'is_available' => 'boolean',
         'price' => 'double',
         'discount_price' => 'double',
         'installation_price' => 'double',

@@ -8,6 +8,7 @@ use App\Models\Material;
 use App\Models\BundleMaterial;
 use App\Helpers\ResponseHelper;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Exception;
 
 class BundleSelectionController extends Controller
@@ -24,6 +25,9 @@ class BundleSelectionController extends Controller
                 : 'Solar+Inverter+Battery';
 
             $bundles = Bundles::where('bundle_type', $bundleType)
+                ->when(Schema::hasColumn('bundles', 'is_available'), function ($q) {
+                    $q->where('is_available', true);
+                })
                 ->with(['bundleMaterials.material.category'])
                 ->orderBy('total_price')
                 ->get()
@@ -32,6 +36,7 @@ class BundleSelectionController extends Controller
                         'id' => $bundle->id,
                         'title' => $bundle->title,
                         'bundle_type' => $bundle->bundle_type,
+                        'is_available' => (bool) ($bundle->is_available ?? true),
                         'total_price' => (float) $bundle->total_price,
                         'discount_price' => $bundle->discount_price ? (float) $bundle->discount_price : null,
                         'inver_rating' => $bundle->inver_rating,
@@ -67,7 +72,9 @@ class BundleSelectionController extends Controller
                 'bundleItems.product.category',
                 'bundleMaterials.material.category',
                 'customServices',
-            ])->find($id);
+            ])->when(Schema::hasColumn('bundles', 'is_available'), function ($q) {
+                $q->where('is_available', true);
+            })->find($id);
 
             if (!$bundle) {
                 return ResponseHelper::error('Bundle not found.', 404);
