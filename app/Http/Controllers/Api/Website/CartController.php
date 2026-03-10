@@ -79,7 +79,8 @@ class CartController extends Controller
         try {
             // ---- Configurable
             $deliveryFee       = (int) config('checkout.delivery_fee', 20000);
-            $installationPrice = (int) config('checkout.installation_price', 25000);
+            // Installation is derived from actual cart items (not hardcoded fallback).
+            $installationPrice = 0;
             $installationText  = (string) config('checkout.installation_text',
                 'Installation will be carried out by our skilled technicians. You can choose to use our installers.'
             );
@@ -142,6 +143,22 @@ class CartController extends Controller
                     'data'    => [],
                 ], 422);
             }
+
+            // 3a) Calculate installation from cart line items using actual model values.
+            // Product API exposes installation_price (e.g. 0), so we honor that value.
+            $installationPrice = (int) round($rawItems->sum(function ($item) {
+                if (!$item->itemable) {
+                    return 0;
+                }
+                $qty = max(1, (int) ($item->quantity ?? 1));
+                $perUnitInstall = (float) (
+                    $item->itemable->installation_price
+                    ?? $item->itemable->install_price
+                    ?? $item->itemable->installation_cost
+                    ?? 0
+                );
+                return max(0, $perUnitInstall) * $qty;
+            }));
 
             // 3) Totals
             $itemsSubtotal = (int) $cartItems->sum('subtotal');
