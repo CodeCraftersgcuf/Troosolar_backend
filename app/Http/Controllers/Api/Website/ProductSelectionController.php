@@ -62,21 +62,47 @@ class ProductSelectionController extends Controller
             // Final strict pass by product title so "panels-only" never leaks inverter/battery items
             $products = $products->filter(function ($product) use ($normalizedGroup) {
                 $title = strtolower(trim((string) ($product->title ?? '')));
+                $categoryTitle = strtolower(trim((string) ($product->category->title ?? '')));
                 $isBatteryTitle = str_contains($title, 'battery')
                     || str_contains($title, 'batteries')
-                    || str_contains($title, 'lithium');
+                    || str_contains($title, 'lithium')
+                    || str_contains($title, 'rack');
+                $isBatteryCategory = str_contains($categoryTitle, 'battery')
+                    || str_contains($categoryTitle, 'batteries')
+                    || str_contains($categoryTitle, 'lithium')
+                    || str_contains($categoryTitle, 'rack');
                 $isInverterTitle = str_contains($title, 'inverter');
+                $isInverterCategory = str_contains($categoryTitle, 'inverter');
                 $isPanelTitle = str_contains($title, 'panel') || str_contains($title, 'pv');
+                $isPanelCategory = str_contains($categoryTitle, 'panel') || str_contains($categoryTitle, 'pv');
                 $isAllInOneSystem = str_contains($title, 'all in one')
                     || str_contains($title, 'all-in-one')
                     || str_contains($title, 'aio')
                     || str_contains($title, 'system');
+                $isAllInOneCategory = str_contains($categoryTitle, 'all in one')
+                    || str_contains($categoryTitle, 'all-in-one')
+                    || str_contains($categoryTitle, 'aio')
+                    || str_contains($categoryTitle, 'system');
 
                 return match ($normalizedGroup) {
                     // Keep battery-only to standalone battery products only
-                    'battery-only' => $isBatteryTitle && !$isInverterTitle && !$isPanelTitle && !$isAllInOneSystem,
-                    'inverter-only' => $isInverterTitle && !$isBatteryTitle,
-                    'panels-only' => $isPanelTitle && !$isInverterTitle && !$isBatteryTitle,
+                    'battery-only' => ($isBatteryTitle || $isBatteryCategory)
+                        && !$isInverterTitle
+                        && !$isPanelTitle
+                        && !$isInverterCategory
+                        && !$isPanelCategory
+                        && !$isAllInOneSystem
+                        && !$isAllInOneCategory,
+                    'inverter-only' => ($isInverterTitle || $isInverterCategory)
+                        && !$isBatteryTitle
+                        && !$isPanelTitle
+                        && !$isBatteryCategory
+                        && !$isPanelCategory,
+                    'panels-only' => ($isPanelTitle || $isPanelCategory)
+                        && !$isInverterTitle
+                        && !$isBatteryTitle
+                        && !$isInverterCategory
+                        && !$isBatteryCategory,
                     default => true,
                 };
             })->values();
