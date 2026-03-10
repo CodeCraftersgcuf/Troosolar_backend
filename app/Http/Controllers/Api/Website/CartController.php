@@ -18,6 +18,23 @@ use Illuminate\Support\Arr;
 
 class CartController extends Controller
 {
+    private function resolveItemUnitPrice($model): float
+    {
+        if ($model instanceof Product) {
+            $discount = (float) ($model->discount_price ?? 0);
+            $basePrice = (float) ($model->price ?? 0);
+            return $discount > 0 ? $discount : max(0, $basePrice);
+        }
+
+        if ($model instanceof Bundles) {
+            $discount = (float) ($model->discount_price ?? 0);
+            $basePrice = (float) ($model->total_price ?? 0);
+            return $discount > 0 ? $discount : max(0, $basePrice);
+        }
+
+        return (float) ($model->price ?? $model->total_price ?? 0);
+    }
+
     public function index()
     {
         try {
@@ -26,6 +43,21 @@ class CartController extends Controller
             $items = CartItem::with('itemable')
                 ->where('user_id', $userId)
                 ->get();
+
+            // Heal previously saved invalid rows where unit_price became 0 because discount_price was 0.
+            foreach ($items as $item) {
+                if (!$item->itemable) {
+                    continue;
+                }
+                $resolvedUnitPrice = $this->resolveItemUnitPrice($item->itemable);
+                $qty = max(1, (int) $item->quantity);
+                $currentUnitPrice = (float) ($item->unit_price ?? 0);
+                if ($currentUnitPrice <= 0 && $resolvedUnitPrice > 0) {
+                    $item->unit_price = $resolvedUnitPrice;
+                    $item->subtotal = $resolvedUnitPrice * $qty;
+                    $item->save();
+                }
+            }
 
             return ResponseHelper::success($items, 'Cart items fetched successfully');
         } catch (Exception $e) {
@@ -247,7 +279,7 @@ class CartController extends Controller
                 }
             }
 
-            $price = $model->discount_price ?? $model->price ?? $model->total_price;
+            $price = $this->resolveItemUnitPrice($model);
             $subtotal = $price * $quantity;
 
             $cartItem = CartItem::create([
@@ -284,9 +316,10 @@ class CartController extends Controller
                     return ResponseHelper::error("Only {$availableStock} unit(s) left in stock.", 422);
                 }
             }
-            $price = $model->discount_price ?? $model->price ?? $model->total_price;
+            $price = $this->resolveItemUnitPrice($model);
 
             $cartItem->quantity = $quantity;
+            $cartItem->unit_price = $price;
             $cartItem->subtotal = $price * $quantity;
             $cartItem->save();
 

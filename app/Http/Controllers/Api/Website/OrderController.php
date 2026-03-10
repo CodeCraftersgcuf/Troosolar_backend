@@ -28,6 +28,32 @@ use App\Services\ReferralRewardService;
 
 class OrderController extends Controller
 {
+    private function resolveCatalogUnitPrice($itemable): float
+    {
+        if ($itemable instanceof Product) {
+            $discount = (float) ($itemable->discount_price ?? 0);
+            $basePrice = (float) ($itemable->price ?? 0);
+            return $discount > 0 ? $discount : max(0, $basePrice);
+        }
+
+        if ($itemable instanceof Bundles) {
+            $discount = (float) ($itemable->discount_price ?? 0);
+            $basePrice = (float) ($itemable->total_price ?? 0);
+            return $discount > 0 ? $discount : max(0, $basePrice);
+        }
+
+        return (float) ($itemable->price ?? $itemable->total_price ?? 0);
+    }
+
+    private function applyOutrightDiscount(float $amount, ?float $percentage): float
+    {
+        $pct = max(0, (float) ($percentage ?? 0));
+        if ($pct <= 0 || $amount <= 0) {
+            return $amount;
+        }
+        return max(0, round($amount - (($amount * $pct) / 100), 2));
+    }
+
     /**
      * GET /api/orders
      * Returns orders for the authenticated user.
@@ -169,6 +195,12 @@ class OrderController extends Controller
         $total            = 0;
         $primaryProductId = null;
         $primaryBundleId  = null;
+        $orderPaymentMethod = strtolower((string) ($data['payment_method'] ?? ''));
+        $isOutrightCheckout = in_array($orderPaymentMethod, ['direct', 'cash'], true);
+        $referralSettings = $isOutrightCheckout ? ReferralSettings::getSettings() : null;
+        $outrightDiscountPercentage = $isOutrightCheckout
+            ? (float) ($referralSettings->outright_discount_percentage ?? 0)
+            : 0;
 
         foreach ($cartItems as $ci) {
             $itemable = $ci->itemable; // Product|Bundles|null
@@ -179,13 +211,13 @@ class OrderController extends Controller
 
             $fqcn = $itemable instanceof Product ? Product::class : Bundles::class;
 
-            // Prefer stored values; fallback to model price
-            $unit = (int) $ci->unit_price;
-            if ($unit <= 0) {
-                $unit = (int) ($itemable->discount_price ?? $itemable->price ?? $itemable->total_price ?? 0);
-            }
+            $catalogUnit = $this->resolveCatalogUnitPrice($itemable);
+            $effectiveUnit = $isOutrightCheckout
+                ? $this->applyOutrightDiscount($catalogUnit, $outrightDiscountPercentage)
+                : $catalogUnit;
+            $unit = (float) $effectiveUnit;
             $qty      = max(1, (int) $ci->quantity);
-            $subtotal = (int) ($ci->subtotal ?? ($unit * $qty));
+            $subtotal = (float) round($unit * $qty, 2);
 
             if ($itemable instanceof Product) {
                 $availableStock = (int) ($itemable->stock ?? 0);
@@ -667,10 +699,16 @@ class OrderController extends Controller
             
             if ($productId) {
                 $product = Product::findOrFail($productId);
-                $productPrice = $product->discount_price ?? $product->price ?? 0;
+                $productDiscount = (float) ($product->discount_price ?? 0);
+                $productPrice = $productDiscount > 0
+                    ? $productDiscount
+                    : (float) ($product->price ?? 0);
             } elseif ($bundleId) {
                 $bundle = Bundles::with('bundleMaterials.material')->findOrFail($bundleId);
-                $productPrice = (float) ($bundle->discount_price ?? $bundle->total_price ?? 0);
+                $bundleDiscount = (float) ($bundle->discount_price ?? 0);
+                $productPrice = $bundleDiscount > 0
+                    ? $bundleDiscount
+                    : (float) ($bundle->total_price ?? 0);
                 // Use amount from request when bundle price is missing/zero (e.g. from bundle detail flow)
                 if ($productPrice <= 0 && $amount !== null) {
                     $productPrice = (float) $amount;
@@ -1059,7 +1097,10 @@ class OrderController extends Controller
                     if ($item && $item->product) {
                         $category = $item->product->category;
                         $categoryName = $category ? strtolower($category->title ?? '') : '';
-                        $productPrice = $item->product->discount_price ?? $item->product->price ?? 0;
+                        $productDiscount = (float) ($item->product->discount_price ?? 0);
+                        $productPrice = $productDiscount > 0
+                            ? $productDiscount
+                            : (float) ($item->product->price ?? 0);
                         
                         if (strpos($categoryName, 'inverter') !== false) {
                             $inverterTotal += $productPrice;
@@ -1196,7 +1237,7 @@ class OrderController extends Controller
                                 'name' => $item->product->title ?? 'Unknown Product',
                                 'description' => !empty($productDetails) ? implode(', ', $productDetails) : ($item->product->title ?? 'No description'),
                                 'quantity' => $item->quantity ?? 1,
-                                'price' => $item->product->discount_price ?? $item->product->price ?? 0,
+                        'price' => $this->resolveCatalogUnitPrice($item->product),
                             ];
                         }
                     }
@@ -1220,7 +1261,7 @@ class OrderController extends Controller
                         'name' => $product->title ?? 'Unknown Product',
                         'description' => !empty($productDetails) ? implode(', ', $productDetails) : ($product->title ?? 'No description'),
                         'quantity' => 1,
-                        'price' => $product->discount_price ?? $product->price ?? 0,
+                        'price' => $this->resolveCatalogUnitPrice($product),
                     ];
                 } else {
                     // If no product or bundle, try to get items from order_items
