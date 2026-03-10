@@ -90,11 +90,11 @@ class ProductSelectionController extends Controller
                         $isBatteryTitle
                         || $isBatteryCategory
                         || $isKwhTitle
-                        || $isAllInOneSystem
-                        || $isAllInOneCategory
                     )
                         && !$isPanelTitle
                         && !$isPanelCategory
+                        && !$isAllInOneSystem
+                        && !$isAllInOneCategory
                         && !($isInverterTitle && !$isKwhTitle),
                     'inverter-only' => ($isInverterTitle || $isInverterCategory)
                         && !$isBatteryTitle

@@ -17,13 +17,6 @@ class ProductSeeder extends Seeder
      */
     public function run(): void
     {
-        // Check if products from materials already exist (check by price = 1000)
-        $existingProducts = Product::where('price', 1000)->whereNotNull('featured_image')->count();
-        if ($existingProducts > 0) {
-            $this->command->info('Products from materials already exist. Skipping...');
-            return;
-        }
-
         // Fallback image URL
         $fallbackImage = 'https://troosolar.hmstech.org/storage/products/e212b55b-057a-4a39-8d80-d241169cdac0.png';
 
@@ -42,37 +35,43 @@ class ProductSeeder extends Seeder
             ->get();
 
         $created = 0;
+        $updated = 0;
         $skipped = 0;
 
         foreach ($materials as $material) {
-            // Skip if product with same title already exists
             $existingProduct = Product::where('title', $material->name)->first();
-            if ($existingProduct) {
-                $skipped++;
-                continue;
-            }
 
             // Map material category to product category
             $productCategory = $this->mapMaterialCategoryToProductCategory($material->category->name, $categoryMap);
 
-            // Create product
-            Product::create([
-                'title' => $material->name,
-                'category_id' => $productCategory->id,
-                'brand_id' => $defaultBrand->id,
-                'price' => 1000.00,
-                'discount_price' => 1000.00,
-                'stock' => 'In Stock',
-                'installation_price' => 0.00,
-                'top_deal' => false,
-                'installation_compulsory' => false,
-                'featured_image' => $fallbackImage,
-            ]);
-
-            $created++;
+            if ($existingProduct) {
+                // Keep existing pricing/image but enforce correct category and baseline stock visibility.
+                $existingProduct->update([
+                    'category_id' => $productCategory->id,
+                    'brand_id' => $existingProduct->brand_id ?: $defaultBrand->id,
+                    'stock' => $existingProduct->stock ?: 'In Stock',
+                    'is_available' => $existingProduct->is_available ?? true,
+                ]);
+                $updated++;
+            } else {
+                Product::create([
+                    'title' => $material->name,
+                    'category_id' => $productCategory->id,
+                    'brand_id' => $defaultBrand->id,
+                    'price' => 1000.00,
+                    'discount_price' => 1000.00,
+                    'stock' => 'In Stock',
+                    'installation_price' => 0.00,
+                    'top_deal' => false,
+                    'installation_compulsory' => false,
+                    'featured_image' => $fallbackImage,
+                    'is_available' => true,
+                ]);
+                $created++;
+            }
         }
 
-        $this->command->info("Products seeded successfully! Created: {$created}, Skipped: {$skipped}");
+        $this->command->info("Products seeded successfully! Created: {$created}, Updated: {$updated}, Skipped: {$skipped}");
     }
 
     /**
@@ -92,7 +91,7 @@ class ProductSeeder extends Seeder
             'PV BREAKERS' => 'Electrical Components',
             'SOLAR PV DC FLEXIBLE CABLE' => 'Cables & Wiring',
             'SURGE PROTECTORS' => 'Electrical Components',
-            'BATTERY RACK' => 'Mounting & Installation',
+            'BATTERY RACK' => 'Lithium Batteries',
             'DC FLEXIBLE CABLE' => 'Cables & Wiring',
             'DC BREAKER' => 'Electrical Components',
             'AC BREAKER' => 'Electrical Components',
