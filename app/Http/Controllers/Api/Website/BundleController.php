@@ -81,10 +81,14 @@ class BundleController extends Controller
     {
         try {
             $query = $request->query('q');
+            $bundleType = $request->query('bundle_type');
             $bundlesQuery = Bundles::with(['bundleItems.product', 'customServices', 'bundleMaterials.material.category'])
                 ->orderBy('created_at', 'desc');
             if (Schema::hasColumn('bundles', 'is_available')) {
                 $bundlesQuery->where('is_available', true);
+            }
+            if (!empty($bundleType)) {
+                $bundlesQuery->where('bundle_type', $bundleType);
             }
             $bundles = $bundlesQuery->get();
 
