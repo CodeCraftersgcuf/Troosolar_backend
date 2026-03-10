@@ -58,16 +58,17 @@ class BundleController extends Controller
 
     /**
      * Resolve bundle usable capacity in watts.
-     * Prefer total_load, fallback to inverter rating when total_load is missing/zero.
+     * For recommendation by inverter demand, prefer inverter rating first.
+     * Fallback to total_load only when inverter rating is missing/zero.
      */
     private function resolveBundleCapacityWatts($bundle): float
     {
-        $fromTotalLoad = $this->parseLoadToWatts($bundle->total_load ?? null);
-        if ($fromTotalLoad > 0) {
-            return $fromTotalLoad;
+        $fromInverterRating = $this->parseLoadToWatts($bundle->inver_rating ?? null);
+        if ($fromInverterRating > 0) {
+            return $fromInverterRating;
         }
 
-        return $this->parseLoadToWatts($bundle->inver_rating ?? null);
+        return $this->parseLoadToWatts($bundle->total_load ?? null);
     }
 
     /**
@@ -105,20 +106,43 @@ class BundleController extends Controller
                 if (!$exact->isEmpty()) {
                     $bundles = $exact->sortBy('_parsed_load_watts')->values();
                 } else {
-                    // No exact match: return bundles at the closest capacity.
-                    $closestDelta = $bundles
-                        ->map(function ($bundle) use ($targetCapacityWatts) {
-                            return abs(((float) ($bundle->_parsed_load_watts ?? 0)) - $targetCapacityWatts);
+                    // Prefer the closest bundle(s) at or above requested capacity.
+                    $aboveOrEqual = $bundles
+                        ->filter(function ($bundle) use ($targetCapacityWatts) {
+                            return ((float) ($bundle->_parsed_load_watts ?? 0)) >= $targetCapacityWatts;
                         })
-                        ->min();
-
-                    $bundles = $bundles
-                        ->filter(function ($bundle) use ($targetCapacityWatts, $closestDelta) {
-                            $delta = abs(((float) ($bundle->_parsed_load_watts ?? 0)) - $targetCapacityWatts);
-                            return abs($delta - $closestDelta) < 0.0001;
-                        })
-                        ->sortBy('_parsed_load_watts')
                         ->values();
+
+                    if (!$aboveOrEqual->isEmpty()) {
+                        $minAboveDelta = $aboveOrEqual
+                            ->map(function ($bundle) use ($targetCapacityWatts) {
+                                return ((float) ($bundle->_parsed_load_watts ?? 0)) - $targetCapacityWatts;
+                            })
+                            ->min();
+
+                        $bundles = $aboveOrEqual
+                            ->filter(function ($bundle) use ($targetCapacityWatts, $minAboveDelta) {
+                                $deltaAbove = ((float) ($bundle->_parsed_load_watts ?? 0)) - $targetCapacityWatts;
+                                return abs($deltaAbove - $minAboveDelta) < 0.0001;
+                            })
+                            ->sortBy('_parsed_load_watts')
+                            ->values();
+                    } else {
+                        // If everything is below target, return nearest overall.
+                        $closestDelta = $bundles
+                            ->map(function ($bundle) use ($targetCapacityWatts) {
+                                return abs(((float) ($bundle->_parsed_load_watts ?? 0)) - $targetCapacityWatts);
+                            })
+                            ->min();
+
+                        $bundles = $bundles
+                            ->filter(function ($bundle) use ($targetCapacityWatts, $closestDelta) {
+                                $delta = abs(((float) ($bundle->_parsed_load_watts ?? 0)) - $targetCapacityWatts);
+                                return abs($delta - $closestDelta) < 0.0001;
+                            })
+                            ->sortBy('_parsed_load_watts')
+                            ->values();
+                    }
                 }
             }
 
