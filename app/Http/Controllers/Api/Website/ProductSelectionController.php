@@ -47,13 +47,13 @@ class ProductSelectionController extends Controller
                 ->values()
                 ->all();
 
-            if (empty($matchedCategoryIds)) {
-                return ResponseHelper::success([], 'No matching categories found for this product group.');
-            }
-
             $query = Product::query()
-                ->with(['details', 'images', 'reviews', 'category'])
-                ->whereIn('category_id', $matchedCategoryIds);
+                ->with(['details', 'images', 'reviews', 'category']);
+
+            // Keep category narrowing when available, but do not hard-fail when category mapping is off.
+            if (!empty($matchedCategoryIds)) {
+                $query->whereIn('category_id', $matchedCategoryIds);
+            }
 
             $this->applyPublicAvailabilityFilters($query);
 
@@ -75,6 +75,7 @@ class ProductSelectionController extends Controller
                 $isInverterCategory = str_contains($categoryTitle, 'inverter');
                 $isPanelTitle = str_contains($title, 'panel') || str_contains($title, 'pv');
                 $isPanelCategory = str_contains($categoryTitle, 'panel') || str_contains($categoryTitle, 'pv');
+                $isKwhTitle = str_contains($title, 'kwh');
                 $isAllInOneSystem = str_contains($title, 'all in one')
                     || str_contains($title, 'all-in-one')
                     || str_contains($title, 'aio')
@@ -85,14 +86,16 @@ class ProductSelectionController extends Controller
                     || str_contains($categoryTitle, 'system');
 
                 return match ($normalizedGroup) {
-                    // Keep battery-only to standalone battery products only
-                    'battery-only' => ($isBatteryTitle || $isBatteryCategory)
-                        && !$isInverterTitle
+                    'battery-only' => (
+                        $isBatteryTitle
+                        || $isBatteryCategory
+                        || $isKwhTitle
+                        || $isAllInOneSystem
+                        || $isAllInOneCategory
+                    )
                         && !$isPanelTitle
-                        && !$isInverterCategory
                         && !$isPanelCategory
-                        && !$isAllInOneSystem
-                        && !$isAllInOneCategory,
+                        && !($isInverterTitle && !$isKwhTitle),
                     'inverter-only' => ($isInverterTitle || $isInverterCategory)
                         && !$isBatteryTitle
                         && !$isPanelTitle
