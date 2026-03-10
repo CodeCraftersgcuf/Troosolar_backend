@@ -32,7 +32,7 @@ class ProductSelectionController extends Controller
                         || str_contains($name, 'battries');
 
                     $isInverterCategory = str_contains($name, 'inverter');
-                    $isPanelCategory = str_contains($name, 'solar') || str_contains($name, 'panel');
+                    $isPanelCategory = str_contains($name, 'panel') || str_contains($name, 'pv');
 
                     return match ($normalizedGroup) {
                         'battery-only' => $isBatteryCategory,
@@ -58,6 +58,23 @@ class ProductSelectionController extends Controller
             $this->applyPublicAvailabilityFilters($query);
 
             $products = $query->get();
+
+            // Final strict pass by product title so "panels-only" never leaks inverter/battery items
+            $products = $products->filter(function ($product) use ($normalizedGroup) {
+                $title = strtolower(trim((string) ($product->title ?? '')));
+                $isBatteryTitle = str_contains($title, 'battery')
+                    || str_contains($title, 'batteries')
+                    || str_contains($title, 'lithium');
+                $isInverterTitle = str_contains($title, 'inverter');
+                $isPanelTitle = str_contains($title, 'panel') || str_contains($title, 'pv');
+
+                return match ($normalizedGroup) {
+                    'battery-only' => $isBatteryTitle && !$isInverterTitle && !$isPanelTitle,
+                    'inverter-only' => $isInverterTitle && !$isBatteryTitle,
+                    'panels-only' => $isPanelTitle && !$isInverterTitle && !$isBatteryTitle,
+                    default => true,
+                };
+            })->values();
 
             return ResponseHelper::success($products, 'Products fetched successfully.');
         } catch (Exception $e) {
