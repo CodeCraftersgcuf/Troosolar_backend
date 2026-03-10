@@ -52,7 +52,10 @@ public function index(Request $request)
         $q = (float) $query;
 
         // Fetch all bundles with relations
-        $bundlesQuery = Bundles::with(['bundleItems.product', 'customServices']);
+        $bundlesQuery = Bundles::with(['bundleItems.product.category', 'bundleMaterials.material.category', 'customServices', 'brand']);
+        if (!empty($bundleType)) {
+            $bundlesQuery->where('bundle_type', $bundleType);
+        }
         if (Schema::hasColumn('bundles', 'is_available') && !($includeUnavailable && $isAdmin)) {
             $bundlesQuery->where('is_available', true);
         }
@@ -62,38 +65,77 @@ public function index(Request $request)
             return ResponseHelper::error('No bundles found.', 404);
         }
 
-        // Parse total_output to numeric (e.g. "3.8 kWh" -> 3.8, "1200 W" -> 1200); null/empty -> 0
-        $parseOutput = function ($value) {
+        // Parse load/rating to watts (e.g. "1.5kVA" => 1500, "1200 W" => 1200, "1.2" => 1200)
+        $parseToWatts = function ($value) {
             if ($value === null || $value === '') {
                 return 0.0;
             }
-            if (is_numeric($value)) {
-                return (float) $value;
+
+            $valueStr = trim((string) $value);
+            $numeric = 0.0;
+
+            $normalized = preg_replace('/[,\s]+/', '', $valueStr);
+            if ($normalized !== null && is_numeric($normalized)) {
+                $numeric = (float) $normalized;
+            } elseif (preg_match('/([\d.]+)/', $valueStr, $m)) {
+                $numeric = (float) $m[1];
+            } else {
+                return 0.0;
             }
-            if (preg_match('/^([\d.]+)/', (string) $value, $m)) {
-                return (float) $m[1];
+
+            $lower = strtolower($valueStr);
+            if (strpos($lower, 'kva') !== false || strpos($lower, 'kw') !== false || strpos($lower, 'kwh') !== false) {
+                return $numeric * 1000;
             }
-            return 0.0;
+            if (strpos($lower, 'w') !== false) {
+                return $numeric;
+            }
+
+            return $numeric < 100 ? $numeric * 1000 : $numeric;
         };
 
-        // Find bundle with closest total_output to $q
-        $closestBundle = $bundles->sortBy(function ($bundle) use ($q, $parseOutput) {
-            $num = $parseOutput($bundle->total_output);
-            return abs($num - $q);
-        })->first();
+        $bundles = $bundles->map(function ($bundle) use ($parseToWatts) {
+            // For load-calculator recommendations, compare by inverter rating first.
+            $bundle->_parsed_capacity_watts = $parseToWatts($bundle->inver_rating ?? null);
+            if ($bundle->_parsed_capacity_watts <= 0) {
+                $bundle->_parsed_capacity_watts = $parseToWatts($bundle->total_load ?? null);
+            }
+            return $bundle;
+        })->filter(fn($b) => ((float) ($b->_parsed_capacity_watts ?? 0)) > 0)->values();
 
-        // If there's a bundle with total_output >= $q and closest to it
-        $closerOrAbove = $bundles->filter(function ($bundle) use ($q, $parseOutput) {
-            return $parseOutput($bundle->total_output) >= $q;
-        })->sortBy(function ($bundle) use ($q, $parseOutput) {
-            $num = $parseOutput($bundle->total_output);
-            return abs($num - $q);
-        })->first();
+        if ($bundles->isEmpty()) {
+            return ResponseHelper::error('No bundles with valid inverter/load capacity found.', 404);
+        }
 
-        return ResponseHelper::success(
-            $closerOrAbove ?? $closestBundle,
-            'Closest bundle fetched.'
-        );
+        // Exact match first
+        $exact = $bundles->filter(function ($bundle) use ($q) {
+            return abs(((float) ($bundle->_parsed_capacity_watts ?? 0)) - $q) < 0.0001;
+        })->values();
+
+        if (!$exact->isEmpty()) {
+            $selected = $exact->sortBy('_parsed_capacity_watts')->values();
+        } else {
+            // Prefer closest bundle(s) at or above the target.
+            $above = $bundles->filter(fn($bundle) => ((float) ($bundle->_parsed_capacity_watts ?? 0)) >= $q)->values();
+
+            if (!$above->isEmpty()) {
+                $minAboveDelta = $above->map(fn($bundle) => ((float) ($bundle->_parsed_capacity_watts ?? 0)) - $q)->min();
+                $selected = $above->filter(function ($bundle) use ($q, $minAboveDelta) {
+                    $delta = ((float) ($bundle->_parsed_capacity_watts ?? 0)) - $q;
+                    return abs($delta - $minAboveDelta) < 0.0001;
+                })->sortBy('_parsed_capacity_watts')->values();
+            } else {
+                // If all bundles are below target, use nearest overall
+                $closestDelta = $bundles->map(fn($bundle) => abs(((float) ($bundle->_parsed_capacity_watts ?? 0)) - $q))->min();
+                $selected = $bundles->filter(function ($bundle) use ($q, $closestDelta) {
+                    $delta = abs(((float) ($bundle->_parsed_capacity_watts ?? 0)) - $q);
+                    return abs($delta - $closestDelta) < 0.0001;
+                })->sortBy('_parsed_capacity_watts')->values();
+            }
+        }
+
+        $formatted = $selected->map(fn($b) => $this->formatBundleResponse($b))->values();
+        return ResponseHelper::success($formatted, 'Closest bundle fetched.');
     } catch (Exception $e) {
         Log::error('Error fetching bundles: ' . $e->getMessage(), [
             'trace' => $e->getTraceAsString(),
