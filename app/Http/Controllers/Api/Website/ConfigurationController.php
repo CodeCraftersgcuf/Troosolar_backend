@@ -70,35 +70,64 @@ class ConfigurationController extends Controller
     {
         try {
             $config = \App\Models\LoanConfiguration::where('is_active', true)->first();
-            
-            if (!$config) {
-                // Return default values if no configuration exists
-                return ResponseHelper::success([
-                    'minimum_loan_amount' => 1500000,
-                    'equity_contribution_min' => 30,
-                    'equity_contribution_max' => 80,
-                    'interest_rate_min' => 3,
-                    'interest_rate_max' => 4,
-                    'management_fee_percentage' => 1.0,
-                    'residual_fee_percentage' => 1.0,
-                    'insurance_fee_percentage' => 0.5,
-                    'repayment_tenor_min' => 1,
-                    'repayment_tenor_max' => 12,
-                ], 'Loan configuration retrieved successfully (defaults)');
+            $bnplSettings = \App\Models\BnplSettings::get();
+
+            $defaultPayload = [
+                'minimum_loan_amount' => 1500000,
+                'equity_contribution_min' => 30,
+                'equity_contribution_max' => 80,
+                'interest_rate_min' => 4,
+                'interest_rate_max' => 4,
+                'management_fee_percentage' => 1.0,
+                'residual_fee_percentage' => 1.0,
+                'insurance_fee_percentage' => 0.5,
+                'repayment_tenor_min' => 1,
+                'repayment_tenor_max' => 12,
+            ];
+
+            $payload = $defaultPayload;
+
+            // Base from loan_configuration when present
+            if ($config) {
+                $payload = [
+                    'minimum_loan_amount' => (float) $config->minimum_loan_amount,
+                    'equity_contribution_min' => (float) $config->equity_contribution_min,
+                    'equity_contribution_max' => (float) $config->equity_contribution_max,
+                    'interest_rate_min' => (float) $config->interest_rate_min,
+                    'interest_rate_max' => (float) $config->interest_rate_max,
+                    'management_fee_percentage' => (float) $config->management_fee_percentage,
+                    'residual_fee_percentage' => (float) $config->residual_fee_percentage,
+                    'insurance_fee_percentage' => (float) $config->insurance_fee_percentage,
+                    'repayment_tenor_min' => (int) $config->repayment_tenor_min,
+                    'repayment_tenor_max' => (int) $config->repayment_tenor_max,
+                ];
             }
 
-            return ResponseHelper::success([
-                'minimum_loan_amount' => (float) $config->minimum_loan_amount,
-                'equity_contribution_min' => (float) $config->equity_contribution_min,
-                'equity_contribution_max' => (float) $config->equity_contribution_max,
-                'interest_rate_min' => (float) $config->interest_rate_min,
-                'interest_rate_max' => (float) $config->interest_rate_max,
-                'management_fee_percentage' => (float) $config->management_fee_percentage,
-                'residual_fee_percentage' => (float) $config->residual_fee_percentage,
-                'insurance_fee_percentage' => (float) $config->insurance_fee_percentage,
-                'repayment_tenor_min' => (int) $config->repayment_tenor_min,
-                'repayment_tenor_max' => (int) $config->repayment_tenor_max,
-            ], 'Loan configuration retrieved successfully');
+            // Override with BNPL admin settings (source of truth from Admin > BNPL Loan Settings)
+            if ($bnplSettings) {
+                $loanDurations = is_array($bnplSettings->loan_durations)
+                    ? array_values(array_filter($bnplSettings->loan_durations, fn($d) => is_numeric($d) && (int) $d > 0))
+                    : [];
+                sort($loanDurations);
+
+                $interest = (float) ($bnplSettings->interest_rate_percentage ?? $payload['interest_rate_max']);
+                $down = (float) ($bnplSettings->min_down_percentage ?? $payload['equity_contribution_min']);
+
+                $payload['minimum_loan_amount'] = (float) ($bnplSettings->minimum_loan_amount ?? $payload['minimum_loan_amount']);
+                $payload['equity_contribution_min'] = $down;
+                $payload['equity_contribution_max'] = $down;
+                $payload['interest_rate_min'] = $interest;
+                $payload['interest_rate_max'] = $interest;
+                $payload['management_fee_percentage'] = (float) ($bnplSettings->management_fee_percentage ?? $payload['management_fee_percentage']);
+                $payload['residual_fee_percentage'] = (float) ($bnplSettings->legal_fee_percentage ?? $payload['residual_fee_percentage']);
+                $payload['insurance_fee_percentage'] = (float) ($bnplSettings->insurance_fee_percentage ?? $payload['insurance_fee_percentage']);
+                if (!empty($loanDurations)) {
+                    $payload['repayment_tenor_min'] = (int) min($loanDurations);
+                    $payload['repayment_tenor_max'] = (int) max($loanDurations);
+                }
+            }
+
+            return ResponseHelper::success($payload, 'Loan configuration retrieved successfully');
         } catch (\Exception $e) {
             return ResponseHelper::error('Failed to retrieve loan configuration', 500);
         }
