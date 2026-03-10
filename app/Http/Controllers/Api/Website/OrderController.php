@@ -627,12 +627,15 @@ class OrderController extends Controller
             
             // installer_choice is required only for non-audit orders
             if (!$isAuditOrder) {
-                $validationRules['installer_choice'] = 'required|in:troosolar,own';
+                $validationRules['installer_choice'] = 'nullable|in:troosolar,own';
             } else {
                 $validationRules['installer_choice'] = 'nullable|in:troosolar,own';
             }
 
             $data = $request->validate($validationRules);
+            if (!$isAuditOrder && empty($data['installer_choice'])) {
+                $data['installer_choice'] = 'troosolar';
+            }
             
             // For audit orders, skip installer_choice requirement
             if ($isAuditOrder) {
@@ -877,6 +880,12 @@ class OrderController extends Controller
 
             return ResponseHelper::success($invoice, 'Invoice calculated successfully');
 
+        } catch (ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (Exception $e) {
             Log::error('Checkout Error: ' . $e->getMessage());
             return ResponseHelper::error('Failed to calculate invoice: ' . $e->getMessage(), 500);
