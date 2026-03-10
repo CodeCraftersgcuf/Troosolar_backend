@@ -67,9 +67,14 @@ class ProductSelectionController extends Controller
                     || str_contains($title, 'lithium');
                 $isInverterTitle = str_contains($title, 'inverter');
                 $isPanelTitle = str_contains($title, 'panel') || str_contains($title, 'pv');
+                $isAllInOneSystem = str_contains($title, 'all in one')
+                    || str_contains($title, 'all-in-one')
+                    || str_contains($title, 'aio')
+                    || str_contains($title, 'system');
 
                 return match ($normalizedGroup) {
-                    'battery-only' => $isBatteryTitle && !$isInverterTitle && !$isPanelTitle,
+                    // Keep battery-only to standalone battery products only
+                    'battery-only' => $isBatteryTitle && !$isInverterTitle && !$isPanelTitle && !$isAllInOneSystem,
                     'inverter-only' => $isInverterTitle && !$isBatteryTitle,
                     'panels-only' => $isPanelTitle && !$isInverterTitle && !$isBatteryTitle,
                     default => true,
