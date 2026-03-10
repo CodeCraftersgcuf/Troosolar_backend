@@ -4,8 +4,14 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CategoryRequest;
+use App\Models\Brand;
 use App\Models\Category;
+use App\Models\Material;
+use App\Models\MaterialCategory;
+use App\Models\Product;
 use App\Helpers\ResponseHelper;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Schema;
@@ -113,14 +119,58 @@ public function getProducts($id)
             return ResponseHelper::error('Category not found.', 404);
         }
 
-        $products = $category->products()
+        $query = $category->products()
             ->where('category_id', $category->id)
             ->when(Schema::hasColumn('products', 'is_available'), function ($q) {
                 $q->where('is_available', true);
             })
-            ->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0')
-            ->with(['details', 'images', 'reviews'])
-            ->get();
+            ->with(['details', 'images', 'reviews']);
+
+        // Support both numeric stock and textual values (e.g. "In Stock").
+        $normalizedStockExpr = DB::raw("LOWER(REPLACE(REPLACE(REPLACE(TRIM(stock), ' ', ''), '-', ''), '_', ''))");
+        $query->where(function (Builder $q) use ($normalizedStockExpr) {
+            $q->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0')
+                ->orWhereIn($normalizedStockExpr, ['instock', 'available', 'true', 'yes']);
+        });
+
+        $products = $query->get();
+
+        // Self-heal for categories where products were uploaded under materials/wrong category.
+        if ($products->isEmpty() && $this->isAllInOneCategoryTitle((string) $category->title)) {
+            $this->syncAllInOneProductsForCategory((int) $category->id);
+
+            $retry = $category->products()
+                ->where('category_id', $category->id)
+                ->when(Schema::hasColumn('products', 'is_available'), function ($q) {
+                    $q->where('is_available', true);
+                })
+                ->with(['details', 'images', 'reviews']);
+
+            $retry->where(function (Builder $q) use ($normalizedStockExpr) {
+                $q->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0')
+                    ->orWhereIn($normalizedStockExpr, ['instock', 'available', 'true', 'yes']);
+            });
+
+            $products = $retry->get();
+        }
+
+        if ($products->isEmpty() && $this->isAccessoriesCategoryTitle((string) $category->title)) {
+            $this->syncAccessoriesProductsForCategory((int) $category->id);
+
+            $retry = $category->products()
+                ->where('category_id', $category->id)
+                ->when(Schema::hasColumn('products', 'is_available'), function ($q) {
+                    $q->where('is_available', true);
+                })
+                ->with(['details', 'images', 'reviews']);
+
+            $retry->where(function (Builder $q) use ($normalizedStockExpr) {
+                $q->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0')
+                    ->orWhereIn($normalizedStockExpr, ['instock', 'available', 'true', 'yes']);
+            });
+
+            $products = $retry->get();
+        }
 
         return ResponseHelper::success($products, 'Products fetched by category.');
     } catch (\Exception $e) {
@@ -128,5 +178,161 @@ public function getProducts($id)
     }
 }
 
+
+private function isAllInOneCategoryTitle(string $title): bool
+{
+    $name = strtolower(trim($title));
+    return str_contains($name, 'all in one')
+        || str_contains($name, 'all-in-one')
+        || str_contains($name, 'aio')
+        || str_contains($name, 'system');
+}
+
+private function isAllInOneProductTitle(string $title): bool
+{
+    $name = strtolower(trim($title));
+    if ($name === '') {
+        return false;
+    }
+
+    return str_contains($name, 'all in one')
+        || str_contains($name, 'all-in-one')
+        || str_contains($name, 'aio')
+        || (str_contains($name, 'kva') && str_contains($name, 'kwh'));
+}
+
+private function syncAllInOneProductsForCategory(int $categoryId): void
+{
+    Product::query()
+        ->select(['id', 'title', 'category_id'])
+        ->get()
+        ->filter(fn ($product) => $this->isAllInOneProductTitle((string) ($product->title ?? '')))
+        ->each(function ($product) use ($categoryId) {
+            if ((int) $product->category_id !== $categoryId) {
+                $product->category_id = $categoryId;
+                $product->save();
+            }
+        });
+
+    $allInOneMaterialCategoryIds = MaterialCategory::query()
+        ->where('is_active', true)
+        ->where(function ($q) {
+            $q->where('code', 'C')
+                ->orWhereRaw('LOWER(name) like ?', ['%all in one%'])
+                ->orWhereRaw('LOWER(name) like ?', ['%all-in-one%'])
+                ->orWhereRaw('LOWER(name) like ?', ['%aio%'])
+                ->orWhereRaw('LOWER(name) like ?', ['%system%']);
+        })
+        ->pluck('id')
+        ->all();
+
+    if (empty($allInOneMaterialCategoryIds)) {
+        return;
+    }
+
+    $defaultBrand = Brand::query()->where('category_id', $categoryId)->first();
+    if (!$defaultBrand) {
+        $defaultBrand = Brand::first();
+    }
+    if (!$defaultBrand) {
+        return;
+    }
+
+    $materials = Material::query()
+        ->whereIn('material_category_id', $allInOneMaterialCategoryIds)
+        ->where('is_active', true)
+        ->get();
+
+    foreach ($materials as $material) {
+        if (!$this->isAllInOneProductTitle((string) ($material->name ?? ''))) {
+            continue;
+        }
+
+        Product::updateOrCreate(
+            ['title' => $material->name],
+            [
+                'category_id' => $categoryId,
+                'brand_id' => $defaultBrand->id,
+                'price' => 1000.00,
+                'discount_price' => 1000.00,
+                'stock' => 'In Stock',
+                'installation_price' => 0.00,
+                'top_deal' => false,
+                'installation_compulsory' => false,
+                'is_available' => true,
+                'featured_image' => 'https://troosolar.hmstech.org/storage/products/e212b55b-057a-4a39-8d80-d241169cdac0.png',
+            ]
+        );
+    }
+}
+
+private function isAccessoriesCategoryTitle(string $title): bool
+{
+    $name = strtolower(trim($title));
+    return str_contains($name, 'accessor');
+}
+
+private function syncAccessoriesProductsForCategory(int $categoryId): void
+{
+    $accessoryMaterialCategoryIds = MaterialCategory::query()
+        ->where('is_active', true)
+        ->where(function ($q) {
+            $q->where('code', 'S')
+                ->orWhereRaw('LOWER(name) like ?', ['%accessor%']);
+        })
+        ->pluck('id')
+        ->all();
+
+    if (empty($accessoryMaterialCategoryIds)) {
+        return;
+    }
+
+    $materials = Material::query()
+        ->whereIn('material_category_id', $accessoryMaterialCategoryIds)
+        ->where('is_active', true)
+        ->get();
+
+    if ($materials->isEmpty()) {
+        return;
+    }
+
+    // Retag already-existing products that match accessory material titles.
+    $materialNames = $materials->pluck('name')->filter()->values()->all();
+    if (!empty($materialNames)) {
+        Product::query()
+            ->whereIn('title', $materialNames)
+            ->where('category_id', '!=', $categoryId)
+            ->update(['category_id' => $categoryId]);
+    }
+
+    $defaultBrand = Brand::query()->where('category_id', $categoryId)->first();
+    if (!$defaultBrand) {
+        $defaultBrand = Brand::first();
+    }
+    if (!$defaultBrand) {
+        return;
+    }
+
+    foreach ($materials as $material) {
+        $rawRate = (float) ($material->selling_rate ?? $material->rate ?? 0);
+        $safePrice = $rawRate > 0 ? $rawRate : 1000.00;
+
+        Product::updateOrCreate(
+            ['title' => $material->name],
+            [
+                'category_id' => $categoryId,
+                'brand_id' => $defaultBrand->id,
+                'price' => $safePrice,
+                'discount_price' => $safePrice,
+                'stock' => 'In Stock',
+                'installation_price' => 0.00,
+                'top_deal' => false,
+                'installation_compulsory' => false,
+                'is_available' => true,
+                'featured_image' => 'https://troosolar.hmstech.org/storage/products/e212b55b-057a-4a39-8d80-d241169cdac0.png',
+            ]
+        );
+    }
+}
 
 }
