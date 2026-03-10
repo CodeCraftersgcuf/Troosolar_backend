@@ -41,7 +41,8 @@ use App\Http\Controllers\Api\Website\{
     ConfigurationController,
     BNPLController,
     CalendarController,
-    AuditController
+    AuditController,
+    ProductSelectionController
 };
 use App\Http\Controllers\InstallmentController;
 use App\Http\Controllers\KycController;
@@ -119,6 +120,8 @@ Route::get('/bundles', [\App\Http\Controllers\Api\Website\BundleController::clas
 Route::get('/bundles/type/{type}', [\App\Http\Controllers\Api\Website\BundleSelectionController::class, 'getBundlesByType']);
 Route::get('/bundles/{id}/details', [\App\Http\Controllers\Api\Website\BundleSelectionController::class, 'getBundleDetails']);
 Route::get('/bundles/materials/category/{categoryId}', [\App\Http\Controllers\Api\Website\BundleSelectionController::class, 'getMaterialsByCategory']);
+Route::get('/website/categories/{id}/products', [ProductSelectionController::class, 'getProductsByCategory']);
+Route::get('/website/products/group/{groupType}', [ProductSelectionController::class, 'getProductsByGroup']);
 
 // Public cart access via token (from email links - allows access before login)
 Route::get('/cart/access/{token}', [\App\Http\Controllers\Api\Website\CartController::class, 'accessCartViaToken']);

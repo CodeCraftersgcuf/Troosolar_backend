@@ -1,0 +1,98 @@
+<?php
+
+namespace App\Http\Controllers\Api\Website;
+
+use App\Helpers\ResponseHelper;
+use App\Http\Controllers\Controller;
+use App\Models\Category;
+use App\Models\Product;
+use Exception;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+class ProductSelectionController extends Controller
+{
+    public function getProductsByGroup(string $groupType)
+    {
+        try {
+            $normalizedGroup = strtolower(trim($groupType));
+
+            $categories = Category::query()
+                ->select(['id', 'title'])
+                ->get();
+
+            $matchedCategoryIds = $categories
+                ->filter(function ($category) use ($normalizedGroup) {
+                    $name = strtolower(trim((string) ($category->title ?? '')));
+
+                    $isBatteryCategory = str_contains($name, 'battery')
+                        || str_contains($name, 'batteries')
+                        || str_contains($name, 'lithium')
+                        || str_contains($name, 'battries');
+
+                    $isInverterCategory = str_contains($name, 'inverter');
+                    $isPanelCategory = str_contains($name, 'solar') || str_contains($name, 'panel');
+
+                    return match ($normalizedGroup) {
+                        'battery-only' => $isBatteryCategory,
+                        'inverter-only' => $isInverterCategory,
+                        'panels-only' => $isPanelCategory,
+                        'inverter-battery' => $isInverterCategory || $isBatteryCategory,
+                        'full-kit' => $isInverterCategory || $isBatteryCategory || $isPanelCategory,
+                        default => false,
+                    };
+                })
+                ->pluck('id')
+                ->values()
+                ->all();
+
+            if (empty($matchedCategoryIds)) {
+                return ResponseHelper::success([], 'No matching categories found for this product group.');
+            }
+
+            $query = Product::query()
+                ->with(['details', 'images', 'reviews', 'category'])
+                ->whereIn('category_id', $matchedCategoryIds);
+
+            $this->applyPublicAvailabilityFilters($query);
+
+            $products = $query->get();
+
+            return ResponseHelper::success($products, 'Products fetched successfully.');
+        } catch (Exception $e) {
+            return ResponseHelper::error('Failed to fetch products for this group.', 500);
+        }
+    }
+
+    public function getProductsByCategory($categoryId)
+    {
+        try {
+            $query = Product::query()
+                ->with(['details', 'images', 'reviews', 'category'])
+                ->where('category_id', $categoryId);
+
+            $this->applyPublicAvailabilityFilters($query);
+
+            $products = $query->get();
+
+            return ResponseHelper::success($products, 'Products fetched by category.');
+        } catch (Exception $e) {
+            return ResponseHelper::error('Failed to fetch products by category.', 500);
+        }
+    }
+
+    private function applyPublicAvailabilityFilters(Builder $query): void
+    {
+        if (Schema::hasColumn('products', 'is_available')) {
+            $query->where('is_available', true);
+        }
+
+        $normalizedStockExpr = DB::raw("LOWER(REPLACE(REPLACE(REPLACE(TRIM(stock), ' ', ''), '-', ''), '_', ''))");
+        $query->where(function (Builder $q) use ($normalizedStockExpr) {
+            $q->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0')
+                ->orWhereIn($normalizedStockExpr, ['instock', 'available', 'true', 'yes']);
+        });
+    }
+}
+
