@@ -17,6 +17,7 @@ return new class extends Migration
             $table->id();
             $table->decimal('interest_rate_percentage', 5, 2)->default(4.00)->comment('Default interest rate %');
             $table->decimal('min_down_percentage', 5, 2)->default(30.00)->comment('Minimum initial deposit % of total');
+            $table->json('down_payment_options')->nullable()->comment('Allowed down payment percentages e.g. [30,40,50]');
             $table->decimal('management_fee_percentage', 5, 2)->default(1.00);
             $table->decimal('legal_fee_percentage', 5, 2)->default(0.00);
             $table->decimal('insurance_fee_percentage', 5, 2)->default(0.50);
@@ -29,6 +30,7 @@ return new class extends Migration
         DB::table('bnpl_settings')->insert([
             'interest_rate_percentage' => 4,
             'min_down_percentage' => 30,
+            'down_payment_options' => json_encode([30, 40, 50, 60, 70, 80]),
             'management_fee_percentage' => 1,
             'legal_fee_percentage' => 0,
             'insurance_fee_percentage' => 0.5,

@@ -19,9 +19,17 @@ class BnplSettingsController extends Controller
     {
         try {
             $settings = BnplSettings::get();
+            $downPaymentOptions = is_array($settings->down_payment_options)
+                ? array_values(array_filter($settings->down_payment_options, fn($v) => is_numeric($v)))
+                : [];
+            sort($downPaymentOptions);
+            if (empty($downPaymentOptions)) {
+                $downPaymentOptions = [(float) $settings->min_down_percentage];
+            }
             return ResponseHelper::success([
                 'interest_rate_percentage' => (float) $settings->interest_rate_percentage,
                 'min_down_percentage' => (float) $settings->min_down_percentage,
+                'down_payment_options' => $downPaymentOptions,
                 'management_fee_percentage' => (float) $settings->management_fee_percentage,
                 'legal_fee_percentage' => (float) $settings->legal_fee_percentage,
                 'insurance_fee_percentage' => (float) $settings->insurance_fee_percentage,
@@ -44,6 +52,8 @@ class BnplSettingsController extends Controller
             $request->validate([
                 'interest_rate_percentage' => 'nullable|numeric|min:0|max:100',
                 'min_down_percentage' => 'nullable|numeric|min:0|max:100',
+                'down_payment_options' => 'nullable|array',
+                'down_payment_options.*' => 'numeric|min:0|max:100',
                 'management_fee_percentage' => 'nullable|numeric|min:0|max:100',
                 'legal_fee_percentage' => 'nullable|numeric|min:0|max:100',
                 'insurance_fee_percentage' => 'nullable|numeric|min:0|max:100',
@@ -59,6 +69,20 @@ class BnplSettingsController extends Controller
             }
             if ($request->has('min_down_percentage')) {
                 $settings->min_down_percentage = $request->min_down_percentage;
+            }
+            if ($request->has('down_payment_options')) {
+                $downOptions = collect($request->down_payment_options)
+                    ->filter(fn($v) => is_numeric($v))
+                    ->map(fn($v) => (float) $v)
+                    ->unique()
+                    ->sort()
+                    ->values()
+                    ->all();
+
+                $settings->down_payment_options = $downOptions;
+                if (!empty($downOptions)) {
+                    $settings->min_down_percentage = min($downOptions);
+                }
             }
             if ($request->has('management_fee_percentage')) {
                 $settings->management_fee_percentage = $request->management_fee_percentage;
@@ -80,9 +104,18 @@ class BnplSettingsController extends Controller
 
             $settings->save();
 
+            $downPaymentOptions = is_array($settings->down_payment_options)
+                ? array_values(array_filter($settings->down_payment_options, fn($v) => is_numeric($v)))
+                : [];
+            sort($downPaymentOptions);
+            if (empty($downPaymentOptions)) {
+                $downPaymentOptions = [(float) $settings->min_down_percentage];
+            }
+
             return ResponseHelper::success([
                 'interest_rate_percentage' => (float) $settings->interest_rate_percentage,
                 'min_down_percentage' => (float) $settings->min_down_percentage,
+                'down_payment_options' => $downPaymentOptions,
                 'management_fee_percentage' => (float) $settings->management_fee_percentage,
                 'legal_fee_percentage' => (float) $settings->legal_fee_percentage,
                 'insurance_fee_percentage' => (float) $settings->insurance_fee_percentage,

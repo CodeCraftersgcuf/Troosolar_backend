@@ -11,6 +11,7 @@ class BnplSettings extends Model
     protected $fillable = [
         'interest_rate_percentage',
         'min_down_percentage',
+        'down_payment_options',
         'management_fee_percentage',
         'legal_fee_percentage',
         'insurance_fee_percentage',
@@ -21,6 +22,7 @@ class BnplSettings extends Model
     protected $casts = [
         'interest_rate_percentage' => 'decimal:2',
         'min_down_percentage' => 'decimal:2',
+        'down_payment_options' => 'array',
         'management_fee_percentage' => 'decimal:2',
         'legal_fee_percentage' => 'decimal:2',
         'insurance_fee_percentage' => 'decimal:2',
@@ -38,6 +40,7 @@ class BnplSettings extends Model
             $row = self::create([
                 'interest_rate_percentage' => 4,
                 'min_down_percentage' => 30,
+                'down_payment_options' => [30, 40, 50, 60, 70, 80],
                 'management_fee_percentage' => 1,
                 'legal_fee_percentage' => 0,
                 'insurance_fee_percentage' => 0.5,

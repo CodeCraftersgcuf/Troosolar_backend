@@ -76,6 +76,7 @@ class ConfigurationController extends Controller
                 'minimum_loan_amount' => 1500000,
                 'equity_contribution_min' => 30,
                 'equity_contribution_max' => 80,
+                'down_payment_options' => [30, 40, 50, 60, 70, 80],
                 'interest_rate_min' => 4,
                 'interest_rate_max' => 4,
                 'management_fee_percentage' => 1.0,
@@ -83,6 +84,7 @@ class ConfigurationController extends Controller
                 'insurance_fee_percentage' => 0.5,
                 'repayment_tenor_min' => 1,
                 'repayment_tenor_max' => 12,
+                'loan_durations' => [3, 6, 9, 12],
             ];
 
             $payload = $defaultPayload;
@@ -111,11 +113,19 @@ class ConfigurationController extends Controller
                 sort($loanDurations);
 
                 $interest = (float) ($bnplSettings->interest_rate_percentage ?? $payload['interest_rate_max']);
-                $down = (float) ($bnplSettings->min_down_percentage ?? $payload['equity_contribution_min']);
+                $downPaymentOptions = is_array($bnplSettings->down_payment_options)
+                    ? array_values(array_filter($bnplSettings->down_payment_options, fn($d) => is_numeric($d)))
+                    : [];
+                $downPaymentOptions = array_values(array_unique(array_map('floatval', $downPaymentOptions)));
+                sort($downPaymentOptions);
+                if (empty($downPaymentOptions)) {
+                    $downPaymentOptions = [(float) ($bnplSettings->min_down_percentage ?? $payload['equity_contribution_min'])];
+                }
 
                 $payload['minimum_loan_amount'] = (float) ($bnplSettings->minimum_loan_amount ?? $payload['minimum_loan_amount']);
-                $payload['equity_contribution_min'] = $down;
-                $payload['equity_contribution_max'] = $down;
+                $payload['equity_contribution_min'] = (float) min($downPaymentOptions);
+                $payload['equity_contribution_max'] = (float) max($downPaymentOptions);
+                $payload['down_payment_options'] = $downPaymentOptions;
                 $payload['interest_rate_min'] = $interest;
                 $payload['interest_rate_max'] = $interest;
                 $payload['management_fee_percentage'] = (float) ($bnplSettings->management_fee_percentage ?? $payload['management_fee_percentage']);
@@ -124,6 +134,7 @@ class ConfigurationController extends Controller
                 if (!empty($loanDurations)) {
                     $payload['repayment_tenor_min'] = (int) min($loanDurations);
                     $payload['repayment_tenor_max'] = (int) max($loanDurations);
+                    $payload['loan_durations'] = $loanDurations;
                 }
             }
 
