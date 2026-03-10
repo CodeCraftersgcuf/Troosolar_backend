@@ -159,30 +159,48 @@ class BrandController extends Controller
 
     private function syncMissingBrandTagsForCategory(int $categoryId): void
     {
-        $brands = Brand::query()->select(['id', 'title'])->get();
+        $brands = Brand::query()->select(['id', 'title', 'category_id'])->get();
         if ($brands->isEmpty()) {
             return;
         }
 
         $products = Product::query()
             ->where('category_id', $categoryId)
-            ->whereNull('brand_id')
-            ->get(['id', 'title']);
+            ->get(['id', 'title', 'brand_id']);
+
+        if ($products->isEmpty()) {
+            return;
+        }
+
+        $brandsById = $brands->keyBy('id');
+        $sortedBrands = $brands
+            ->filter(fn ($b) => trim((string) $b->title) !== '')
+            ->sortByDesc(fn ($b) => strlen((string) $b->title))
+            ->values();
 
         foreach ($products as $product) {
-            $title = strtolower((string) $product->title);
+            $title = trim(strtolower((string) $product->title));
             if ($title === '') {
                 continue;
             }
 
-            $matchedBrand = $brands
-                ->sortByDesc(fn ($b) => strlen((string) $b->title))
-                ->first(function ($brand) use ($title) {
+            $matchedBrand = $sortedBrands->first(function ($brand) use ($title) {
                     $needle = trim(strtolower((string) $brand->title));
                     return $needle !== '' && str_contains($title, $needle);
                 });
 
-            if ($matchedBrand) {
+            if (!$matchedBrand) {
+                continue;
+            }
+
+            $currentBrand = $product->brand_id ? $brandsById->get((int) $product->brand_id) : null;
+            $currentBrandTitle = trim(strtolower((string) ($currentBrand->title ?? '')));
+            $isCurrentBrandMissing = !$currentBrand;
+            $isCurrentBrandOutsideCategory = $currentBrand && (int) ($currentBrand->category_id ?? 0) !== $categoryId;
+            $isCurrentBrandNotInTitle = $currentBrandTitle === '' || !str_contains($title, $currentBrandTitle);
+            $needsRetag = $isCurrentBrandMissing || $isCurrentBrandOutsideCategory || $isCurrentBrandNotInTitle;
+
+            if ($needsRetag && (int) $product->brand_id !== (int) $matchedBrand->id) {
                 $product->brand_id = $matchedBrand->id;
                 $product->save();
             }
