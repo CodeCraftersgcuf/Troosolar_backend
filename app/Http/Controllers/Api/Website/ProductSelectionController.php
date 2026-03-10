@@ -81,6 +81,11 @@ class ProductSelectionController extends Controller
     public function getProductsByCategory($categoryId)
     {
         try {
+            $category = Category::query()->select(['id', 'title'])->find($categoryId);
+            if (!$category) {
+                return ResponseHelper::error('Category not found.', 404);
+            }
+
             $query = Product::query()
                 ->with(['details', 'images', 'reviews', 'category'])
                 ->where('category_id', $categoryId);
@@ -88,6 +93,18 @@ class ProductSelectionController extends Controller
             $this->applyPublicAvailabilityFilters($query);
 
             $products = $query->get();
+
+            // Self-heal for categories that were historically uploaded under materials/wrong category.
+            // For All-In-One, retag existing matching products and seed from material category "C".
+            if ($products->isEmpty() && $this->isAllInOneCategoryTitle((string) $category->title)) {
+                $this->syncAllInOneProductsForCategory((int) $categoryId);
+
+                $retryQuery = Product::query()
+                    ->with(['details', 'images', 'reviews', 'category'])
+                    ->where('category_id', $categoryId);
+                $this->applyPublicAvailabilityFilters($retryQuery);
+                $products = $retryQuery->get();
+            }
 
             return ResponseHelper::success($products, 'Products fetched by category.');
         } catch (Exception $e) {
@@ -202,6 +219,97 @@ class ProductSelectionController extends Controller
                 ['title' => $material->name],
                 [
                     'category_id' => $batteryProductCategory->id,
+                    'brand_id' => $defaultBrand->id,
+                    'price' => 1000.00,
+                    'discount_price' => 1000.00,
+                    'stock' => 'In Stock',
+                    'installation_price' => 0.00,
+                    'top_deal' => false,
+                    'installation_compulsory' => false,
+                    'is_available' => true,
+                    'featured_image' => 'https://troosolar.hmstech.org/storage/products/e212b55b-057a-4a39-8d80-d241169cdac0.png',
+                ]
+            );
+        }
+    }
+
+    private function isAllInOneCategoryTitle(string $title): bool
+    {
+        $name = strtolower(trim($title));
+        return str_contains($name, 'all in one')
+            || str_contains($name, 'all-in-one')
+            || str_contains($name, 'aio')
+            || str_contains($name, 'system');
+    }
+
+    private function isAllInOneProductTitle(string $title): bool
+    {
+        $name = strtolower(trim($title));
+        if ($name === '') {
+            return false;
+        }
+
+        return str_contains($name, 'all in one')
+            || str_contains($name, 'all-in-one')
+            || str_contains($name, 'aio')
+            || (str_contains($name, 'kva') && str_contains($name, 'kwh'));
+    }
+
+    private function syncAllInOneProductsForCategory(int $categoryId): void
+    {
+        // 1) Retag existing products that clearly match all-in-one naming.
+        Product::query()
+            ->select(['id', 'title', 'category_id'])
+            ->get()
+            ->filter(function ($product) {
+                return $this->isAllInOneProductTitle((string) ($product->title ?? ''));
+            })
+            ->each(function ($product) use ($categoryId) {
+                if ((int) $product->category_id !== $categoryId) {
+                    $product->category_id = $categoryId;
+                    $product->save();
+                }
+            });
+
+        // 2) If products were uploaded only as materials, seed missing product rows from material category C.
+        $allInOneMaterialCategoryIds = MaterialCategory::query()
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->where('code', 'C')
+                    ->orWhereRaw('LOWER(name) like ?', ['%all in one%'])
+                    ->orWhereRaw('LOWER(name) like ?', ['%all-in-one%'])
+                    ->orWhereRaw('LOWER(name) like ?', ['%aio%'])
+                    ->orWhereRaw('LOWER(name) like ?', ['%system%']);
+            })
+            ->pluck('id')
+            ->all();
+
+        if (empty($allInOneMaterialCategoryIds)) {
+            return;
+        }
+
+        $defaultBrand = Brand::query()->where('category_id', $categoryId)->first();
+        if (!$defaultBrand) {
+            $defaultBrand = Brand::first();
+        }
+        if (!$defaultBrand) {
+            return;
+        }
+
+        $materials = Material::query()
+            ->whereIn('material_category_id', $allInOneMaterialCategoryIds)
+            ->where('is_active', true)
+            ->get();
+
+        foreach ($materials as $material) {
+            if (!$this->isAllInOneProductTitle((string) ($material->name ?? ''))) {
+                continue;
+            }
+
+            Product::updateOrCreate(
+                ['title' => $material->name],
+                [
+                    'category_id' => $categoryId,
                     'brand_id' => $defaultBrand->id,
                     'price' => 1000.00,
                     'discount_price' => 1000.00,
