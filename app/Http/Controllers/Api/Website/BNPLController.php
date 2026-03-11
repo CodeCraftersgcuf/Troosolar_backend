@@ -522,7 +522,7 @@ class BNPLController extends Controller
                     'has_signed_form' => !empty($application->guarantor->signed_form_path),
                     'signed_form_path' => $application->guarantor->signed_form_path,
                 ] : null,
-                'installation_requested_date' => $application->installation_requested_date?->format('Y-m-d'),
+                'installation_requested_date' => $this->formatDateValue($application->installation_requested_date, 'Y-m-d'),
                 'installation_booking_status' => $application->installation_booking_status,
                 'installation_rejected_dates' => $application->installation_rejected_dates ?? [],
                 'order_id' => $orderInfo ? $orderInfo['order_id'] : null,
