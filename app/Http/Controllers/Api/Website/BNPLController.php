@@ -17,6 +17,7 @@ use App\Models\LoanRepayment;
 use App\Models\BnplSettings;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -1121,20 +1122,25 @@ class BNPLController extends Controller
                     ->get();
                 
                 foreach ($allInstallments as $installment) {
+                    $paymentDate = $this->toCarbon($installment->payment_date);
+                    $paidAt = $this->toCarbon($installment->paid_at);
+                    $transactedAt = $installment->transaction
+                        ? $this->toCarbon($installment->transaction->transacted_at)
+                        : null;
                     $installmentData = [
                         'id' => $installment->id,
                         'installment_number' => $installment->installment_number ?? null,
                         'amount' => (float) $installment->amount,
-                        'payment_date' => $installment->payment_date ? $installment->payment_date->format('Y-m-d') : null,
+                        'payment_date' => $paymentDate ? $paymentDate->format('Y-m-d') : null,
                         'status' => $installment->status,
-                        'paid_at' => $installment->paid_at ? $installment->paid_at->format('Y-m-d H:i:s') : null,
-                        'is_overdue' => $installment->payment_date && $installment->payment_date->lt(now()) && $installment->status !== 'paid',
+                        'paid_at' => $paidAt ? $paidAt->format('Y-m-d H:i:s') : null,
+                        'is_overdue' => $paymentDate && $paymentDate->lt(now()) && $installment->status !== 'paid',
                         'transaction' => $installment->transaction ? [
                             'id' => $installment->transaction->id,
                             'tx_id' => $installment->transaction->tx_id,
                             'method' => $installment->transaction->method,
                             'amount' => (float) $installment->transaction->amount,
-                            'transacted_at' => $installment->transaction->transacted_at ? $installment->transaction->transacted_at->format('Y-m-d H:i:s') : null,
+                            'transacted_at' => $transactedAt ? $transactedAt->format('Y-m-d H:i:s') : null,
                         ] : null,
                     ];
                     $installments[] = $installmentData;
@@ -1193,7 +1199,7 @@ class BNPLController extends Controller
                     'signed_form_path' => $loanApplication->guarantor->signed_form_path,
                     'has_signed_form' => !empty($loanApplication->guarantor->signed_form_path),
                 ] : null,
-                'installation_requested_date' => $loanApplication->installation_requested_date?->format('Y-m-d'),
+                'installation_requested_date' => $this->formatDateValue($loanApplication->installation_requested_date, 'Y-m-d'),
                 'installation_booking_status' => $loanApplication->installation_booking_status,
                 'installation_rejected_dates' => $loanApplication->installation_rejected_dates ?? [],
             ] : null;
@@ -1358,7 +1364,7 @@ class BNPLController extends Controller
             $loanApplication->installation_booking_status = 'pending';
             $loanApplication->save();
             return ResponseHelper::success([
-                'installation_requested_date' => $loanApplication->installation_requested_date->format('Y-m-d'),
+                'installation_requested_date' => $this->formatDateValue($loanApplication->installation_requested_date, 'Y-m-d'),
                 'installation_booking_status' => $loanApplication->installation_booking_status,
             ], 'Installation date request submitted. You will be notified once it is confirmed.');
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -1425,5 +1431,26 @@ class BNPLController extends Controller
             'created_at' => $order->created_at->format('Y-m-d H:i:s'),
             'updated_at' => $order->updated_at->format('Y-m-d H:i:s'),
         ];
+    }
+
+    private function toCarbon($value): ?Carbon
+    {
+        if (empty($value)) {
+            return null;
+        }
+        if ($value instanceof Carbon) {
+            return $value;
+        }
+        try {
+            return Carbon::parse($value);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function formatDateValue($value, string $format): ?string
+    {
+        $date = $this->toCarbon($value);
+        return $date ? $date->format($format) : null;
     }
 }
