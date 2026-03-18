@@ -149,6 +149,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Categories, Brands, Products, Bundles
     Route::apiResource('categories', CategoryController::class);
+    // Category ordering (drag & drop)
+    Route::post('categories/reorder', [CategoryController::class, 'reorder']);
     Route::post('categories/{category}/update', [CategoryController::class, 'update']);
     Route::get('/categories/{id}/brands', [BrandController::class, 'getByCategory']);
     Route::get('/categories/{id}/products', [CategoryController::class, 'getProducts']);
