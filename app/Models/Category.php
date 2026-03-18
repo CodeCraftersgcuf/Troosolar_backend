@@ -13,6 +13,7 @@ class Category extends Model
         'title',
         'icon',
         'has_method_selection',
+        'sort_order',
     ];
 
     // Optional: Define relationship with brands

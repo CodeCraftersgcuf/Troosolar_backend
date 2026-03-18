@@ -22,7 +22,9 @@ class CategoryController extends Controller
     public function index()
     {
         try {
-            $categories = Category::all();
+            $categories = Category::query()
+                ->orderByRaw('COALESCE(sort_order, id) asc')
+                ->get();
             return ResponseHelper::success($categories, 'Categories fetched.');
         } catch (Exception $e) {
             return ResponseHelper::error('Something went wrong.', 500, $e->getMessage());
@@ -82,6 +84,33 @@ class CategoryController extends Controller
             return ResponseHelper::success($category, 'Category updated.');
         } catch (Exception $e) {
             return ResponseHelper::error('Failed to update category.', 500, $e->getMessage());
+        }
+    }
+
+    /**
+     * POST /categories/reorder
+     * Body: { "orders": [ { "id": 5, "sort_order": 1 }, ... ] }
+     */
+    public function reorder(Request $request)
+    {
+        try {
+            $entries = $request->input('orders', []);
+            if (!is_array($entries) || empty($entries)) {
+                return ResponseHelper::error('Invalid payload.', 422);
+            }
+
+            foreach ($entries as $entry) {
+                $id = $entry['id'] ?? null;
+                $order = $entry['sort_order'] ?? null;
+                if ($id === null || $order === null) {
+                    continue;
+                }
+                Category::where('id', (int) $id)->update(['sort_order' => (int) $order]);
+            }
+
+            return ResponseHelper::success(null, 'Category order updated.');
+        } catch (Exception $e) {
+            return ResponseHelper::error('Failed to reorder categories.', 500, $e->getMessage());
         }
     }
 
