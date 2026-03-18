@@ -26,6 +26,7 @@ public function index(Request $request)
 {
     try {
         $query = $request->query('q'); // accept ?q=1080 or any number
+        $kvaQuery = $request->query('kva');
         $bundleType = $request->query('bundle_type');
         $includeUnavailable = $request->boolean('include_unavailable', false);
         $isAdmin = strtolower((string) (auth()->user()->role ?? '')) === 'admin';
@@ -107,6 +108,17 @@ public function index(Request $request)
             return ResponseHelper::error('No bundles with valid inverter/load capacity found.', 404);
         }
 
+        // Helper: parse numeric kVA from strings like "4", "4kVA/24V", "3.6".
+        $parseKva = function ($value) {
+            if ($value === null || $value === '') return null;
+            $valueStr = trim((string) $value);
+            if (preg_match('/([\d.]+)/', $valueStr, $m)) {
+                $num = (float) $m[1];
+                return $num > 0 ? $num : null;
+            }
+            return null;
+        };
+
         // Exact match first
         $exact = $bundles->filter(function ($bundle) use ($q) {
             return abs(((float) ($bundle->_parsed_capacity_watts ?? 0)) - $q) < 0.0001;
@@ -131,6 +143,37 @@ public function index(Request $request)
                     $delta = abs(((float) ($bundle->_parsed_capacity_watts ?? 0)) - $q);
                     return abs($delta - $closestDelta) < 0.0001;
                 })->sortBy('_parsed_capacity_watts')->values();
+            }
+        }
+
+        // Pair recommendations:
+        // - if requested/proposed is 3.6kVA, include 4.0kVA bundles too (and vice versa)
+        // - if requested/proposed is 6.0kVA, include 6.5kVA bundles too (and vice versa)
+        // This is only applied for these groups; other recommendations remain unchanged.
+        $requestedKva = $parseKva($kvaQuery);
+        if ($requestedKva === null && !$selected->isEmpty()) {
+            $requestedKva = $parseKva($selected->first()->inver_rating ?? null);
+        }
+
+        $groupKvaStrs = [];
+        if ($requestedKva !== null) {
+            if (abs($requestedKva - 3.6) <= 0.2 || abs($requestedKva - 4.0) <= 0.2) {
+                $groupKvaStrs = ['3.6', '4.0'];
+            } elseif (abs($requestedKva - 6.0) <= 0.2 || abs($requestedKva - 6.5) <= 0.2) {
+                $groupKvaStrs = ['6.0', '6.5'];
+            }
+        }
+
+        if (!empty($groupKvaStrs)) {
+            $extra = $bundles->filter(function ($bundle) use ($parseKva, $groupKvaStrs) {
+                $kva = $parseKva($bundle->inver_rating ?? null);
+                if ($kva === null) return false;
+                $kvaStr = number_format(round($kva, 1), 1, '.', '');
+                return in_array($kvaStr, $groupKvaStrs, true);
+            })->values();
+
+            if (!$extra->isEmpty()) {
+                $selected = $selected->concat($extra)->unique('id')->values();
             }
         }
 
