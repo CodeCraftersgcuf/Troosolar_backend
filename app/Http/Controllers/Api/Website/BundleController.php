@@ -72,6 +72,22 @@ class BundleController extends Controller
     }
 
     /**
+     * Parse inverter rating string to numeric kVA (e.g., "3.6kVA/24V" -> 3.6).
+     */
+    private function parseInverterKva(?string $value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        $valueStr = trim($value);
+        if (preg_match('/([\d.]+)/', $valueStr, $m)) {
+            $num = (float) $m[1];
+            return $num > 0 ? $num : null;
+        }
+        return null;
+    }
+
+    /**
      * GET /api/bundles
      * Get all active bundles (Public endpoint for Buy Now flow).
      * When ?q={wattage} is present: treat q as target inverter capacity (in watts),
@@ -91,6 +107,7 @@ class BundleController extends Controller
                 $bundlesQuery->where('bundle_type', $bundleType);
             }
             $bundles = $bundlesQuery->get();
+            $allBundles = $bundles->values();
 
             // When q is provided (target capacity in watts), find exact/closest capacity bundles.
             if ($query !== null && $query !== '' && is_numeric($query)) {
@@ -146,6 +163,39 @@ class BundleController extends Controller
                             })
                             ->sortBy('_parsed_load_watts')
                             ->values();
+                    }
+                }
+
+                // If we have at least one closest-capacity bundle, and the *requested/proposed* inverter kVA
+                // falls into specific kVA groups (3.6/4.0 or 6.0/6.5), also include neighbours in that group.
+                // The frontend passes ?kva=3.6 etc so this is deterministic.
+                $requestedKva = $this->parseInverterKva($request->query('kva'));
+                if ($requestedKva === null && !$bundles->isEmpty()) {
+                    $primary = $bundles->first();
+                    $requestedKva = $this->parseInverterKva($primary->inver_rating ?? null);
+                }
+
+                $groupKvas = [];
+                if ($requestedKva !== null) {
+                    if (abs($requestedKva - 3.6) <= 0.2 || abs($requestedKva - 4.0) <= 0.2) {
+                        $groupKvas = [3.6, 4.0];
+                    } elseif (abs($requestedKva - 6.0) <= 0.2 || abs($requestedKva - 6.5) <= 0.2) {
+                        $groupKvas = [6.0, 6.5];
+                    }
+                }
+
+                if (!empty($groupKvas)) {
+                    $extra = $allBundles->filter(function ($bundle) use ($groupKvas) {
+                        $kva = $this->parseInverterKva($bundle->inver_rating ?? null);
+                        if ($kva === null) {
+                            return false;
+                        }
+                        $rounded = round($kva, 1);
+                        return in_array($rounded, $groupKvas, true);
+                    });
+
+                    if (!$extra->isEmpty()) {
+                        $bundles = $bundles->concat($extra)->unique('id')->values();
                     }
                 }
             }
