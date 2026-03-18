@@ -175,23 +175,24 @@ class BundleController extends Controller
                     $requestedKva = $this->parseInverterKva($primary->inver_rating ?? null);
                 }
 
-                $groupKvas = [];
+                $groupKvaStrs = [];
                 if ($requestedKva !== null) {
                     if (abs($requestedKva - 3.6) <= 0.2 || abs($requestedKva - 4.0) <= 0.2) {
-                        $groupKvas = [3.6, 4.0];
+                        $groupKvaStrs = ['3.6', '4.0'];
                     } elseif (abs($requestedKva - 6.0) <= 0.2 || abs($requestedKva - 6.5) <= 0.2) {
-                        $groupKvas = [6.0, 6.5];
+                        $groupKvaStrs = ['6.0', '6.5'];
                     }
                 }
 
-                if (!empty($groupKvas)) {
-                    $extra = $allBundles->filter(function ($bundle) use ($groupKvas) {
+                if (!empty($groupKvaStrs)) {
+                    $extra = $allBundles->filter(function ($bundle) use ($groupKvaStrs) {
                         $kva = $this->parseInverterKva($bundle->inver_rating ?? null);
                         if ($kva === null) {
                             return false;
                         }
-                        $rounded = round($kva, 1);
-                        return in_array($rounded, $groupKvas, true);
+                        // Normalize to 1-decimal string to avoid float strict-compare edge cases.
+                        $kvaStr = number_format(round($kva, 1), 1, '.', '');
+                        return in_array($kvaStr, $groupKvaStrs, true);
                     });
 
                     if (!$extra->isEmpty()) {
