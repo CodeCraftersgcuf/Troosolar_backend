@@ -796,7 +796,7 @@ class OrderController extends Controller
 
             // Insurance fee (optional for Buy Now, compulsory for BNPL)
             if ($data['include_insurance'] ?? false) {
-                $insuranceFee = round($productPrice * 0.005, 2); // 0.5% of product price
+                $insuranceFee = round($productPrice * 0.03, 2); // 3% of product price
             }
 
             // Calculate add-ons total
@@ -809,7 +809,7 @@ class OrderController extends Controller
                     $addOnPrice = $addOn->price;
                     // If price is 0, it might be calculated (like insurance)
                     if ($addOnPrice == 0 && strtolower($addOn->title) == 'insurance') {
-                        $addOnPrice = round($productPrice * 0.005, 2);
+                        $addOnPrice = round($productPrice * 0.03, 2);
                     }
                     $addOnsTotal += $addOnPrice;
                     $addOns[] = [
