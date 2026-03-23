@@ -620,6 +620,8 @@ class OrderController extends Controller
                 'property_address' => 'nullable|string',
                 'property_floors' => 'nullable|integer',
                 'property_rooms' => 'nullable|integer',
+                'contact_name' => 'nullable|string|max:255',
+                'contact_phone' => 'nullable|string|max:50',
             ];
 
             // Check if this is an audit order before validation
@@ -851,6 +853,25 @@ class OrderController extends Controller
             foreach ($columnsToCheck as $column => $value) {
                 if (\Illuminate\Support\Facades\Schema::hasColumn('orders', $column)) {
                     $orderData[$column] = $value;
+                }
+            }
+
+            // Persist installation / delivery site from Buy Now flow (dashboard sends property_* + contact_*)
+            $propAddr = trim((string) ($data['property_address'] ?? ''));
+            $propState = trim((string) ($data['property_state'] ?? ''));
+            $contactPhone = trim((string) ($data['contact_phone'] ?? ''));
+            $contactName = trim((string) ($data['contact_name'] ?? ''));
+            if ($propAddr !== '' || $propState !== '' || $contactPhone !== '' || $contactName !== '') {
+                $user = Auth::user();
+                $deliveryAddress = DeliveryAddress::create([
+                    'user_id' => Auth::id(),
+                    'phone_number' => $contactPhone !== '' ? $contactPhone : ($user->phone ?? ''),
+                    'title' => $contactName !== '' ? $contactName : 'Installation site',
+                    'address' => $propAddr !== '' ? $propAddr : ($propState !== '' ? $propState : ''),
+                    'state' => $propState !== '' ? $propState : null,
+                ]);
+                if (\Illuminate\Support\Facades\Schema::hasColumn('orders', 'delivery_address_id')) {
+                    $orderData['delivery_address_id'] = $deliveryAddress->id;
                 }
             }
 
