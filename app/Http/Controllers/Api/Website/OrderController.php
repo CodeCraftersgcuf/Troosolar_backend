@@ -84,7 +84,7 @@ class OrderController extends Controller
     {
         try {
             $user = auth()->user();
-            $isAdmin = $user->role=='admin' ;
+            $isAdmin = $this->isAuthenticatedAdmin();
 
             // Build query based on user role
             $query = Order::with(['items.itemable', 'deliveryAddress', 'user:id,first_name,sur_name,email,phone']);
@@ -105,7 +105,7 @@ class OrderController extends Controller
                 'user_type'        => $isAdmin ? 'admin' : 'user',
             ];
 
-            $formatted = $orders->map(fn ($o) => $this->formatOrder($o, ['include_user_info' => $isAdmin]))->all();
+            $formatted = $orders->map(fn ($o) => $this->formatOrder($o, []))->all();
 
             return response()->json([
                 'status'  => true,
@@ -291,11 +291,14 @@ class OrderController extends Controller
         // 8) Optional extras like installation/loan (your prior logic can stay)
         $extras = [];
         if ($order->payment_method === 'direct') {
-            $extras['installation'] = [
-                'technician_name'   => 'John Doe',
-                'installation_date' => now()->addDays(3)->toDateString(),
-                'installation_fee'  => 2000,
-            ];
+            // No placeholder technician; optional date when column exists and is set
+            if (Schema::hasColumn('orders', 'installation_requested_date') && $order->installation_requested_date) {
+                $extras['installation'] = [
+                    'installation_date' => $order->installation_requested_date instanceof \Carbon\CarbonInterface
+                        ? $order->installation_requested_date->format('Y-m-d')
+                        : (string) $order->installation_requested_date,
+                ];
+            }
         } elseif ($order->payment_method === 'loan') {
             $loan = LoanCalculation::where('user_id', $userId)->latest()->first();
             $application = LoanApplication::where('user_id', $userId)
@@ -325,7 +328,7 @@ class OrderController extends Controller
             ];
         }
 
-        $response = $this->formatOrder($order, array_merge($extras, ['include_user_info' => true]));
+        $response = $this->formatOrder($order, $extras);
 
         return ResponseHelper::success($response, 'Order placed successfully');
     });
@@ -337,16 +340,14 @@ class OrderController extends Controller
     public function show($id)
     {
         try {
-            $user = auth()->user();
-            $isAdmin = $user; // Based on your change: all authenticated users are treated as admin
-            
+            $viewer = auth()->user();
+            $isAdminViewer = $this->isAuthenticatedAdmin();
+
             $query = Order::with(['items.itemable', 'deliveryAddress', 'user:id,first_name,sur_name,email,phone']);
             
-            if (!$isAdmin) {
-                // Regular users only see their own orders
-                $query->where('user_id', $user->id);
+            if (! $isAdminViewer) {
+                $query->where('user_id', $viewer->id);
             }
-            // Admin users can see any order (no where clause needed)
             
             $order = $query->findOrFail($id);
 
@@ -373,11 +374,13 @@ class OrderController extends Controller
                 }
             }
             if ($order->payment_method === 'direct') {
-                $extras['installation'] = [
-                    'technician_name'   => 'John Doe',
-                    'installation_date' => now()->addDays(3)->toDateString(),
-                    'installation_fee'  => 2000,
-                ];
+                if (Schema::hasColumn('orders', 'installation_requested_date') && $order->installation_requested_date) {
+                    $extras['installation'] = [
+                        'installation_date' => $order->installation_requested_date instanceof \Carbon\CarbonInterface
+                            ? $order->installation_requested_date->format('Y-m-d')
+                            : (string) $order->installation_requested_date,
+                    ];
+                }
             } elseif ($order->payment_method === 'loan') {
                 $loan = LoanCalculation::where('user_id', auth()->id())->latest()->first();
                 $application = LoanApplication::where('user_id', auth()->id())
@@ -407,7 +410,16 @@ class OrderController extends Controller
                 ];
             }
 
-            $response = $this->formatOrder($order, array_merge($extras, ['include_user_info' => $isAdmin]));
+            if ($isAdminViewer && $viewer) {
+                $extras['viewer_account'] = [
+                    'id' => $viewer->id,
+                    'first_name' => $viewer->first_name,
+                    'sur_name' => $viewer->sur_name,
+                    'email' => $viewer->email,
+                ];
+            }
+
+            $response = $this->formatOrder($order, $extras);
 
             return ResponseHelper::success($response, 'Order fetched successfully');
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -492,11 +504,13 @@ class OrderController extends Controller
             'items'            => $items,
         ];
 
-        // Add user information if this is an admin request
-        if (isset($extras['include_user_info']) && $extras['include_user_info'] && $order->relationLoaded('user')) {
+        // Order owner (always when user is loaded) — My Orders / order detail must not use the viewer's profile
+        if ($order->relationLoaded('user') && $order->user) {
             $baseData['user_info'] = [
                 'id' => $order->user->id,
-                'name' => $order->user->first_name . ' ' . $order->user->sur_name,
+                'name' => trim(($order->user->first_name ?? '').' '.($order->user->sur_name ?? '')),
+                'first_name' => $order->user->first_name,
+                'sur_name' => $order->user->sur_name,
                 'email' => $order->user->email,
                 'phone' => $order->user->phone,
             ];
@@ -573,6 +587,13 @@ class OrderController extends Controller
         }
 
         $title = $itemable ? ($itemable->title ?? $itemable->name ?? null) : null;
+        $subtitle = null;
+        if ($itemable instanceof Bundles) {
+            $subtitle = $itemable->product_model ?? null;
+            if ($subtitle && $title && trim((string) $subtitle) === trim((string) $title)) {
+                $subtitle = null;
+            }
+        }
 
         return [
             'itemable_type' => strtolower(class_basename($item->itemable_type)), // "product" | "bundles"
@@ -583,6 +604,7 @@ class OrderController extends Controller
             'item'          => $itemable ? [
                 'id'             => $itemable->id,
                 'title'          => $title,
+                'subtitle'       => $subtitle,
                 'featured_image' => $featured,
             ] : null,
         ];
