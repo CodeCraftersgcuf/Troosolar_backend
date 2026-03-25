@@ -248,6 +248,7 @@ class AuditAdminController extends Controller
                     'id' => $request->id,
                     'audit_type' => $request->audit_type,
                     'customer_type' => $request->customer_type,
+                    'source' => $request->source,
                     'status' => $request->status,
                     'user' => $request->user ? [
                         'id' => $request->user->id,
@@ -325,6 +326,7 @@ class AuditAdminController extends Controller
                 ],
                 'audit_type' => $auditRequest->audit_type,
                 'customer_type' => $auditRequest->customer_type,
+                'source' => $auditRequest->source,
                 'property_state' => $auditRequest->property_state,
                 'property_address' => $auditRequest->property_address,
                 'contact_name' => $auditRequest->contact_name,

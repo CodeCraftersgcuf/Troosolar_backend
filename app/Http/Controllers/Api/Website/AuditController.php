@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class AuditController extends Controller
@@ -22,20 +23,51 @@ class AuditController extends Controller
     public function submit(Request $request)
     {
         try {
-            // Validate required fields
-            // For home-office: property_state and property_address are required
-            // For commercial: all property details are optional (admin will gather details)
+            // Buy Now flow sends source=buy_now and must include full property + contact for all audit types.
+            // BNPL may omit source or send bnpl; commercial audits can still be submitted with minimal fields.
+            $isBuyNow = $request->input('source') === 'buy_now';
+            $isHomeOffice = $request->input('audit_type') === 'home-office';
+
             $data = $request->validate([
                 'audit_type' => 'required|in:home-office,commercial',
                 'customer_type' => 'nullable|in:residential,sme,commercial',
-                // Property fields - required for home-office, optional for commercial
-                'property_state' => 'required_if:audit_type,home-office|nullable|string|max:255',
-                'property_address' => 'required_if:audit_type,home-office|nullable|string',
+                'source' => 'nullable|in:buy_now,bnpl',
+                'property_state' => [
+                    Rule::requiredIf(fn () => $isBuyNow || $isHomeOffice),
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
+                'property_address' => [
+                    Rule::requiredIf(fn () => $isBuyNow || $isHomeOffice),
+                    'nullable',
+                    'string',
+                ],
                 'property_landmark' => 'nullable|string|max:255',
-                'property_floors' => 'nullable|integer|min:0',
-                'property_rooms' => 'nullable|integer|min:0',
-                'contact_name' => 'nullable|string|max:255',
-                'contact_phone' => 'nullable|string|max:30',
+                'property_floors' => [
+                    Rule::requiredIf(fn () => $isBuyNow || $isHomeOffice),
+                    'nullable',
+                    'integer',
+                    'min:0',
+                ],
+                'property_rooms' => [
+                    Rule::requiredIf(fn () => $isBuyNow || $isHomeOffice),
+                    'nullable',
+                    'integer',
+                    'min:0',
+                ],
+                'contact_name' => [
+                    Rule::requiredIf(fn () => $isBuyNow || $isHomeOffice),
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
+                'contact_phone' => [
+                    Rule::requiredIf(fn () => $isBuyNow || $isHomeOffice),
+                    'nullable',
+                    'string',
+                    'max:30',
+                ],
                 'is_gated_estate' => 'nullable|boolean',
                 'estate_name' => 'nullable|required_if:is_gated_estate,true|string|max:255',
                 'estate_address' => 'nullable|required_if:is_gated_estate,true|string',
@@ -81,6 +113,12 @@ class AuditController extends Controller
                 'estate_address' => !empty($data['estate_address']) ? (string) $data['estate_address'] : null,
             ];
 
+            if (Schema::hasColumn('audit_requests', 'source')) {
+                $auditData['source'] = isset($data['source']) && $data['source'] !== ''
+                    ? (string) $data['source']
+                    : 'bnpl';
+            }
+
             // Log the data being inserted for debugging
             Log::info('Creating audit request', [
                 'user_id' => $userId,
@@ -122,6 +160,7 @@ class AuditController extends Controller
                 'estate_name' => $auditRequest->estate_name,
                 'estate_address' => $auditRequest->estate_address,
                 'has_property_details' => !empty($auditRequest->property_address), // Indicates if user provided details
+                'source' => Schema::hasColumn('audit_requests', 'source') ? $auditRequest->source : null,
                 'created_at' => $auditRequest->created_at->toIso8601String(),
             ], $message);
 
@@ -204,6 +243,7 @@ class AuditController extends Controller
                 'is_gated_estate' => $auditRequest->is_gated_estate,
                 'estate_name' => $auditRequest->estate_name,
                 'estate_address' => $auditRequest->estate_address,
+                'source' => Schema::hasColumn('audit_requests', 'source') ? $auditRequest->source : null,
                 'admin_notes' => $auditRequest->admin_notes,
                 'approved_by' => $auditRequest->approver ? [
                     'id' => $auditRequest->approver->id,
@@ -245,6 +285,7 @@ class AuditController extends Controller
                         'contact_phone' => $request->contact_phone,
                         'order_id' => $request->order_id,
                         'order_number' => $request->order?->order_number,
+                        'source' => Schema::hasColumn('audit_requests', 'source') ? $request->source : null,
                         'created_at' => $request->created_at->toIso8601String(),
                     ];
                 }),

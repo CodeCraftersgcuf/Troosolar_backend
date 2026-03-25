@@ -14,6 +14,7 @@ class AuditRequest extends Model
         'order_id',
         'audit_type',
         'customer_type',
+        'source',
         'property_state',
         'property_address',
         'property_landmark',
