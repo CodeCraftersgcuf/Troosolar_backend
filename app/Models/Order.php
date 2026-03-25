@@ -27,7 +27,13 @@ class Order extends Model
         'insurance_fee',
         'order_type',
         'audit_request_id',
+        'installation_requested_date',
     ];
+
+    protected $casts = [
+        'installation_requested_date' => 'date',
+    ];
+
     public function product()
     {
         return $this->belongsTo(\App\Models\Product::class);

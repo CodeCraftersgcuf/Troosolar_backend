@@ -54,6 +54,17 @@ class OrderController extends Controller
         return max(0, round($amount - (($amount * $pct) / 100), 2));
     }
 
+    /** Admin role can be stored as "admin", "Admin", etc. */
+    private function isAuthenticatedAdmin(): bool
+    {
+        $user = Auth::user();
+        if (! $user || ! isset($user->role)) {
+            return false;
+        }
+
+        return in_array(strtolower((string) $user->role), ['admin', 'superadmin', 'super_admin'], true);
+    }
+
     /**
      * GET /api/orders
      * Returns orders for the authenticated user.
@@ -340,6 +351,13 @@ class OrderController extends Controller
             $order = $query->findOrFail($id);
 
             $extras = [];
+            // Buy Now: delivery row missing on relation but FK set (or legacy load)
+            if (($order->order_type ?? null) === 'buy_now' && ! $order->deliveryAddress && $order->delivery_address_id) {
+                $addr = DeliveryAddress::find($order->delivery_address_id);
+                if ($addr) {
+                    $extras['delivery_address'] = $addr;
+                }
+            }
             // BNPL orders: use application's property address when order has no delivery address
             if (($order->order_type ?? null) === 'bnpl' && !$order->deliveryAddress && $order->mono_calculation_id) {
                 $bnplApplication = LoanApplication::where('mono_loan_calculation', $order->mono_calculation_id)
@@ -424,8 +442,26 @@ class OrderController extends Controller
 
     private function formatOrder(Order $order, array $extras = []): array
     {
-        $items = $order->items->map(fn ($i) => $this->formatOrderItem($i))->all();
+        $order->loadMissing(['items.itemable']);
+        $items = $order->items->isNotEmpty()
+            ? $order->items->map(fn ($i) => $this->formatOrderItem($i))->all()
+            : $this->buildSyntheticFormattedOrderItems($order);
         $totalPrice = (float) $order->total_price;
+        // Amount-only checkout (no product_id / bundle_id) — still return one line for the dashboard
+        if (count($items) === 0 && $totalPrice > 0) {
+            $items = [[
+                'itemable_type' => 'order',
+                'itemable_id'   => null,
+                'quantity'      => 1,
+                'unit_price'    => (string) round($totalPrice, 2),
+                'subtotal'      => (string) round($totalPrice, 2),
+                'item'          => [
+                    'id'               => null,
+                    'title'            => 'Purchase',
+                    'featured_image'   => null,
+                ],
+            ]];
+        }
         $totalQuantity = array_sum(array_map(fn ($i) => (int) ($i['quantity'] ?? 1), $items));
         // When items have zero unit_price/subtotal (e.g. BNPL snapshot), distribute order total proportionally
         if ($totalPrice > 0 && $totalQuantity > 0 && count($items) > 0) {
@@ -469,6 +505,54 @@ class OrderController extends Controller
         return array_merge($baseData, $extras);
     }
 
+    /**
+     * Legacy Buy Now orders often have product_id/bundle_id on orders but no order_items rows.
+     * Build one display line so GET /orders/{id} shows the real bundle/product name and matches order total.
+     */
+    private function buildSyntheticFormattedOrderItems(Order $order): array
+    {
+        $total = (float) ($order->total_price ?? 0);
+        if ($total <= 0) {
+            return [];
+        }
+
+        if ($order->bundle_id) {
+            $bundle = Bundles::with('bundleItems.product')->find($order->bundle_id);
+            if ($bundle) {
+                $fake = new OrderItem([
+                    'order_id'      => $order->id,
+                    'itemable_type' => Bundles::class,
+                    'itemable_id'   => $bundle->id,
+                    'quantity'      => 1,
+                    'unit_price'    => number_format($total, 2, '.', ''),
+                    'subtotal'      => number_format($total, 2, '.', ''),
+                ]);
+                $fake->setRelation('itemable', $bundle);
+
+                return [$this->formatOrderItem($fake)];
+            }
+        }
+
+        if ($order->product_id) {
+            $product = Product::find($order->product_id);
+            if ($product) {
+                $fake = new OrderItem([
+                    'order_id'      => $order->id,
+                    'itemable_type' => Product::class,
+                    'itemable_id'   => $product->id,
+                    'quantity'      => 1,
+                    'unit_price'    => number_format($total, 2, '.', ''),
+                    'subtotal'      => number_format($total, 2, '.', ''),
+                ]);
+                $fake->setRelation('itemable', $product);
+
+                return [$this->formatOrderItem($fake)];
+            }
+        }
+
+        return [];
+    }
+
     private function formatOrderItem(OrderItem $item): array
     {
         $itemable = $item->itemable; // Product | Bundles | null
@@ -488,6 +572,8 @@ class OrderController extends Controller
             }
         }
 
+        $title = $itemable ? ($itemable->title ?? $itemable->name ?? null) : null;
+
         return [
             'itemable_type' => strtolower(class_basename($item->itemable_type)), // "product" | "bundles"
             'itemable_id'   => $item->itemable_id,
@@ -496,7 +582,7 @@ class OrderController extends Controller
             'subtotal'      => $item->subtotal,
             'item'          => $itemable ? [
                 'id'             => $itemable->id,
-                'title'          => $itemable->title ?? null,
+                'title'          => $title,
                 'featured_image' => $featured,
             ] : null,
         ];
@@ -509,6 +595,7 @@ class OrderController extends Controller
             'orderId' => 'required|integer|exists:orders,id',
             'txId' => 'required|string',
             'type' => 'required|in:direct,audit,wallet',
+            'installation_requested_date' => 'nullable|date|date_format:Y-m-d',
         ]);
 
         $amount = $request->amount;
@@ -540,6 +627,9 @@ class OrderController extends Controller
     }
 
     $order->payment_status="paid";
+        if ($request->filled('installation_requested_date') && Schema::hasColumn('orders', 'installation_requested_date')) {
+            $order->installation_requested_date = $request->installation_requested_date;
+        }
     $order->update();
 
         // Determine transaction title based on type
@@ -878,6 +968,27 @@ class OrderController extends Controller
             // Create order record for Buy Now
             $order = Order::create($orderData);
 
+            // Line items for My Orders / GET /orders/{id} (legacy orders had empty order_items)
+            if ($productId && $product) {
+                OrderItem::create([
+                    'order_id'      => $order->id,
+                    'itemable_type' => Product::class,
+                    'itemable_id'   => $product->id,
+                    'quantity'      => 1,
+                    'unit_price'    => round($total, 2),
+                    'subtotal'      => round($total, 2),
+                ]);
+            } elseif ($bundleId && $bundle) {
+                OrderItem::create([
+                    'order_id'      => $order->id,
+                    'itemable_type' => Bundles::class,
+                    'itemable_id'   => $bundle->id,
+                    'quantity'      => 1,
+                    'unit_price'    => round($total, 2),
+                    'subtotal'      => round($total, 2),
+                ]);
+            }
+
             $invoice = [
                 'order_id' => $order->id,
                 'product_price' => $productPrice,
@@ -920,7 +1031,7 @@ class OrderController extends Controller
     public function getBuyNowOrders(Request $request)
     {
         try {
-            $query = Order::with(['items.itemable', 'deliveryAddress', 'user:id,first_name,sur_name,email,phone'])
+            $query = Order::with(['items.itemable', 'deliveryAddress', 'bundle', 'product', 'user:id,first_name,sur_name,email,phone'])
                 ->where('order_type', 'buy_now');
 
             // Filter by status
@@ -955,7 +1066,7 @@ class OrderController extends Controller
     public function getBuyNowOrder($id)
     {
         try {
-            $order = Order::with(['items.itemable', 'deliveryAddress', 'user'])
+            $order = Order::with(['items.itemable', 'deliveryAddress', 'bundle', 'product', 'user'])
                 ->where('order_type', 'buy_now')
                 ->findOrFail($id);
 
@@ -1221,11 +1332,10 @@ class OrderController extends Controller
     public function getOrderSummary($id)
     {
         try {
-            $user = Auth::user();
-            $isAdmin = $user && $user->role === 'admin';
+            $isAdmin = $this->isAuthenticatedAdmin();
 
             // Build query - admins can view any order, users can only view their own
-            $query = Order::with(['product.category', 'bundle.bundleItems.product.category', 'user'])
+            $query = Order::with(['product.category', 'bundle.bundleItems.product.category', 'user', 'deliveryAddress'])
                 ->where('id', $id);
 
             if (!$isAdmin) {
@@ -1320,6 +1430,37 @@ class OrderController extends Controller
                 // Continue with empty items array rather than failing completely
             }
 
+            // Bundle linked but no component rows — still show the selected bundle as one line
+            if ($order->bundle && count($items) === 0) {
+                $bundle = $order->bundle;
+                $pp = Schema::hasColumn('orders', 'product_price') ? (float) ($order->product_price ?? 0) : 0;
+                if ($pp <= 0) {
+                    $bundleDiscount = (float) ($bundle->discount_price ?? 0);
+                    $basePrice = (float) ($bundle->total_price ?? 0);
+                    $pp = $bundleDiscount > 0 ? $bundleDiscount : $basePrice;
+                }
+                if ($pp <= 0) {
+                    $pp = (float) ($order->total_price ?? 0);
+                }
+                $desc = trim((string) ($bundle->product_model ?? ''));
+                if ($desc === '') {
+                    $desc = trim((string) ($bundle->what_is_inside_bundle_text ?? $bundle->detailed_description ?? ''));
+                }
+                $items[] = [
+                    'name' => $bundle->title ?? 'Bundle',
+                    'description' => $desc !== '' ? $desc : ($bundle->title ?? 'Bundle'),
+                    'quantity' => 1,
+                    'price' => round($pp, 2),
+                ];
+            }
+
+            $installationRequested = null;
+            if (Schema::hasColumn('orders', 'installation_requested_date') && $order->installation_requested_date) {
+                $installationRequested = $order->installation_requested_date instanceof \Carbon\CarbonInterface
+                    ? $order->installation_requested_date->format('Y-m-d')
+                    : (string) $order->installation_requested_date;
+            }
+
             return ResponseHelper::success([
                 'order_id' => $order->id,
                 'order_number' => $order->order_number ?? null,
@@ -1327,6 +1468,10 @@ class OrderController extends Controller
                 'appliances' => $appliances,
                 'backup_time' => $backupTime,
                 'total_price' => $order->total_price ?? 0,
+                'bundle_title' => $order->bundle?->title,
+                'product_title' => $order->product?->title,
+                'delivery_address' => $order->deliveryAddress,
+                'installation_requested_date' => $installationRequested,
             ], 'Order summary retrieved successfully');
 
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -1408,10 +1553,14 @@ class OrderController extends Controller
     public function getInvoiceDetails($id)
     {
         try {
-            $order = Order::with(['product.category', 'bundle.bundleItems.product.category'])
-                ->where('id', $id)
-                ->where('user_id', Auth::id())
-                ->first();
+            $query = Order::with(['product.category', 'bundle.bundleItems.product.category', 'deliveryAddress'])
+                ->where('id', $id);
+
+            if (! $this->isAuthenticatedAdmin()) {
+                $query->where('user_id', Auth::id());
+            }
+
+            $order = $query->first();
 
             if (!$order) {
                 return ResponseHelper::error('Order not found', 404);
@@ -1435,9 +1584,20 @@ class OrderController extends Controller
                 $totalPrice
             );
 
+            $installationRequested = null;
+            if (Schema::hasColumn('orders', 'installation_requested_date') && $order->installation_requested_date) {
+                $installationRequested = $order->installation_requested_date instanceof \Carbon\CarbonInterface
+                    ? $order->installation_requested_date->format('Y-m-d')
+                    : (string) $order->installation_requested_date;
+            }
+
             return ResponseHelper::success([
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
+                'bundle_title' => $order->bundle?->title,
+                'product_title' => $order->product?->title,
+                'delivery_address' => $order->deliveryAddress,
+                'installation_requested_date' => $installationRequested,
                 'invoice' => [
                     'solar_inverter' => $productBreakdown['solar_inverter'],
                     'solar_panels' => $productBreakdown['solar_panels'],
