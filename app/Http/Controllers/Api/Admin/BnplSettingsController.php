@@ -34,6 +34,7 @@ class BnplSettingsController extends Controller
                 'legal_fee_percentage' => (float) $settings->legal_fee_percentage,
                 'insurance_fee_percentage' => (float) $settings->insurance_fee_percentage,
                 'minimum_loan_amount' => (float) $settings->minimum_loan_amount,
+                'credit_check_fee' => (float) ($settings->credit_check_fee ?? 1000),
                 'loan_durations' => $settings->loan_durations ?? [3, 6, 9, 12],
             ], 'BNPL settings retrieved successfully');
         } catch (Exception $e) {
@@ -58,6 +59,7 @@ class BnplSettingsController extends Controller
                 'legal_fee_percentage' => 'nullable|numeric|min:0|max:100',
                 'insurance_fee_percentage' => 'nullable|numeric|min:0|max:100',
                 'minimum_loan_amount' => 'nullable|numeric|min:0',
+                'credit_check_fee' => 'nullable|numeric|min:0',
                 'loan_durations' => 'nullable|array',
                 'loan_durations.*' => 'integer|min:1|max:120',
             ]);
@@ -96,6 +98,9 @@ class BnplSettingsController extends Controller
             if ($request->has('minimum_loan_amount')) {
                 $settings->minimum_loan_amount = $request->minimum_loan_amount;
             }
+            if ($request->has('credit_check_fee')) {
+                $settings->credit_check_fee = $request->credit_check_fee;
+            }
             if ($request->has('loan_durations')) {
                 $durations = $request->loan_durations;
                 sort($durations);
@@ -120,6 +125,7 @@ class BnplSettingsController extends Controller
                 'legal_fee_percentage' => (float) $settings->legal_fee_percentage,
                 'insurance_fee_percentage' => (float) $settings->insurance_fee_percentage,
                 'minimum_loan_amount' => (float) $settings->minimum_loan_amount,
+                'credit_check_fee' => (float) ($settings->credit_check_fee ?? 1000),
                 'loan_durations' => $settings->loan_durations ?? [3, 6, 9, 12],
             ], 'BNPL settings updated successfully');
         } catch (\Illuminate\Validation\ValidationException $e) {

@@ -82,6 +82,7 @@ class ConfigurationController extends Controller
                 'management_fee_percentage' => 1.0,
                 'residual_fee_percentage' => 1.0,
                 'insurance_fee_percentage' => 0.5,
+                'credit_check_fee' => 1000,
                 'repayment_tenor_min' => 1,
                 'repayment_tenor_max' => 12,
                 'loan_durations' => [3, 6, 9, 12],
@@ -131,6 +132,7 @@ class ConfigurationController extends Controller
                 $payload['management_fee_percentage'] = (float) ($bnplSettings->management_fee_percentage ?? $payload['management_fee_percentage']);
                 $payload['residual_fee_percentage'] = (float) ($bnplSettings->legal_fee_percentage ?? $payload['residual_fee_percentage']);
                 $payload['insurance_fee_percentage'] = (float) ($bnplSettings->insurance_fee_percentage ?? $payload['insurance_fee_percentage']);
+                $payload['credit_check_fee'] = (float) ($bnplSettings->credit_check_fee ?? $payload['credit_check_fee']);
                 if (!empty($loanDurations)) {
                     $payload['repayment_tenor_min'] = (int) min($loanDurations);
                     $payload['repayment_tenor_max'] = (int) max($loanDurations);

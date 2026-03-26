@@ -15,11 +15,13 @@ use App\Models\Product;
 use App\Models\LoanInstallment;
 use App\Models\LoanRepayment;
 use App\Models\BnplSettings;
+use App\Mail\BNPLApplicationSubmittedEmail;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use App\Services\ReferralRewardService;
 
@@ -324,6 +326,18 @@ class BNPLController extends Controller
                 'status' => 'pending',
                 'order_items_snapshot' => !empty($orderItemsSnapshot) ? $orderItemsSnapshot : null,
             ]);
+
+            // Send application submitted email (non-blocking for the main flow)
+            try {
+                $user = Auth::user();
+                if ($user && !empty($user->email)) {
+                    Mail::to($user->email)->send(new BNPLApplicationSubmittedEmail($user, $loanApplication));
+                }
+            } catch (\Exception $mailException) {
+                Log::warning('BNPL submission email failed: ' . $mailException->getMessage(), [
+                    'loan_application_id' => $loanApplication->id ?? null,
+                ]);
+            }
 
             return ResponseHelper::success([
                 'loan_application' => $loanApplication,

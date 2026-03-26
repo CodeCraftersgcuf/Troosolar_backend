@@ -16,6 +16,7 @@ class BnplSettings extends Model
         'legal_fee_percentage',
         'insurance_fee_percentage',
         'minimum_loan_amount',
+        'credit_check_fee',
         'loan_durations',
     ];
 
@@ -27,6 +28,7 @@ class BnplSettings extends Model
         'legal_fee_percentage' => 'decimal:2',
         'insurance_fee_percentage' => 'decimal:2',
         'minimum_loan_amount' => 'decimal:2',
+        'credit_check_fee' => 'decimal:2',
         'loan_durations' => 'array',
     ];
 
@@ -45,6 +47,7 @@ class BnplSettings extends Model
                 'legal_fee_percentage' => 0,
                 'insurance_fee_percentage' => 0.5,
                 'minimum_loan_amount' => 0,
+                'credit_check_fee' => 1000,
                 'loan_durations' => [3, 6, 9, 12],
             ]);
         }
