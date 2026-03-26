@@ -22,7 +22,7 @@ class BNPLApplicationSubmittedEmail extends Mailable
     {
         $this->user = $user;
         $this->application = $application;
-        $frontendUrl = rtrim(config('app.frontend_url', 'https://troosolar.hmstech.org'), '/');
+        $frontendUrl = rtrim(config('app.frontend_url', 'https://app.troosolar.io'), '/');
         $this->applicationUrl = $frontendUrl . '/bnpl-loans/app-' . $application->id;
     }
 

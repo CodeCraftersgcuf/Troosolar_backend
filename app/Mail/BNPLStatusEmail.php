@@ -35,7 +35,7 @@ class BNPLStatusEmail extends Mailable
         $this->application = $application;
         $this->status = $status;
 
-        $frontendUrl = rtrim(config('app.frontend_url', 'https://troosolar.hmstech.org'), '/');
+        $frontendUrl = rtrim(config('app.frontend_url', 'https://app.troosolar.io'), '/');
         $this->continueUrl = $frontendUrl . '/bnpl-loans/app-' . $application->id;
 
         $this->downPayment = $application->mono ? (float) $application->mono->down_payment : null;
