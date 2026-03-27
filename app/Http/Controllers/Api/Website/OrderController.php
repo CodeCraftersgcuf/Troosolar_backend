@@ -1144,7 +1144,13 @@ class OrderController extends Controller
     public function getBnplOrders(Request $request)
     {
         try {
-            $query = Order::with(['items.itemable', 'deliveryAddress', 'user:id,first_name,sur_name,email,phone', 'monoCalculation']);
+            $query = Order::with([
+                'items.itemable',
+                'deliveryAddress',
+                'user:id,first_name,sur_name,email,phone',
+                'monoCalculation',
+                'loanApplication:id,user_id,mono_loan_calculation,customer_type,product_category,property_state,property_address,property_landmark,property_floors,property_rooms,is_gated_estate,estate_name,estate_address,credit_check_method,social_media_handle,repayment_duration,loan_amount,order_items_snapshot,created_at',
+            ]);
             
             // BNPL orders: either have order_type='bnpl' OR have mono_calculation_id (for backward compatibility)
             // This handles cases where order_type column exists but might be NULL for older orders
@@ -1199,7 +1205,13 @@ class OrderController extends Controller
     public function getBnplOrder($id)
     {
         try {
-            $query = Order::with(['items.itemable', 'deliveryAddress', 'user', 'monoCalculation']);
+            $query = Order::with([
+                'items.itemable',
+                'deliveryAddress',
+                'user',
+                'monoCalculation',
+                'loanApplication:id,user_id,mono_loan_calculation,customer_type,product_category,property_state,property_address,property_landmark,property_floors,property_rooms,is_gated_estate,estate_name,estate_address,credit_check_method,social_media_handle,repayment_duration,loan_amount,order_items_snapshot,created_at',
+            ]);
             
             // BNPL orders: either have order_type='bnpl' OR have mono_calculation_id
             if (Schema::hasColumn('orders', 'order_type')) {
@@ -1218,6 +1230,69 @@ class OrderController extends Controller
             }
             
             $order = $query->findOrFail($id);
+
+            // Fallback for legacy BNPL orders where order_items table is empty:
+            // derive order items from loan_application.order_items_snapshot.
+            if ($order->items()->count() === 0 && $order->loanApplication && is_array($order->loanApplication->order_items_snapshot)) {
+                $snapshot = $order->loanApplication->order_items_snapshot;
+
+                $bundleIds = collect($snapshot)
+                    ->where('itemable_type', Bundles::class)
+                    ->pluck('itemable_id')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+                $productIds = collect($snapshot)
+                    ->where('itemable_type', Product::class)
+                    ->pluck('itemable_id')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                $bundleMap = !empty($bundleIds)
+                    ? Bundles::whereIn('id', $bundleIds)->get()->keyBy('id')
+                    : collect();
+                $productMap = !empty($productIds)
+                    ? Product::whereIn('id', $productIds)->get()->keyBy('id')
+                    : collect();
+
+                $derivedItems = collect($snapshot)->map(function ($row, $idx) use ($bundleMap, $productMap) {
+                    $itemableType = $row['itemable_type'] ?? null;
+                    $itemableId = $row['itemable_id'] ?? null;
+                    $qty = (int) ($row['quantity'] ?? 1);
+                    $unitPrice = (float) ($row['unit_price'] ?? 0);
+                    $subtotal = (float) ($row['subtotal'] ?? ($unitPrice * $qty));
+
+                    $name = "Item " . ($idx + 1);
+                    $type = null;
+
+                    if ($itemableType === Bundles::class && $itemableId && $bundleMap->has($itemableId)) {
+                        $bundle = $bundleMap->get($itemableId);
+                        $name = $bundle->title ?? $bundle->name ?? $name;
+                        $type = 'bundle';
+                    } elseif ($itemableType === Product::class && $itemableId && $productMap->has($itemableId)) {
+                        $product = $productMap->get($itemableId);
+                        $name = $product->title ?? $product->name ?? $name;
+                        $type = 'product';
+                    }
+
+                    return [
+                        'id' => null,
+                        'name' => $name,
+                        'title' => $name,
+                        'type' => $type,
+                        'quantity' => $qty,
+                        'unit_price' => $unitPrice,
+                        'subtotal' => $subtotal,
+                        'itemable_type' => $itemableType,
+                        'itemable_id' => $itemableId,
+                    ];
+                })->values();
+
+                $order->setRelation('items', $derivedItems);
+            }
 
             return ResponseHelper::success($order, 'BNPL order retrieved successfully');
         } catch (Exception $e) {

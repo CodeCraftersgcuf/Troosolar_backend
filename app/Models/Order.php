@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\LoanApplication;
 
 class Order extends Model
 {
@@ -62,6 +63,11 @@ class Order extends Model
     public function monoCalculation() {
     return $this->belongsTo(MonoLoanCalculation::class, 'mono_calculation_id');
 }
+
+    public function loanApplication()
+    {
+        return $this->hasOne(LoanApplication::class, 'mono_loan_calculation', 'mono_calculation_id');
+    }
 
     public function auditRequest()
     {
