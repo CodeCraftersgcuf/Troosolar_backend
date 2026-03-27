@@ -158,10 +158,17 @@ class BNPLController extends Controller
                 'bundle_ids.*' => 'integer|exists:bundles,id',
                 'product_ids' => 'nullable|array',
                 'product_ids.*' => 'integer|exists:products,id',
+                'loan_plan_snapshot' => 'nullable|string',
             ]));
 
             // Get loan amount (minimum validation removed - no minimum requirement)
             $loanAmount = (float) $data['loan_amount'];
+
+            $planSnapshot = null;
+            if (! empty($data['loan_plan_snapshot'])) {
+                $decoded = json_decode($data['loan_plan_snapshot'], true);
+                $planSnapshot = is_array($decoded) ? $decoded : null;
+            }
 
             // Build order_items_snapshot from bundle_ids and product_ids for creating order items when down payment is confirmed
             $orderItemsSnapshot = [];
@@ -277,26 +284,61 @@ class BNPLController extends Controller
             // Get or create MonoLoanCalculation if loan calculation exists
             $monoLoanCalculationId = null;
             if ($loanCalculation) {
+                $repaymentDuration = (int) ($data['repayment_duration'] ?? $loanCalculation->repayment_duration);
+                $principalFinanced = $planSnapshot
+                    ? (float) ($planSnapshot['principal'] ?? $planSnapshot['totalLoanAmount'] ?? 0)
+                    : 0.0;
+                $upfrontWithFees = $planSnapshot
+                    ? (float) ($planSnapshot['depositAmount'] ?? 0)
+                    : 0.0;
+                $bundlePlusFeesTotal = $planSnapshot
+                    ? (float) ($planSnapshot['totalAmount'] ?? 0)
+                    : 0.0;
+
                 // Check if MonoLoanCalculation exists for this LoanCalculation
                 $monoLoanCalculation = MonoLoanCalculation::where('loan_calculation_id', $loanCalculation->id)->first();
-                
-                if (!$monoLoanCalculation) {
-                    $monoLoanCalculation = MonoLoanCalculation::create([
-                        'loan_calculation_id' => $loanCalculation->id,
-                        'loan_amount' => $loanAmount,
-                        'repayment_duration' => (int) ($data['repayment_duration'] ?? $loanCalculation->repayment_duration),
-                        'down_payment' => round($loanAmount * ((float) ($settings->min_down_percentage ?? 30) / 100), 2),
-                        'total_amount' => $loanAmount,
-                        'status' => 'pending',
-                        'interest_rate' => $settings->interest_rate_percentage,
-                        'management_fee_percentage' => $settings->management_fee_percentage,
-                        'legal_fee_percentage' => $settings->legal_fee_percentage,
-                        'insurance_fee_percentage' => $settings->insurance_fee_percentage,
-                    ]);
+
+                if (! $monoLoanCalculation) {
+                    if ($planSnapshot && $principalFinanced > 0 && $upfrontWithFees > 0) {
+                        $monoLoanCalculation = MonoLoanCalculation::create([
+                            'loan_calculation_id' => $loanCalculation->id,
+                            'loan_amount' => $principalFinanced,
+                            'repayment_duration' => $repaymentDuration,
+                            'down_payment' => $upfrontWithFees,
+                            'total_amount' => $bundlePlusFeesTotal > 0 ? $bundlePlusFeesTotal : ($principalFinanced + $upfrontWithFees),
+                            'status' => 'pending',
+                            'interest_rate' => $planSnapshot['interestRate'] ?? $planSnapshot['interest_rate'] ?? $settings->interest_rate_percentage,
+                            'management_fee_percentage' => $settings->management_fee_percentage,
+                            'legal_fee_percentage' => $settings->legal_fee_percentage,
+                            'insurance_fee_percentage' => $settings->insurance_fee_percentage,
+                        ]);
+                    } else {
+                        $monoLoanCalculation = MonoLoanCalculation::create([
+                            'loan_calculation_id' => $loanCalculation->id,
+                            'loan_amount' => $loanAmount,
+                            'repayment_duration' => $repaymentDuration,
+                            'down_payment' => round($loanAmount * ((float) ($settings->min_down_percentage ?? 30) / 100), 2),
+                            'total_amount' => $loanAmount,
+                            'status' => 'pending',
+                            'interest_rate' => $settings->interest_rate_percentage,
+                            'management_fee_percentage' => $settings->management_fee_percentage,
+                            'legal_fee_percentage' => $settings->legal_fee_percentage,
+                            'insurance_fee_percentage' => $settings->insurance_fee_percentage,
+                        ]);
+                    }
+                } elseif ($planSnapshot && $principalFinanced > 0 && $upfrontWithFees > 0) {
+                    $monoLoanCalculation->loan_amount = $principalFinanced;
+                    $monoLoanCalculation->down_payment = $upfrontWithFees;
+                    $monoLoanCalculation->total_amount = $bundlePlusFeesTotal > 0 ? $bundlePlusFeesTotal : ($principalFinanced + $upfrontWithFees);
+                    $monoLoanCalculation->repayment_duration = $repaymentDuration;
+                    if (isset($planSnapshot['interestRate']) || isset($planSnapshot['interest_rate'])) {
+                        $monoLoanCalculation->interest_rate = $planSnapshot['interestRate'] ?? $planSnapshot['interest_rate'];
+                    }
+                    $monoLoanCalculation->save();
                 }
-                
+
                 $monoLoanCalculationId = $monoLoanCalculation->id;
-                
+
                 // Update loan calculation status
                 $loanCalculation->status = 'submitted';
                 $loanCalculation->save();
@@ -325,6 +367,7 @@ class BNPLController extends Controller
                 'social_media_handle' => $personalDetails['social_media'] ?? null,
                 'status' => 'pending',
                 'order_items_snapshot' => !empty($orderItemsSnapshot) ? $orderItemsSnapshot : null,
+                'loan_plan_snapshot' => $planSnapshot,
             ]);
 
             // Send application submitted email (non-blocking for the main flow)
@@ -441,18 +484,8 @@ class BNPLController extends Controller
                 return ResponseHelper::error('Application not found', 404);
             }
 
-            // Get loan calculation details if available
-            $loanCalculationDetails = null;
-            if ($application->mono_loan_calculation && $application->mono) {
-                $monoLoan = $application->mono;
-                $loanCalculationDetails = [
-                    'loan_amount' => number_format((float) ($monoLoan->loan_amount ?? $application->loan_amount), 2),
-                    'repayment_duration' => $monoLoan->repayment_duration ?? $application->repayment_duration,
-                    'down_payment' => number_format((float) ($monoLoan->down_payment ?? 0), 2),
-                    'total_amount' => number_format((float) ($monoLoan->total_amount ?? 0), 2),
-                    'interest_rate' => $monoLoan->interest_rate ?? null,
-                ];
-            }
+            // Prefer stored loan plan snapshot (matches "Review Your Loan Plan" in the dashboard)
+            $loanCalculationDetails = $this->buildLoanCalculationForStatus($application);
 
             // If down payment was done, an order exists for this application's mono – return it so frontend can show order view
             $orderInfo = null;
@@ -525,6 +558,7 @@ class BNPLController extends Controller
                 'social_media_handle' => $application->social_media_handle,
                 'bank_statement_path' => $application->bank_statement_path,
                 'live_photo_path' => $application->live_photo_path,
+                'loan_plan_snapshot' => $application->loan_plan_snapshot,
                 'loan_calculation' => $loanCalculationDetails,
                 'counter_offer_details' => $counterOfferDetails,
                 'guarantor' => $application->guarantor ? [
@@ -1466,5 +1500,61 @@ class BNPLController extends Controller
     {
         $date = $this->toCarbon($value);
         return $date ? $date->format($format) : null;
+    }
+
+    /**
+     * Build loan_calculation payload for GET /bnpl/status — aligned with BNPL flow snapshot when present.
+     */
+    private function buildLoanCalculationForStatus(LoanApplication $application): ?array
+    {
+        $snapshot = $application->loan_plan_snapshot;
+        if (is_array($snapshot) && ! empty($snapshot)) {
+            $principal = (float) ($snapshot['principal'] ?? $snapshot['totalLoanAmount'] ?? 0);
+            $upfront = (float) ($snapshot['depositAmount'] ?? 0);
+            $totalProduct = (float) ($snapshot['totalAmount'] ?? 0);
+            $totalRep = (float) ($snapshot['totalRepayment'] ?? $snapshot['totalRepaymentAmount'] ?? (float) $application->loan_amount);
+            $monthly = (float) ($snapshot['monthlyRepayment'] ?? $snapshot['monthlyRepaymentAmount'] ?? 0);
+            $tenor = (int) ($snapshot['tenor'] ?? $application->repayment_duration ?? 0);
+            $interestRate = (float) ($snapshot['interestRate'] ?? $snapshot['interest_rate'] ?? 0);
+            if ($interestRate <= 0 && $application->mono) {
+                $interestRate = (float) ($application->mono->interest_rate ?? 0);
+            }
+            $monoInterestFallback = $application->mono ? $application->mono->interest_rate : null;
+            $totalInterestAmt = (float) ($snapshot['totalInterestAmount'] ?? $snapshot['totalInterest'] ?? 0);
+
+            return [
+                'loan_amount' => number_format($principal, 2),
+                'principal_amount' => number_format($principal, 2),
+                'total_repayment' => number_format($totalRep, 2),
+                'repayment_duration' => $tenor,
+                'down_payment' => number_format($upfront, 2),
+                'total_amount' => number_format($totalProduct > 0 ? $totalProduct : ($principal + $upfront), 2),
+                'monthly_repayment' => number_format($monthly, 2),
+                'interest_rate' => $interestRate > 0 ? number_format($interestRate, 2, '.', '') : $monoInterestFallback,
+                'total_interest_amount' => number_format($totalInterestAmt, 2),
+                'insurance_fee' => isset($snapshot['insuranceFee']) ? number_format((float) $snapshot['insuranceFee'], 2) : null,
+                'management_fee' => isset($snapshot['managementFee']) ? number_format((float) $snapshot['managementFee'], 2) : null,
+                'legal_fee' => isset($snapshot['legalFee']) ? number_format((float) $snapshot['legalFee'], 2) : null,
+                'admin_fees_total' => isset($snapshot['adminFeesTotal']) ? number_format((float) $snapshot['adminFeesTotal'], 2) : null,
+                'deposit_percent' => $snapshot['depositPercent'] ?? null,
+                'base_deposit_amount' => isset($snapshot['baseDepositAmount']) ? number_format((float) $snapshot['baseDepositAmount'], 2) : null,
+            ];
+        }
+
+        if ($application->mono_loan_calculation && $application->mono) {
+            $monoLoan = $application->mono;
+
+            return [
+                'loan_amount' => number_format((float) ($monoLoan->loan_amount ?? $application->loan_amount), 2),
+                'repayment_duration' => $monoLoan->repayment_duration ?? $application->repayment_duration,
+                'down_payment' => number_format((float) ($monoLoan->down_payment ?? 0), 2),
+                'total_amount' => number_format((float) ($monoLoan->total_amount ?? 0), 2),
+                'interest_rate' => $monoLoan->interest_rate ?? null,
+                'monthly_repayment' => null,
+                'total_interest_amount' => null,
+            ];
+        }
+
+        return null;
     }
 }

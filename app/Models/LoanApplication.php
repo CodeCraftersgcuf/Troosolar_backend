@@ -39,14 +39,16 @@ class LoanApplication extends Model
     'admin_notes',
     'counter_offer_min_deposit',
     'counter_offer_min_tenor',
-    'order_items_snapshot',
-    'installation_requested_date',
+        'order_items_snapshot',
+        'loan_plan_snapshot',
+        'installation_requested_date',
     'installation_booking_status',
     'installation_rejected_dates',
 ];
 
     protected $casts = [
         'order_items_snapshot' => 'array',
+        'loan_plan_snapshot' => 'array',
         'installation_rejected_dates' => 'array',
     ];
 
