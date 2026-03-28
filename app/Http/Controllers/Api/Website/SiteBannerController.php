@@ -10,22 +10,22 @@ use Illuminate\Http\Request;
 class SiteBannerController extends Controller
 {
     /**
-     * Get current home promotion banner (public, no auth).
+     * Home + sidebar promotion banners (public, no auth).
      * GET /api/site/banner
+     *
+     * Legacy fields `url` and `path` mirror the home banner for older clients.
      */
-    public function show()
+    public function show(Request $request)
     {
-        $banner = SiteBanner::where('key', SiteBanner::KEY_HOME_PROMO)->first();
-        $url = null;
-        if ($banner && !empty($banner->path)) {
-            $url = $banner->path;
-            if (!str_starts_with($url, 'http')) {
-                $url = rtrim(config('app.url'), '/') . '/' . ltrim($url, '/');
-            }
-        }
+        $home = SiteBanner::where('key', SiteBanner::KEY_HOME_PROMO)->first();
+        $sidebar = SiteBanner::where('key', SiteBanner::KEY_SIDEBAR_PROMO)->first();
+        $homePayload = SiteBanner::apiPayload($request, $home);
+
         return ResponseHelper::success([
-            'url' => $url,
-            'path' => $banner->path ?? null,
-        ], 'Banner retrieved');
+            'home' => $homePayload,
+            'sidebar' => SiteBanner::apiPayload($request, $sidebar),
+            'url' => $homePayload['url'],
+            'path' => $homePayload['path'],
+        ], 'Banners retrieved');
     }
 }

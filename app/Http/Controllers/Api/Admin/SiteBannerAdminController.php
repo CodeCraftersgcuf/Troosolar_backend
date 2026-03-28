@@ -12,42 +12,44 @@ use Illuminate\Support\Facades\Log;
 class SiteBannerAdminController extends Controller
 {
     /**
-     * Get current banner (admin).
+     * Home + sidebar banners (admin).
      * GET /api/admin/site/banner
      */
-    public function show()
+    public function show(Request $request)
     {
-        $banner = SiteBanner::where('key', SiteBanner::KEY_HOME_PROMO)->first();
-        $url = null;
-        if ($banner && !empty($banner->path)) {
-            $url = $banner->path;
-            if (!str_starts_with($url, 'http')) {
-                $url = rtrim(config('app.url'), '/') . '/' . ltrim($url, '/');
-            }
-        }
+        $home = SiteBanner::where('key', SiteBanner::KEY_HOME_PROMO)->first();
+        $sidebar = SiteBanner::where('key', SiteBanner::KEY_SIDEBAR_PROMO)->first();
+        $homePayload = SiteBanner::apiPayload($request, $home);
+
         return ResponseHelper::success([
-            'url' => $url,
-            'path' => $banner->path ?? null,
-        ], 'Banner retrieved');
+            'home' => $homePayload,
+            'sidebar' => SiteBanner::apiPayload($request, $sidebar),
+            'url' => $homePayload['url'],
+            'path' => $homePayload['path'],
+        ], 'Banners retrieved');
     }
 
     /**
-     * Upload or replace home promotion banner.
-     * POST /api/admin/site/banner
+     * Upload or replace a promotion banner.
+     * POST /api/admin/site/banner  (multipart: banner, placement=home|sidebar)
      */
     public function store(Request $request)
     {
         try {
             $request->validate([
                 'banner' => 'required|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'placement' => 'nullable|in:home,sidebar',
             ]);
             $file = $request->file('banner');
             $dir = 'banners';
-            $name = 'home_promotion_' . time() . '.' . $file->getClientOriginalExtension();
+            $isSidebar = $request->input('placement') === 'sidebar';
+            $prefix = $isSidebar ? 'sidebar_promotion_' : 'home_promotion_';
+            $name = $prefix . time() . '.' . $file->getClientOriginalExtension();
             $file->move(public_path($dir), $name);
             $path = $dir . '/' . $name;
 
-            $banner = SiteBanner::firstOrNew(['key' => SiteBanner::KEY_HOME_PROMO]);
+            $key = $isSidebar ? SiteBanner::KEY_SIDEBAR_PROMO : SiteBanner::KEY_HOME_PROMO;
+            $banner = SiteBanner::firstOrNew(['key' => $key]);
             $oldPath = $banner->path;
             $banner->path = $path;
             $banner->save();
@@ -56,10 +58,12 @@ class SiteBannerAdminController extends Controller
                 @unlink(public_path($oldPath));
             }
 
-            $url = rtrim(config('app.url'), '/') . '/' . ltrim($path, '/');
+            $payload = SiteBanner::apiPayload($request, $banner);
+
             return ResponseHelper::success([
-                'url' => $url,
-                'path' => $path,
+                'placement' => $isSidebar ? 'sidebar' : 'home',
+                'url' => $payload['url'],
+                'path' => $payload['path'],
             ], 'Banner updated successfully');
         } catch (\Illuminate\Validation\ValidationException $e) {
             throw $e;
@@ -70,13 +74,21 @@ class SiteBannerAdminController extends Controller
     }
 
     /**
-     * Remove home promotion banner.
-     * DELETE /api/admin/site/banner
+     * Remove a promotion banner.
+     * DELETE /api/admin/site/banner?placement=home|sidebar
      */
-    public function destroy()
+    public function destroy(Request $request)
     {
         try {
-            $banner = SiteBanner::where('key', SiteBanner::KEY_HOME_PROMO)->first();
+            $request->validate([
+                'placement' => 'nullable|in:home,sidebar',
+            ]);
+            $raw = $request->query('placement') ?? $request->input('placement');
+            $placement = $raw === 'sidebar' ? 'sidebar' : 'home';
+            $key = $placement === 'sidebar'
+                ? SiteBanner::KEY_SIDEBAR_PROMO
+                : SiteBanner::KEY_HOME_PROMO;
+            $banner = SiteBanner::where('key', $key)->first();
             if ($banner && $banner->path && is_file(public_path($banner->path))) {
                 @unlink(public_path($banner->path));
             }
@@ -84,7 +96,10 @@ class SiteBannerAdminController extends Controller
                 $banner->path = null;
                 $banner->save();
             }
+
             return ResponseHelper::success(null, 'Banner removed');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (Exception $e) {
             Log::error('Site banner delete error: ' . $e->getMessage());
             return ResponseHelper::error('Failed to remove banner', 500);
