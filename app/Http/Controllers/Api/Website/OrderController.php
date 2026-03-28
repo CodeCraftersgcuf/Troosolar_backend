@@ -16,6 +16,7 @@ use App\Helpers\ResponseHelper;
 use App\Models\CartItem;
 use App\Models\DeliveryAddress;
 use App\Models\Transaction;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -1207,6 +1208,8 @@ class OrderController extends Controller
         try {
             $query = Order::with([
                 'items.itemable',
+                'bundle',
+                'product',
                 'deliveryAddress',
                 'user',
                 'monoCalculation.loanInstallments.transaction.user',
@@ -1297,6 +1300,9 @@ class OrderController extends Controller
 
             $repaymentExtras = $this->buildAdminBnplRepaymentPayload($order);
             $payload = array_merge($order->toArray(), $repaymentExtras);
+            if ($order->deliveryAddress) {
+                $payload['delivery_address'] = $this->formatDeliveryAddressForApi($order->deliveryAddress, $order->user);
+            }
 
             return ResponseHelper::success($payload, 'BNPL order retrieved successfully');
         } catch (Exception $e) {
@@ -1447,6 +1453,87 @@ class OrderController extends Controller
                 'interest_rate' => $mono->interest_rate,
             ],
         ];
+    }
+
+    /**
+     * Resolve bundle/product for invoice & summary when order.bundle_id / product_id are empty
+     * (common for BNPL: bundle stored on polymorphic order_items or loan_application.order_items_snapshot).
+     *
+     * @return array{0: ?Product, 1: ?Bundles}
+     */
+    private function resolveOrderBundleAndProductForInvoice(Order $order): array
+    {
+        $product = $order->product_id ? $order->product : null;
+        $bundle = $order->bundle_id ? $order->bundle : null;
+
+        if ($bundle) {
+            $bundle->loadMissing(['bundleItems.product.category']);
+        }
+        if ($product) {
+            $product->loadMissing('category');
+        }
+        if ($bundle || $product) {
+            return [$product, $bundle];
+        }
+
+        $order->loadMissing(['items.itemable']);
+        foreach ($order->items as $orderItem) {
+            $itemable = $orderItem->itemable;
+            if ($itemable instanceof Bundles) {
+                $itemable->loadMissing(['bundleItems.product.category']);
+
+                return [null, $itemable];
+            }
+            if ($itemable instanceof Product) {
+                $itemable->loadMissing('category');
+
+                return [$itemable, null];
+            }
+        }
+
+        $order->loadMissing('loanApplication');
+        $application = $order->loanApplication;
+        if ($application && is_array($application->order_items_snapshot)) {
+            foreach ($application->order_items_snapshot as $row) {
+                $type = (string) ($row['itemable_type'] ?? '');
+                $oid = $row['itemable_id'] ?? null;
+                if ($oid === null || $type === '') {
+                    continue;
+                }
+                if (class_exists($type) && is_a($type, Bundles::class, true)) {
+                    $b = Bundles::with(['bundleItems.product.category'])->find((int) $oid);
+                    if ($b) {
+                        return [null, $b];
+                    }
+                }
+                if (class_exists($type) && is_a($type, Product::class, true)) {
+                    $p = Product::with('category')->find((int) $oid);
+                    if ($p) {
+                        return [$p, null];
+                    }
+                }
+            }
+        }
+
+        return [null, null];
+    }
+
+    /**
+     * API: show customer name as site contact when delivery row title is the BNPL placeholder.
+     */
+    private function formatDeliveryAddressForApi(?DeliveryAddress $address, ?User $user): ?array
+    {
+        if (! $address) {
+            return null;
+        }
+        $data = $address->toArray();
+        $customerName = $user ? trim((string) ($user->first_name ?? '').' '.(string) ($user->sur_name ?? '')) : '';
+        $title = trim((string) ($data['title'] ?? ''));
+        if ($customerName !== '' && ($title === '' || strcasecmp($title, 'BNPL delivery') === 0)) {
+            $data['title'] = $customerName;
+        }
+
+        return $data;
     }
 
     /**
@@ -1645,7 +1732,14 @@ class OrderController extends Controller
             $isAdmin = $this->isAuthenticatedAdmin();
 
             // Build query - admins can view any order, users can only view their own
-            $query = Order::with(['product.category', 'bundle.bundleItems.product.category', 'user', 'deliveryAddress'])
+            $query = Order::with([
+                'product.category',
+                'bundle.bundleItems.product.category',
+                'user',
+                'deliveryAddress',
+                'items.itemable',
+                'loanApplication',
+            ])
                 ->where('id', $id);
 
             if (!$isAdmin) {
@@ -1663,13 +1757,15 @@ class OrderController extends Controller
                 return ResponseHelper::error('Order not found', 404);
             }
 
+            [$resolvedProduct, $resolvedBundle] = $this->resolveOrderBundleAndProductForInvoice($order);
+
             $items = [];
             $appliances = 'Standard household appliances';
             $backupTime = '8-12 hours (depending on usage)';
 
             try {
-                if ($order->bundle) {
-                    $bundle = $order->bundle;
+                if ($resolvedBundle) {
+                    $bundle = $resolvedBundle;
                     $bundleItems = $bundle->bundleItems()->with('product.category')->get();
                     
                     foreach ($bundleItems as $item) {
@@ -1696,8 +1792,8 @@ class OrderController extends Controller
                     if (isset($bundle->total_output) && $bundle->total_output) {
                         $backupTime = $this->calculateBackupTime($bundle->total_output, $bundle->total_load ?? 1000);
                     }
-                } elseif ($order->product) {
-                    $product = $order->product;
+                } elseif ($resolvedProduct) {
+                    $product = $resolvedProduct;
                     $productDetails = [];
                     try {
                         if (method_exists($product, 'details') && $product->details) {
@@ -1741,8 +1837,8 @@ class OrderController extends Controller
             }
 
             // Bundle linked but no component rows — still show the selected bundle as one line
-            if ($order->bundle && count($items) === 0) {
-                $bundle = $order->bundle;
+            if ($resolvedBundle && count($items) === 0) {
+                $bundle = $resolvedBundle;
                 $pp = Schema::hasColumn('orders', 'product_price') ? (float) ($order->product_price ?? 0) : 0;
                 if ($pp <= 0) {
                     $bundleDiscount = (float) ($bundle->discount_price ?? 0);
@@ -1778,9 +1874,9 @@ class OrderController extends Controller
                 'appliances' => $appliances,
                 'backup_time' => $backupTime,
                 'total_price' => $order->total_price ?? 0,
-                'bundle_title' => $order->bundle?->title,
-                'product_title' => $order->product?->title,
-                'delivery_address' => $order->deliveryAddress,
+                'bundle_title' => $resolvedBundle?->title ?? $order->bundle?->title,
+                'product_title' => $resolvedProduct?->title ?? $order->product?->title,
+                'delivery_address' => $this->formatDeliveryAddressForApi($order->deliveryAddress, $order->user),
                 'installation_requested_date' => $installationRequested,
             ], 'Order summary retrieved successfully');
 
@@ -1863,7 +1959,14 @@ class OrderController extends Controller
     public function getInvoiceDetails($id)
     {
         try {
-            $query = Order::with(['product.category', 'bundle.bundleItems.product.category', 'deliveryAddress'])
+            $query = Order::with([
+                'product.category',
+                'bundle.bundleItems.product.category',
+                'deliveryAddress',
+                'user',
+                'items.itemable',
+                'loanApplication',
+            ])
                 ->where('id', $id);
 
             if (! $this->isAuthenticatedAdmin()) {
@@ -1876,9 +1979,7 @@ class OrderController extends Controller
                 return ResponseHelper::error('Order not found', 404);
             }
 
-            // Get product and bundle with proper null checks
-            $product = $order->product;
-            $bundle = $order->bundle;
+            [$product, $bundle] = $this->resolveOrderBundleAndProductForInvoice($order);
             
             // Calculate total price for breakdown
             $totalPrice = 0;
@@ -1904,9 +2005,9 @@ class OrderController extends Controller
             return ResponseHelper::success([
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
-                'bundle_title' => $order->bundle?->title,
-                'product_title' => $order->product?->title,
-                'delivery_address' => $order->deliveryAddress,
+                'bundle_title' => $bundle?->title ?? $order->bundle?->title,
+                'product_title' => $product?->title ?? $order->product?->title,
+                'delivery_address' => $this->formatDeliveryAddressForApi($order->deliveryAddress, $order->user),
                 'installation_requested_date' => $installationRequested,
                 'invoice' => [
                     'solar_inverter' => $productBreakdown['solar_inverter'],
