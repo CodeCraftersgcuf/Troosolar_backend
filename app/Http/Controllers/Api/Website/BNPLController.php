@@ -1155,7 +1155,7 @@ class BNPLController extends Controller
             // Get loan application linked to this order
             $loanApplication = null;
             if ($order->mono_calculation_id) {
-                $loanApplication = LoanApplication::with(['guarantor'])
+                $loanApplication = LoanApplication::with(['guarantor', 'mono'])
                     ->where('mono_loan_calculation', $order->mono_calculation_id)
                     ->where('user_id', $userId)
                     ->first();
@@ -1240,6 +1240,7 @@ class BNPLController extends Controller
                 'repayment_duration' => $loanApplication->repayment_duration,
                 'property_address' => $loanApplication->property_address,
                 'property_state' => $loanApplication->property_state,
+                'loan_plan_snapshot' => $loanApplication->loan_plan_snapshot,
                 'guarantor' => $loanApplication->guarantor ? [
                     'id' => $loanApplication->guarantor->id,
                     'full_name' => $loanApplication->guarantor->full_name,
@@ -1251,6 +1252,9 @@ class BNPLController extends Controller
                 'installation_booking_status' => $loanApplication->installation_booking_status,
                 'installation_rejected_dates' => $loanApplication->installation_rejected_dates ?? [],
             ] : null;
+            $orderData['loan_calculation'] = $loanApplication
+                ? $this->buildLoanCalculationForStatus($loanApplication)
+                : null;
             $orderData['repayment_schedule'] = $repaymentSchedule;
             $orderData['repayment_summary'] = [
                 'total_installments' => $totalInstallments,
@@ -1543,15 +1547,26 @@ class BNPLController extends Controller
 
         if ($application->mono_loan_calculation && $application->mono) {
             $monoLoan = $application->mono;
+            $principal = (float) ($monoLoan->loan_amount ?? 0);
+            $tenor = (int) ($monoLoan->repayment_duration ?? $application->repayment_duration ?? 0);
+            $totalRepFromApp = (float) ($application->loan_amount ?? 0);
+            $totalRep = $totalRepFromApp > 0 ? $totalRepFromApp : $principal;
+            $monthly = ($tenor > 0 && $totalRep > 0) ? ($totalRep / $tenor) : null;
+            $rate = (float) ($monoLoan->interest_rate ?? 0);
+            $totalInterest = ($principal > 0 && $rate > 0 && $tenor > 0)
+                ? (($rate / 100) * $principal * $tenor)
+                : null;
 
             return [
-                'loan_amount' => number_format((float) ($monoLoan->loan_amount ?? $application->loan_amount), 2),
-                'repayment_duration' => $monoLoan->repayment_duration ?? $application->repayment_duration,
+                'loan_amount' => number_format((float) ($monoLoan->loan_amount ?? $application->loan_amount ?? 0), 2),
+                'principal_amount' => number_format($principal, 2),
+                'repayment_duration' => $tenor,
                 'down_payment' => number_format((float) ($monoLoan->down_payment ?? 0), 2),
                 'total_amount' => number_format((float) ($monoLoan->total_amount ?? 0), 2),
                 'interest_rate' => $monoLoan->interest_rate ?? null,
-                'monthly_repayment' => null,
-                'total_interest_amount' => null,
+                'monthly_repayment' => $monthly !== null ? number_format($monthly, 2) : null,
+                'total_repayment' => $totalRep > 0 ? number_format($totalRep, 2) : null,
+                'total_interest_amount' => $totalInterest !== null ? number_format($totalInterest, 2) : null,
             ];
         }
 
