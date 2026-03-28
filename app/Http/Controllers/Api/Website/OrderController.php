@@ -1209,7 +1209,8 @@ class OrderController extends Controller
                 'items.itemable',
                 'deliveryAddress',
                 'user',
-                'monoCalculation',
+                'monoCalculation.loanInstallments.transaction.user',
+                'monoCalculation.loanRepayments.user',
                 'loanApplication:id,user_id,mono_loan_calculation,customer_type,product_category,property_state,property_address,property_landmark,property_floors,property_rooms,is_gated_estate,estate_name,estate_address,credit_check_method,social_media_handle,repayment_duration,loan_amount,order_items_snapshot,loan_plan_snapshot,created_at',
             ]);
             
@@ -1294,7 +1295,10 @@ class OrderController extends Controller
                 $order->setRelation('items', $derivedItems);
             }
 
-            return ResponseHelper::success($order, 'BNPL order retrieved successfully');
+            $repaymentExtras = $this->buildAdminBnplRepaymentPayload($order);
+            $payload = array_merge($order->toArray(), $repaymentExtras);
+
+            return ResponseHelper::success($payload, 'BNPL order retrieved successfully');
         } catch (Exception $e) {
             Log::error('BNPL Order Admin Error: ' . $e->getMessage(), [
                 'order_id' => $id,
@@ -1302,6 +1306,147 @@ class OrderController extends Controller
             ]);
             return ResponseHelper::error('Failed to retrieve BNPL order: ' . $e->getMessage(), 500);
         }
+    }
+
+    /**
+     * Admin BNPL order detail: repayment schedule, summary, and history for tracking.
+     */
+    private function buildAdminBnplRepaymentPayload(Order $order): array
+    {
+        $mono = $order->monoCalculation;
+        $orderUser = $order->user;
+        $orderCustomerName = $orderUser
+            ? trim((string) ($orderUser->first_name ?? '').' '.(string) ($orderUser->sur_name ?? ''))
+            : null;
+
+        if (! $mono) {
+            return [
+                'repayment_schedule' => [],
+                'repayment_summary' => [
+                    'total_installments' => 0,
+                    'paid_installments' => 0,
+                    'pending_installments' => 0,
+                    'overdue_installments' => 0,
+                    'total_amount' => 0.0,
+                    'paid_amount' => 0.0,
+                    'pending_amount' => 0.0,
+                    'overdue_amount' => 0.0,
+                    'order_customer_id' => $order->user_id,
+                    'order_customer_name' => $orderCustomerName,
+                    'order_customer_email' => $orderUser?->email,
+                ],
+                'repayment_history' => [],
+                'loan_details' => null,
+            ];
+        }
+
+        $mono->loadMissing(['loanInstallments.transaction.user', 'loanRepayments.user']);
+
+        $sortedInstallments = $mono->loanInstallments->sortBy(function ($inst) {
+            return $inst->payment_date ? $inst->payment_date->timestamp : 0;
+        })->values();
+
+        $installments = [];
+        foreach ($sortedInstallments as $installment) {
+            $paymentDate = $installment->payment_date;
+            $paidAt = $installment->paid_at;
+            $trans = $installment->transaction;
+            $transactedAt = $trans ? $trans->transacted_at : null;
+            $payer = $trans && $trans->relationLoaded('user') ? $trans->user : null;
+            if ($trans && ! $payer && $trans->user_id) {
+                $trans->loadMissing('user');
+                $payer = $trans->user;
+            }
+            $payerName = $payer
+                ? trim((string) ($payer->first_name ?? '').' '.(string) ($payer->sur_name ?? ''))
+                : null;
+            $paidByLabel = $installment->status === 'paid'
+                ? ($payerName ?: $orderCustomerName ?: ($orderUser ? 'Customer #'.$orderUser->id : 'Customer'))
+                : null;
+
+            $isOverdue = $paymentDate && $paymentDate->lt(now()) && $installment->status !== 'paid';
+
+            $installmentData = [
+                'id' => $installment->id,
+                'installment_number' => $installment->installment_number ?? null,
+                'amount' => (float) $installment->amount,
+                'payment_date' => $paymentDate ? $paymentDate->format('Y-m-d') : null,
+                'status' => $installment->status,
+                'paid_at' => $paidAt ? $paidAt->format('Y-m-d H:i:s') : null,
+                'is_overdue' => $isOverdue,
+                'computed_status' => $installment->computed_status,
+                'paid_by_display' => $paidByLabel,
+                'transaction' => $trans ? [
+                    'id' => $trans->id,
+                    'tx_id' => $trans->tx_id,
+                    'method' => $trans->method,
+                    'amount' => (float) $trans->amount,
+                    'transacted_at' => $transactedAt ? $transactedAt->format('Y-m-d H:i:s') : null,
+                    'user_id' => $trans->user_id,
+                    'payer_name' => $payerName,
+                    'payer_email' => $payer?->email,
+                ] : null,
+            ];
+            $installments[] = $installmentData;
+        }
+
+        $totalInstallments = count($installments);
+        $paidInstallments = count(array_filter($installments, fn ($i) => $i['status'] === 'paid'));
+        $pendingInstallments = count(array_filter($installments, fn ($i) => $i['status'] !== 'paid'));
+        $overdueInstallments = count(array_filter($installments, fn ($i) => $i['is_overdue'] === true));
+        $totalAmount = array_sum(array_column($installments, 'amount'));
+        $paidAmount = array_sum(array_column(array_filter($installments, fn ($i) => $i['status'] === 'paid'), 'amount'));
+        $pendingAmount = $totalAmount - $paidAmount;
+        $overdueAmount = array_sum(array_column(array_filter($installments, fn ($i) => $i['is_overdue'] === true), 'amount'));
+
+        $repayments = [];
+        $repaymentRows = $mono->loanRepayments->sortByDesc(function ($r) {
+            return $r->created_at ? $r->created_at->timestamp : 0;
+        })->values();
+        foreach ($repaymentRows as $repayment) {
+            $ru = $repayment->relationLoaded('user') ? $repayment->user : null;
+            if (! $ru && $repayment->user_id) {
+                $repayment->loadMissing('user');
+                $ru = $repayment->user;
+            }
+            $repPayerName = $ru
+                ? trim((string) ($ru->first_name ?? '').' '.(string) ($ru->sur_name ?? ''))
+                : null;
+            $repayments[] = [
+                'id' => $repayment->id,
+                'amount' => (float) $repayment->amount,
+                'status' => $repayment->status,
+                'created_at' => $repayment->created_at->format('Y-m-d H:i:s'),
+                'user_id' => $repayment->user_id,
+                'payer_name' => $repPayerName ?: ($orderCustomerName ?: null),
+                'payer_email' => $ru?->email,
+            ];
+        }
+
+        return [
+            'repayment_schedule' => $installments,
+            'repayment_summary' => [
+                'total_installments' => $totalInstallments,
+                'paid_installments' => $paidInstallments,
+                'pending_installments' => $pendingInstallments,
+                'overdue_installments' => $overdueInstallments,
+                'total_amount' => $totalAmount,
+                'paid_amount' => $paidAmount,
+                'pending_amount' => $pendingAmount,
+                'overdue_amount' => $overdueAmount,
+                'order_customer_id' => $order->user_id,
+                'order_customer_name' => $orderCustomerName,
+                'order_customer_email' => $orderUser?->email,
+            ],
+            'repayment_history' => $repayments,
+            'loan_details' => [
+                'loan_amount' => (float) ($mono->loan_amount ?? 0),
+                'down_payment' => (float) ($mono->down_payment ?? 0),
+                'total_amount' => (float) ($mono->total_amount ?? 0),
+                'repayment_duration' => $mono->repayment_duration,
+                'interest_rate' => $mono->interest_rate,
+            ],
+        ];
     }
 
     /**
