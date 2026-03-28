@@ -939,7 +939,8 @@ class OrderController extends Controller
             $total = $productPrice + $installationFee + $materialCost + $deliveryFee + $inspectionFee + $insuranceFee + $addOnsTotal;
 
             // Calculate product breakdown (inverter, panels, batteries)
-            $productBreakdown = $this->calculateProductBreakdown($product, $bundle, $productPrice);
+            $_bundleLineItems = null;
+            $productBreakdown = $this->calculateProductBreakdown($product, $bundle, $productPrice, $_bundleLineItems);
 
             // Prepare order data - check if columns exist before including them
             $orderData = [
@@ -1537,27 +1538,62 @@ class OrderController extends Controller
     }
 
     /**
-     * Calculate product breakdown (inverter, panels, batteries)
-     * Helper method for invoice breakdown
+     * Classify a bundle catalog line using category + product title (categories are often missing or generic).
      */
-    private function calculateProductBreakdown($product, $bundle, $totalPrice)
+    private function classifyInvoiceBundleLineType(string $categoryTitle, string $productTitle): string
     {
+        $h = strtolower(trim($categoryTitle.' '.$productTitle));
+        if ($h === '') {
+            return 'other';
+        }
+        // Battery before inverter so titles like "battery module" are not classified as inverter
+        if (str_contains($h, 'battery')
+            || str_contains($h, 'lifepo')
+            || str_contains($h, 'lipo')
+            || str_contains($h, 'li-ion')
+            || str_contains($h, 'lithium')) {
+            return 'batteries';
+        }
+        if (str_contains($h, 'inverter')
+            || str_contains($h, 'all-in-one')
+            || str_contains($h, 'all in one')
+            || str_contains($h, 'hybrid')) {
+            return 'inverter';
+        }
+        if (preg_match('/\b(solar[-\s]?)?panel(s)?\b/', $h)
+            || preg_match('/\b(pv|photovoltaic)\b/', $h)
+            || str_contains($h, 'monofacial')
+            || str_contains($h, 'bifacial')
+            || str_contains($h, 'mono perc')
+            || str_contains($h, 'polycrystalline')) {
+            return 'panels';
+        }
+
+        return 'other';
+    }
+
+    /**
+     * Calculate product breakdown (inverter, panels, batteries) and optional per-line invoice rows.
+     *
+     * @param  array<int, array{type: string, description: string, quantity: int, price: float}>|null  $bundleLineItemsOut
+     */
+    private function calculateProductBreakdown($product, $bundle, $totalPrice, ?array &$bundleLineItemsOut = null): array
+    {
+        if ($bundleLineItemsOut !== null) {
+            $bundleLineItemsOut = [];
+        }
+
         $breakdown = [
             'solar_inverter' => ['quantity' => 0, 'price' => 0, 'description' => ''],
             'solar_panels' => ['quantity' => 0, 'price' => 0, 'description' => ''],
             'batteries' => ['quantity' => 0, 'price' => 0, 'description' => ''],
         ];
 
+        $totalPrice = (float) $totalPrice;
+        $hasBuiltLineItems = false;
+
         if ($bundle) {
-            $inverterTotal = 0;
-            $panelsTotal = 0;
-            $batteriesTotal = 0;
-            $inverterCount = 0;
-            $panelsCount = 0;
-            $batteriesCount = 0;
-            $inverterDesc = '';
-            $panelsDesc = '';
-            $batteriesDesc = '';
+            $lines = [];
 
             try {
                 $bundleItems = $bundle->bundleItems()->with('product.category')->get();
@@ -1568,6 +1604,7 @@ class OrderController extends Controller
                     }
                     $category = $item->product->category;
                     $categoryName = $category ? strtolower((string) ($category->title ?? '')) : '';
+                    $productTitle = (string) ($item->product->title ?? '');
                     $productDiscount = (float) ($item->product->discount_price ?? 0);
                     $baseUnit = $productDiscount > 0
                         ? $productDiscount
@@ -1576,89 +1613,103 @@ class OrderController extends Controller
                     $unitPrice = $rateOverride > 0 ? $rateOverride : $baseUnit;
                     $qty = max(1, (int) ($item->quantity ?? 1));
                     $lineTotal = round($unitPrice * $qty, 2);
+                    $type = $this->classifyInvoiceBundleLineType($categoryName, $productTitle);
 
-                    $isInverter = str_contains($categoryName, 'inverter');
-                    $isPanel = str_contains($categoryName, 'panel')
-                        || str_contains($categoryName, 'solar panel')
-                        || str_contains($categoryName, 'pv module');
-                    $isBattery = str_contains($categoryName, 'battery');
-
-                    if ($isInverter) {
-                        $inverterTotal += $lineTotal;
-                        $inverterCount += $qty;
-                        $inverterDesc = $item->product->title ?? $inverterDesc;
-                    } elseif ($isPanel) {
-                        $panelsTotal += $lineTotal;
-                        $panelsCount += $qty;
-                        $panelsDesc = $item->product->title ?? $panelsDesc;
-                    } elseif ($isBattery) {
-                        $batteriesTotal += $lineTotal;
-                        $batteriesCount += $qty;
-                        $batteriesDesc = $item->product->title ?? $batteriesDesc;
-                    }
+                    $lines[] = [
+                        'type' => $type,
+                        'description' => $productTitle !== '' ? $productTitle : 'Component',
+                        'quantity' => $qty,
+                        'catalog_total' => $lineTotal,
+                    ];
                 }
             } catch (\Exception $e) {
                 Log::warning('Error processing bundle items: ' . $e->getMessage());
             }
 
-            $matchedSum = $inverterTotal + $panelsTotal + $batteriesTotal;
+            $lineCount = count($lines);
 
-            if ($matchedSum > 0 && $totalPrice > 0) {
-                $hasInv = $inverterTotal > 0;
-                $hasPan = $panelsTotal > 0;
-                $hasBat = $batteriesTotal > 0;
+            if ($lineCount > 0 && $totalPrice > 0) {
+                $catalogSum = round(array_sum(array_column($lines, 'catalog_total')), 2);
 
-                $scaledInv = $hasInv ? round($totalPrice * ($inverterTotal / $matchedSum), 2) : 0;
-                $scaledPan = $hasPan ? round($totalPrice * ($panelsTotal / $matchedSum), 2) : 0;
-                $scaledBat = $hasBat ? round($totalPrice * ($batteriesTotal / $matchedSum), 2) : 0;
-                $scaledSum = $scaledInv + $scaledPan + $scaledBat;
+                if ($catalogSum > 0) {
+                    foreach ($lines as $i => $ln) {
+                        $lines[$i]['scaled_price'] = round($totalPrice * ($ln['catalog_total'] / $catalogSum), 2);
+                    }
+                } else {
+                    $each = round($totalPrice / $lineCount, 2);
+                    foreach ($lines as $i => $ln) {
+                        $lines[$i]['scaled_price'] = $each;
+                    }
+                    $sumLines = round($each * $lineCount, 2);
+                    $driftEq = round($totalPrice - $sumLines, 2);
+                    if (abs($driftEq) >= 0.01) {
+                        $lines[$lineCount - 1]['scaled_price'] = round($lines[$lineCount - 1]['scaled_price'] + $driftEq, 2);
+                    }
+                }
+
+                $scaledSum = round(array_sum(array_column($lines, 'scaled_price')), 2);
                 $drift = round($totalPrice - $scaledSum, 2);
-                if (abs($drift) >= 0.01) {
-                    if ($hasInv) {
-                        $scaledInv += $drift;
-                    } elseif ($hasBat) {
-                        $scaledBat += $drift;
-                    } elseif ($hasPan) {
-                        $scaledPan += $drift;
+                if (abs($drift) >= 0.01 && $lineCount > 0) {
+                    $lines[0]['scaled_price'] = round($lines[0]['scaled_price'] + $drift, 2);
+                }
+
+                $bucketInv = 0.0;
+                $bucketPan = 0.0;
+                $bucketBat = 0.0;
+                $qInv = $qPan = $qBat = 0;
+                $dInv = $dPan = $dBat = '';
+
+                foreach ($lines as $ln) {
+                    $p = (float) $ln['scaled_price'];
+                    $q = (int) $ln['quantity'];
+                    $d = (string) $ln['description'];
+                    switch ($ln['type']) {
+                        case 'inverter':
+                            $bucketInv += $p;
+                            $qInv += $q;
+                            $dInv = $dInv !== '' ? $dInv : $d;
+                            break;
+                        case 'panels':
+                            $bucketPan += $p;
+                            $qPan += $q;
+                            $dPan = $dPan !== '' ? $dPan : $d;
+                            break;
+                        case 'batteries':
+                            $bucketBat += $p;
+                            $qBat += $q;
+                            $dBat = $dBat !== '' ? $dBat : $d;
+                            break;
                     }
                 }
 
                 $breakdown['solar_inverter'] = [
-                    'quantity' => $hasInv ? max(1, $inverterCount) : 0,
-                    'price' => $scaledInv,
-                    'description' => $hasInv ? ($inverterDesc ?: 'Solar Inverter') : '',
+                    'quantity' => $bucketInv > 0 ? max(1, $qInv) : 0,
+                    'price' => round($bucketInv, 2),
+                    'description' => $bucketInv > 0 ? ($dInv !== '' ? $dInv : 'Solar Inverter') : '',
                 ];
                 $breakdown['solar_panels'] = [
-                    'quantity' => $hasPan ? max(1, $panelsCount) : 0,
-                    'price' => $scaledPan,
-                    'description' => $hasPan ? ($panelsDesc ?: 'Solar Panels') : '',
+                    'quantity' => $bucketPan > 0 ? max(1, $qPan) : 0,
+                    'price' => round($bucketPan, 2),
+                    'description' => $bucketPan > 0 ? ($dPan !== '' ? $dPan : 'Solar Panels') : '',
                 ];
                 $breakdown['batteries'] = [
-                    'quantity' => $hasBat ? max(1, $batteriesCount) : 0,
-                    'price' => $scaledBat,
-                    'description' => $hasBat ? ($batteriesDesc ?: 'Batteries') : '',
+                    'quantity' => $bucketBat > 0 ? max(1, $qBat) : 0,
+                    'price' => round($bucketBat, 2),
+                    'description' => $bucketBat > 0 ? ($dBat !== '' ? $dBat : 'Batteries') : '',
                 ];
-            } elseif ($matchedSum > 0) {
-                $hasInv = $inverterTotal > 0;
-                $hasPan = $panelsTotal > 0;
-                $hasBat = $batteriesTotal > 0;
-                $breakdown['solar_inverter'] = [
-                    'quantity' => $hasInv ? max(1, $inverterCount) : 0,
-                    'price' => $hasInv ? round($inverterTotal, 2) : 0,
-                    'description' => $hasInv ? ($inverterDesc ?: 'Solar Inverter') : '',
-                ];
-                $breakdown['solar_panels'] = [
-                    'quantity' => $hasPan ? max(1, $panelsCount) : 0,
-                    'price' => $hasPan ? round($panelsTotal, 2) : 0,
-                    'description' => $hasPan ? ($panelsDesc ?: 'Solar Panels') : '',
-                ];
-                $breakdown['batteries'] = [
-                    'quantity' => $hasBat ? max(1, $batteriesCount) : 0,
-                    'price' => $hasBat ? round($batteriesTotal, 2) : 0,
-                    'description' => $hasBat ? ($batteriesDesc ?: 'Batteries') : '',
-                ];
+
+                if ($bundleLineItemsOut !== null) {
+                    foreach ($lines as $ln) {
+                        $bundleLineItemsOut[] = [
+                            'type' => $ln['type'],
+                            'description' => $ln['description'],
+                            'quantity' => $ln['quantity'],
+                            'price' => round((float) $ln['scaled_price'], 2),
+                        ];
+                    }
+                    $hasBuiltLineItems = true;
+                }
             } else {
-                // No bundle line items matched inverter/panel/battery categories
                 $breakdown['solar_inverter'] = [
                     'quantity' => 1,
                     'price' => round($totalPrice * 0.40, 2),
@@ -1677,43 +1728,59 @@ class OrderController extends Controller
             }
         } elseif ($product) {
             try {
-                // Single product - estimate breakdown based on category
                 $category = $product->category;
-                $categoryName = $category ? strtolower($category->title ?? '') : '';
-                
-                if (strpos($categoryName, 'inverter') !== false) {
+                $categoryName = $category ? strtolower((string) ($category->title ?? '')) : '';
+                $productTitle = (string) ($product->title ?? '');
+                $lineType = $this->classifyInvoiceBundleLineType($categoryName, $productTitle);
+
+                if ($lineType === 'inverter') {
                     $breakdown['solar_inverter'] = [
                         'quantity' => 1,
                         'price' => round($totalPrice, 2),
-                        'description' => $product->title ?? 'Solar Inverter'
+                        'description' => $product->title ?? 'Solar Inverter',
                     ];
-                } elseif (strpos($categoryName, 'panel') !== false) {
+                } elseif ($lineType === 'panels') {
                     $breakdown['solar_panels'] = [
                         'quantity' => 1,
                         'price' => round($totalPrice, 2),
-                        'description' => $product->title ?? 'Solar Panels'
+                        'description' => $product->title ?? 'Solar Panels',
                     ];
-                } elseif (strpos($categoryName, 'battery') !== false) {
+                } elseif ($lineType === 'batteries') {
                     $breakdown['batteries'] = [
                         'quantity' => 1,
                         'price' => round($totalPrice, 2),
-                        'description' => $product->title ?? 'Batteries'
+                        'description' => $product->title ?? 'Batteries',
                     ];
                 } else {
-                    // Default breakdown percentages if category unknown
                     $breakdown['solar_inverter'] = ['quantity' => 1, 'price' => round($totalPrice * 0.40, 2), 'description' => 'Solar Inverter'];
                     $breakdown['solar_panels'] = ['quantity' => 1, 'price' => round($totalPrice * 0.35, 2), 'description' => 'Solar Panels'];
                     $breakdown['batteries'] = ['quantity' => 1, 'price' => round($totalPrice * 0.25, 2), 'description' => 'Batteries'];
                 }
+
+                if ($bundleLineItemsOut !== null && $totalPrice > 0) {
+                    $bundleLineItemsOut[] = [
+                        'type' => $lineType,
+                        'description' => $productTitle !== '' ? $productTitle : 'Product',
+                        'quantity' => 1,
+                        'price' => round($totalPrice, 2),
+                    ];
+                    $hasBuiltLineItems = true;
+                }
             } catch (\Exception $e) {
                 Log::warning('Error processing product: ' . $e->getMessage());
-                // Fall through to default breakdown
             }
         }
-        
-        // If breakdown is still empty or has zeros, use default percentages
-        if (($breakdown['solar_inverter']['price'] == 0 && $breakdown['solar_panels']['price'] == 0 && $breakdown['batteries']['price'] == 0) || (!$bundle && !$product)) {
-            // If no product/bundle, use default percentages
+
+        // Legacy estimate only when we did not build real bundle lines and buckets are empty
+        if (
+            ! $hasBuiltLineItems
+            && (float) $breakdown['solar_inverter']['price'] == 0
+            && (float) $breakdown['solar_panels']['price'] == 0
+            && (float) $breakdown['batteries']['price'] == 0
+            && $totalPrice > 0
+            && ! $bundle
+            && ! $product
+        ) {
             $breakdown['solar_inverter'] = ['quantity' => 1, 'price' => round($totalPrice * 0.40, 2), 'description' => 'Solar Inverter'];
             $breakdown['solar_panels'] = ['quantity' => 1, 'price' => round($totalPrice * 0.35, 2), 'description' => 'Solar Panels'];
             $breakdown['batteries'] = ['quantity' => 1, 'price' => round($totalPrice * 0.25, 2), 'description' => 'Batteries'];
@@ -1989,10 +2056,12 @@ class OrderController extends Controller
                 $totalPrice = $order->total_price ?? 0;
             }
 
+            $bundleLineItems = [];
             $productBreakdown = $this->calculateProductBreakdown(
                 $product,
                 $bundle,
-                $totalPrice
+                (float) $totalPrice,
+                $bundleLineItems
             );
 
             $installationRequested = null;
@@ -2013,6 +2082,7 @@ class OrderController extends Controller
                     'solar_inverter' => $productBreakdown['solar_inverter'],
                     'solar_panels' => $productBreakdown['solar_panels'],
                     'batteries' => $productBreakdown['batteries'],
+                    'bundle_line_items' => $bundleLineItems,
                     'material_cost' => (Schema::hasColumn('orders', 'material_cost') ? ($order->material_cost ?? 0) : 0),
                     'installation_fee' => $order->installation_price ?? 0,
                     'delivery_fee' => (Schema::hasColumn('orders', 'delivery_fee') ? ($order->delivery_fee ?? 0) : 0),
