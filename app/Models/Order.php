@@ -64,9 +64,13 @@ class Order extends Model
     return $this->belongsTo(MonoLoanCalculation::class, 'mono_calculation_id');
 }
 
+    /**
+     * Prefer the latest loan application row for this finance plan (avoids stale/duplicate rows without estate fields).
+     */
     public function loanApplication()
     {
-        return $this->hasOne(LoanApplication::class, 'mono_loan_calculation', 'mono_calculation_id');
+        return $this->hasOne(LoanApplication::class, 'mono_loan_calculation', 'mono_calculation_id')
+            ->latestOfMany();
     }
 
     public function auditRequest()

@@ -8,10 +8,12 @@ use App\Mail\BNPLStatusEmail;
 use App\Models\BnplSettings;
 use App\Models\Bundles;
 use App\Models\Guarantor;
+use App\Models\AuditRequest;
 use App\Models\LoanApplication;
 use App\Models\MonoLoanCalculation;
 use App\Models\LoanCalculation;
 use App\Models\Notification;
+use App\Models\Order;
 use App\Models\Product;
 use Exception;
 use Illuminate\Http\Request;
@@ -84,6 +86,7 @@ class BNPLAdminController extends Controller
 
             $payload = $application->toArray();
             $payload['ordered_items'] = $this->resolveOrderedItemsFromSnapshot($application);
+            $payload = $this->mergeLoanApplicationEstateFromLinkedAudit($application, $payload);
 
             return ResponseHelper::success($payload, 'BNPL application retrieved successfully');
         } catch (Exception $e) {
@@ -158,6 +161,41 @@ class BNPLAdminController extends Controller
             'lines' => $lines,
             'display' => $display,
         ];
+    }
+
+    /**
+     * When estate fields were not stored on loan_applications, copy from audit_requests linked via BNPL order.
+     */
+    private function mergeLoanApplicationEstateFromLinkedAudit(LoanApplication $application, array $payload): array
+    {
+        $needName = empty($payload['estate_name'] ?? null);
+        $needAddr = empty($payload['estate_address'] ?? null);
+        if (! $needName && ! $needAddr) {
+            return $payload;
+        }
+        if (! $application->mono_loan_calculation) {
+            return $payload;
+        }
+        $order = Order::query()
+            ->where('mono_calculation_id', $application->mono_loan_calculation)
+            ->whereNotNull('audit_request_id')
+            ->orderByDesc('id')
+            ->first();
+        if (! $order || ! $order->audit_request_id) {
+            return $payload;
+        }
+        $audit = AuditRequest::query()->find($order->audit_request_id);
+        if (! $audit) {
+            return $payload;
+        }
+        if ($needName && ! empty($audit->estate_name)) {
+            $payload['estate_name'] = $audit->estate_name;
+        }
+        if ($needAddr && ! empty($audit->estate_address)) {
+            $payload['estate_address'] = $audit->estate_address;
+        }
+
+        return $payload;
     }
 
     /**

@@ -25,6 +25,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Exception;
 use App\Models\ReferralSettings;
+use App\Models\AuditRequest;
 use App\Services\ReferralRewardService;
 
 class OrderController extends Controller
@@ -1213,6 +1214,7 @@ class OrderController extends Controller
                 'product',
                 'deliveryAddress',
                 'user',
+                'auditRequest',
                 'monoCalculation.loanInstallments.transaction.user',
                 'monoCalculation.loanRepayments.user',
                 'loanApplication:id,user_id,mono_loan_calculation,customer_type,product_category,property_state,property_address,property_landmark,property_floors,property_rooms,is_gated_estate,estate_name,estate_address,credit_check_method,social_media_handle,repayment_duration,loan_amount,order_items_snapshot,loan_plan_snapshot,created_at',
@@ -1304,6 +1306,7 @@ class OrderController extends Controller
             if ($order->deliveryAddress) {
                 $payload['delivery_address'] = $this->formatDeliveryAddressForApi($order->deliveryAddress, $order->user);
             }
+            $payload = $this->mergeBnplLoanApplicationEstateFallback($order, $payload);
 
             return ResponseHelper::success($payload, 'BNPL order retrieved successfully');
         } catch (Exception $e) {
@@ -1313,6 +1316,32 @@ class OrderController extends Controller
             ]);
             return ResponseHelper::error('Failed to retrieve BNPL order: ' . $e->getMessage(), 500);
         }
+    }
+
+    /**
+     * Fill loan_application.estate_* from linked audit request when missing (legacy rows or duplicate loan_application).
+     */
+    private function mergeBnplLoanApplicationEstateFallback(Order $order, array $payload): array
+    {
+        if (empty($payload['loan_application']) || ! is_array($payload['loan_application'])) {
+            return $payload;
+        }
+        $la = &$payload['loan_application'];
+        $audit = $order->auditRequest;
+        if (! $audit && $order->audit_request_id) {
+            $audit = AuditRequest::query()->find($order->audit_request_id);
+        }
+        if (! $audit) {
+            return $payload;
+        }
+        if (empty($la['estate_name']) && ! empty($audit->estate_name)) {
+            $la['estate_name'] = $audit->estate_name;
+        }
+        if (empty($la['estate_address']) && ! empty($audit->estate_address)) {
+            $la['estate_address'] = $audit->estate_address;
+        }
+
+        return $payload;
     }
 
     /**
