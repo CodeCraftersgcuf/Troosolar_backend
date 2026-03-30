@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use App\Services\BnplLoanPlanCalculator;
 use App\Services\ReferralRewardService;
 
 class BNPLController extends Controller
@@ -527,38 +528,43 @@ class BNPLController extends Controller
                 }
             }
 
-            // Calculate counter offer details if status is counter_offer
+            // Counter offer: same math as customer "Review Your Loan Plan" (bundle % deposit + admin fees + interest)
             $counterOfferDetails = null;
-            if ($application->status === 'counter_offer' && 
-                $application->counter_offer_min_deposit !== null && 
+            if ($application->status === 'counter_offer' &&
+                $application->counter_offer_min_deposit !== null &&
                 $application->counter_offer_min_tenor !== null) {
-                
+                $snap = is_array($application->loan_plan_snapshot) ? $application->loan_plan_snapshot : [];
+                $bundle = BnplLoanPlanCalculator::bundlePriceFromSnapshot($snap);
+                $feePcts = BnplLoanPlanCalculator::feePercentagesFromSnapshot($snap);
                 $monoLoan = $application->mono;
-                if ($monoLoan) {
-                    $loanAmount = (float) $monoLoan->loan_amount;
-                    $interestRate = (float) ($monoLoan->interest_rate ?? 0);
-                } else {
-                    $loanAmount = (float) $application->loan_amount;
-                    $interestRate = 0;
-                }
-                
-                $downPayment = (float) $application->counter_offer_min_deposit;
+                $interestMonthly = BnplLoanPlanCalculator::interestMonthlyPercentFromSnapshot(
+                    $snap,
+                    (float) ($monoLoan->interest_rate ?? 4)
+                );
+                $upfront = (float) $application->counter_offer_min_deposit;
                 $duration = (int) $application->counter_offer_min_tenor;
-                
-                // Calculate total amount: loan amount + interest (same logic as acceptCounterOffer)
-                $totalAmount = $loanAmount + ($loanAmount * $interestRate);
-                
-                // Calculate monthly payment: (total amount - down payment) / duration
-                $monthlyPayment = $duration > 0 ? round(($totalAmount - $downPayment) / $duration, 2) : 0;
-                
-                $counterOfferDetails = [
-                    'loan_amount' => number_format($loanAmount, 2),
-                    'down_payment' => number_format($downPayment, 2),
-                    'repayment_duration' => $duration,
-                    'interest_rate' => $interestRate > 0 ? $interestRate : null,
-                    'total_amount' => number_format($totalAmount, 2),
-                    'monthly_payment' => number_format($monthlyPayment, 2),
-                ];
+                if ($bundle > 0 && $upfront > 0 && $duration > 0) {
+                    $plan = BnplLoanPlanCalculator::computeFromUpfrontTotal(
+                        $bundle,
+                        $upfront,
+                        $duration,
+                        $interestMonthly,
+                        $feePcts
+                    );
+                    $counterOfferDetails = [
+                        'bundle_price' => number_format($plan['bundle_price'], 2),
+                        'loan_amount' => number_format($plan['total_loan_amount'], 2),
+                        'down_payment' => number_format($upfront, 2),
+                        'upfront_deposit_total' => number_format($plan['upfront_deposit_total'], 2),
+                        'admin_fees_total' => number_format($plan['admin_fees_total'], 2),
+                        'total_interest_amount' => number_format($plan['total_interest_amount'], 2),
+                        'repayment_duration' => $duration,
+                        'interest_rate' => $interestMonthly,
+                        'total_amount' => number_format($plan['total_repayment_amount'], 2),
+                        'total_repayment_amount' => number_format($plan['total_repayment_amount'], 2),
+                        'monthly_payment' => number_format($plan['monthly_repayment_amount'], 2),
+                    ];
+                }
             }
 
             return ResponseHelper::success([
@@ -899,21 +905,49 @@ class BNPLController extends Controller
 
             $downPayment = (float) $data['minimum_deposit'];
             $duration = (int) $data['minimum_tenor'];
-            $loanAmount = (float) $mono->loan_amount;
-            $interestRate = (float) ($mono->interest_rate ?? 0);
-            $totalAmount = $loanAmount + ($loanAmount * $interestRate);
-            $monthlyPayment = $duration > 0 ? round(($totalAmount - $downPayment) / $duration, 2) : 0;
+            $snap = is_array($application->loan_plan_snapshot) ? $application->loan_plan_snapshot : [];
+            $bundle = BnplLoanPlanCalculator::bundlePriceFromSnapshot($snap);
+            if ($bundle <= 0) {
+                return ResponseHelper::error(
+                    'This application is missing loan plan (bundle) data. Contact support or re-apply from the BNPL flow.',
+                    422
+                );
+            }
+            $feePcts = BnplLoanPlanCalculator::feePercentagesFromSnapshot($snap);
+            $interestMonthly = BnplLoanPlanCalculator::interestMonthlyPercentFromSnapshot(
+                $snap,
+                (float) ($mono->interest_rate ?? 4)
+            );
+            $plan = BnplLoanPlanCalculator::computeFromUpfrontTotal(
+                $bundle,
+                $downPayment,
+                $duration,
+                $interestMonthly,
+                $feePcts
+            );
+            if ((float) $plan['base_deposit'] <= 0 || (float) $plan['base_loan_amount'] <= 0) {
+                return ResponseHelper::error(
+                    'The counter-offer upfront amount is too low for this bundle and fee structure. Increase the minimum deposit percentage in admin and try again.',
+                    422
+                );
+            }
+            $totalRepayment = (float) $plan['total_repayment_amount'];
+            $monthlyPayment = (float) $plan['monthly_repayment_amount'];
+            $principal = (float) $plan['base_loan_amount'];
 
+            $mono->loan_amount = $principal;
             $mono->down_payment = $downPayment;
             $mono->repayment_duration = $duration;
-            $mono->total_amount = $totalAmount;
+            $mono->total_amount = round($totalRepayment + $downPayment, 2);
             $mono->save();
 
+            $application->loan_amount = $totalRepayment;
             $application->repayment_duration = $duration;
             $application->status = 'counter_offer_accepted';
             $application->save();
 
             if ($mono->loanCalculation) {
+                $mono->loanCalculation->loan_amount = $principal;
                 $mono->loanCalculation->repayment_duration = $duration;
                 $mono->loanCalculation->monthly_payment = $monthlyPayment;
                 $mono->loanCalculation->repayment_date = $mono->loanCalculation->repayment_date ?? now()->addMonth();
@@ -926,7 +960,10 @@ class BNPLController extends Controller
                 'minimum_tenor' => $duration,
                 'down_payment' => $downPayment,
                 'repayment_duration' => $duration,
-                'total_amount' => $totalAmount,
+                'total_amount' => $mono->total_amount,
+                'monthly_payment' => $monthlyPayment,
+                'principal' => $principal,
+                'total_repayment' => $totalRepayment,
                 'message' => 'Counter offer accepted. Please pay your initial down payment to complete the order.',
             ], 'Counter offer accepted successfully');
         } catch (\Illuminate\Validation\ValidationException $e) {

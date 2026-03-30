@@ -15,6 +15,7 @@ use App\Models\LoanCalculation;
 use App\Models\Notification;
 use App\Models\Order;
 use App\Models\Product;
+use App\Services\BnplLoanPlanCalculator;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -375,30 +376,44 @@ class BNPLAdminController extends Controller
                                        $application->counter_offer_min_tenor !== null;
                 
                 if ($hasCounterOfferTerms) {
-                    // Use counter offer terms
                     $downPayment = (float) $application->counter_offer_min_deposit;
                     $duration = (int) $application->counter_offer_min_tenor;
-                    $loanAmount = (float) $mono->loan_amount;
-                    $interestRate = (float) ($mono->interest_rate ?? 0);
-                    $totalAmount = $loanAmount + ($loanAmount * $interestRate);
-                    $monthlyPayment = $duration > 0 ? round(($totalAmount - $downPayment) / $duration, 2) : 0;
+                    $snap = is_array($application->loan_plan_snapshot) ? $application->loan_plan_snapshot : [];
+                    $bundle = BnplLoanPlanCalculator::bundlePriceFromSnapshot($snap);
+                    $feePcts = BnplLoanPlanCalculator::feePercentagesFromSnapshot($snap);
+                    $interestMonthly = BnplLoanPlanCalculator::interestMonthlyPercentFromSnapshot(
+                        $snap,
+                        (float) ($mono->interest_rate ?? 4)
+                    );
+                    if ($bundle > 0 && $downPayment > 0 && $duration > 0) {
+                        $plan = BnplLoanPlanCalculator::computeFromUpfrontTotal(
+                            $bundle,
+                            $downPayment,
+                            $duration,
+                            $interestMonthly,
+                            $feePcts
+                        );
+                        $totalRepayment = (float) $plan['total_repayment_amount'];
+                        $monthlyPayment = (float) $plan['monthly_repayment_amount'];
+                        $principal = (float) $plan['base_loan_amount'];
 
-                    // Update mono with counter offer terms
-                    $mono->down_payment = $downPayment;
-                    $mono->repayment_duration = $duration;
-                    $mono->total_amount = $totalAmount;
-                    $mono->save();
+                        $mono->loan_amount = $principal;
+                        $mono->down_payment = $downPayment;
+                        $mono->repayment_duration = $duration;
+                        $mono->total_amount = round($totalRepayment + $downPayment, 2);
+                        $mono->save();
 
-                    // Update application repayment duration
-                    $application->repayment_duration = $duration;
-                    $application->save();
+                        $application->loan_amount = $totalRepayment;
+                        $application->repayment_duration = $duration;
+                        $application->save();
 
-                    // Update loan calculation if exists
-                    if ($mono->loanCalculation) {
-                        $mono->loanCalculation->repayment_duration = $duration;
-                        $mono->loanCalculation->monthly_payment = $monthlyPayment;
-                        $mono->loanCalculation->repayment_date = $mono->loanCalculation->repayment_date ?? now()->addMonth();
-                        $mono->loanCalculation->save();
+                        if ($mono->loanCalculation) {
+                            $mono->loanCalculation->loan_amount = $principal;
+                            $mono->loanCalculation->repayment_duration = $duration;
+                            $mono->loanCalculation->monthly_payment = $monthlyPayment;
+                            $mono->loanCalculation->repayment_date = $mono->loanCalculation->repayment_date ?? now()->addMonth();
+                            $mono->loanCalculation->save();
+                        }
                     }
                 }
             }
