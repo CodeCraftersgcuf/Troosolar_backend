@@ -6,11 +6,13 @@ use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Controller;
 use App\Mail\BNPLStatusEmail;
 use App\Models\BnplSettings;
+use App\Models\Bundles;
 use App\Models\Guarantor;
 use App\Models\LoanApplication;
 use App\Models\MonoLoanCalculation;
 use App\Models\LoanCalculation;
 use App\Models\Notification;
+use App\Models\Product;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -80,11 +82,82 @@ class BNPLAdminController extends Controller
                 return ResponseHelper::error('BNPL application not found', 404);
             }
 
-            return ResponseHelper::success($application, 'BNPL application retrieved successfully');
+            $payload = $application->toArray();
+            $payload['ordered_items'] = $this->resolveOrderedItemsFromSnapshot($application);
+
+            return ResponseHelper::success($payload, 'BNPL application retrieved successfully');
         } catch (Exception $e) {
             Log::error('BNPL Admin Show Error: ' . $e->getMessage());
             return ResponseHelper::error('Failed to retrieve BNPL application', 500);
         }
+    }
+
+    /**
+     * Resolve bundle/product titles from order_items_snapshot for admin UI (before or after approval).
+     *
+     * @return array{lines: array<int, array<string, mixed>>, display: ?string}
+     */
+    private function resolveOrderedItemsFromSnapshot(LoanApplication $application): array
+    {
+        $snapshot = $application->order_items_snapshot;
+        $lines = [];
+
+        if (is_array($snapshot) && count($snapshot) > 0) {
+            foreach ($snapshot as $row) {
+                $itemableType = $row['itemable_type'] ?? null;
+                $itemableId = isset($row['itemable_id']) ? (int) $row['itemable_id'] : null;
+                $qty = (int) ($row['quantity'] ?? 1);
+                $title = null;
+                $kind = null;
+
+                if ($itemableType && $itemableId && is_string($itemableType) && class_exists($itemableType)) {
+                    if (is_a($itemableType, Bundles::class, true)) {
+                        $b = Bundles::query()->find($itemableId);
+                        $title = $b ? (string) ($b->title ?? $b->name ?? '') : null;
+                        $kind = 'bundle';
+                    } elseif (is_a($itemableType, Product::class, true)) {
+                        $p = Product::query()->find($itemableId);
+                        $title = $p ? (string) ($p->title ?? $p->name ?? '') : null;
+                        $kind = 'product';
+                    }
+                }
+
+                if ($title === null || $title === '') {
+                    if ($itemableId) {
+                        $short = is_string($itemableType) ? class_basename($itemableType) : 'Item';
+                        $title = $short.' #'.$itemableId.' (title unavailable)';
+                    } else {
+                        $title = 'Line item (missing reference)';
+                    }
+                }
+
+                $lines[] = [
+                    'kind' => $kind,
+                    'kind_label' => $kind === 'bundle' ? 'Bundle' : ($kind === 'product' ? 'Product' : 'Item'),
+                    'id' => $itemableId,
+                    'title' => $title,
+                    'quantity' => $qty,
+                    'unit_price' => isset($row['unit_price']) ? (float) $row['unit_price'] : null,
+                    'subtotal' => isset($row['subtotal']) ? (float) $row['subtotal'] : null,
+                ];
+            }
+        }
+
+        $displayParts = [];
+        foreach ($lines as $l) {
+            $t = (string) ($l['title'] ?? '');
+            $q = (int) ($l['quantity'] ?? 1);
+            if ($t === '') {
+                continue;
+            }
+            $displayParts[] = $q > 1 ? $t.' (×'.$q.')' : $t;
+        }
+        $display = count($displayParts) > 0 ? implode(', ', $displayParts) : null;
+
+        return [
+            'lines' => $lines,
+            'display' => $display,
+        ];
     }
 
     /**
