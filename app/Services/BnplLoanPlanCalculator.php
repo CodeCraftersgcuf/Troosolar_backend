@@ -22,12 +22,20 @@ class BnplLoanPlanCalculator
     }
 
     /**
+     * LoanCalculator passes `totalAmount` = cart grand total (items + install/delivery/inspection + VAT).
+     * That equals principal + equity deposit. Prefer that sum from snapshot — it matches BNPLFlow + LoanCalculator.jsx.
+     *
      * @param  array<string, mixed>|null  $snap  loan_plan_snapshot (formData.loanDetails JSON)
      */
     public static function bundlePriceFromSnapshot(?array $snap): float
     {
         if (! is_array($snap) || $snap === []) {
             return 0.0;
+        }
+        $principal = self::toFloat($snap['principal'] ?? $snap['totalLoanAmount'] ?? 0);
+        $baseDep = self::toFloat($snap['baseDepositAmount'] ?? 0);
+        if ($principal > 0 && $baseDep >= 0) {
+            return max($principal + $baseDep, 0.0);
         }
         $totalAmount = self::toFloat($snap['totalAmount'] ?? 0);
         $adminFees = self::toFloat($snap['adminFeesTotal'] ?? 0);
@@ -39,10 +47,8 @@ class BnplLoanPlanCalculator
         if ($totalAmount > 0) {
             return max($totalAmount - $adminFees, 0.0);
         }
-        $principal = self::toFloat($snap['principal'] ?? $snap['totalLoanAmount'] ?? 0);
-        $baseDep = self::toFloat($snap['baseDepositAmount'] ?? 0);
 
-        return max($principal + $baseDep, 0.0);
+        return 0.0;
     }
 
     /**
@@ -98,8 +104,9 @@ class BnplLoanPlanCalculator
         $m = $feePcts['management'] / 100;
         $l = $feePcts['legal'] / 100;
 
-        $baseDeposit = round($bundlePrice * ($depositPercentOfBundle / 100), 2);
-        $baseLoanAmount = max(round($bundlePrice - $baseDeposit, 2), 0.0);
+        // Same as LoanCalculator.jsx: depositAmount = (totalAmount * depositPercent) / 100; principal = totalAmount - depositAmount
+        $baseDeposit = $bundlePrice * ($depositPercentOfBundle / 100.0);
+        $baseLoanAmount = max($bundlePrice - $baseDeposit, 0.0);
 
         $insuranceFee = round($bundlePrice * $i, 2);
         $managementFee = round($baseLoanAmount * $m, 2);
