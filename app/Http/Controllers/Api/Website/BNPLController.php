@@ -143,6 +143,9 @@ class BNPLController extends Controller
                 $validationRules['property_details.landmark'] = 'nullable|string|max:255';
                 $validationRules['property_details.floors'] = 'nullable|integer|min:1';
                 $validationRules['property_details.rooms'] = 'nullable|integer|min:1';
+                // Must be validated so they are included in $data (otherwise Laravel strips them and DB never saves)
+                $validationRules['property_details.estate_name'] = 'nullable|string|max:255';
+                $validationRules['property_details.estate_address'] = 'nullable|string';
             } else {
                 // If sent as flat fields
                 $validationRules['property_state'] = 'required|string|max:100';
@@ -151,6 +154,8 @@ class BNPLController extends Controller
                 $validationRules['property_landmark'] = 'nullable|string|max:255';
                 $validationRules['property_floors'] = 'nullable|integer|min:1';
                 $validationRules['property_rooms'] = 'nullable|integer|min:1';
+                $validationRules['estate_name'] = 'nullable|string|max:255';
+                $validationRules['estate_address'] = 'nullable|string';
             }
 
             $data = $request->validate(array_merge($validationRules, [
