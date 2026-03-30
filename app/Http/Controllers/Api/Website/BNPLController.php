@@ -349,6 +349,16 @@ class BNPLController extends Controller
                 $loanCalculation->save();
             }
 
+            // Merge exact "Final Application" personal fields into loan_plan_snapshot for admin display (form can differ from profile)
+            $planSnapshotForDb = is_array($planSnapshot) ? $planSnapshot : [];
+            $planSnapshotForDb['final_application_personal'] = [
+                'full_name' => $personalDetails['full_name'] ?? null,
+                'bvn' => $personalDetails['bvn'] ?? null,
+                'phone' => $personalDetails['phone'] ?? null,
+                'email' => $personalDetails['email'] ?? null,
+                'social_media' => $personalDetails['social_media'] ?? null,
+            ];
+
             // Create loan application (with optional order_items_snapshot for multi-item BNPL orders)
             $loanApplication = LoanApplication::create([
                 'user_id' => Auth::id(),
@@ -375,7 +385,7 @@ class BNPLController extends Controller
                     : null,
                 'status' => 'pending',
                 'order_items_snapshot' => !empty($orderItemsSnapshot) ? $orderItemsSnapshot : null,
-                'loan_plan_snapshot' => $planSnapshot,
+                'loan_plan_snapshot' => $planSnapshotForDb,
             ]);
 
             // Persist BVN on the user profile (form field was validated but not stored before)
