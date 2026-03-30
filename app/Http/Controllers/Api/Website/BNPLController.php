@@ -370,10 +370,20 @@ class BNPLController extends Controller
                 'bank_statement_path' => $bankStatementPath,
                 'live_photo_path' => $livePhotoPath,
                 'social_media_handle' => $personalDetails['social_media'] ?? null,
+                'bvn' => isset($personalDetails['bvn']) && $personalDetails['bvn'] !== ''
+                    ? $personalDetails['bvn']
+                    : null,
                 'status' => 'pending',
                 'order_items_snapshot' => !empty($orderItemsSnapshot) ? $orderItemsSnapshot : null,
                 'loan_plan_snapshot' => $planSnapshot,
             ]);
+
+            // Persist BVN on the user profile (form field was validated but not stored before)
+            $user = Auth::user();
+            if ($user && isset($personalDetails['bvn']) && $personalDetails['bvn'] !== '') {
+                $user->bvn = $personalDetails['bvn'];
+                $user->save();
+            }
 
             // Send application submitted email (non-blocking for the main flow)
             try {

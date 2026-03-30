@@ -35,6 +35,7 @@ class LoanApplication extends Model
     'bank_statement_path',
     'live_photo_path',
     'social_media_handle',
+    'bvn',
     'guarantor_id',
     'admin_notes',
     'counter_offer_min_deposit',
