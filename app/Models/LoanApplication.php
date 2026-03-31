@@ -9,6 +9,7 @@ class LoanApplication extends Model
 {
     use HasFactory;
     protected $fillable = [
+    'prior_application_id',
     'title_document',
     'upload_document',
     'beneficiary_name',
@@ -78,6 +79,11 @@ public function loanStatus()
  public function user()
  {
      return $this->belongsTo(User::class);
+ }
+
+ public function priorApplication()
+ {
+     return $this->belongsTo(self::class, 'prior_application_id');
  }
 
  public function guarantor()

@@ -78,6 +78,21 @@ class BNPLController extends Controller
             // Merge normalized data back into request
             $request->merge($allInput);
 
+            $priorIdRaw = $request->input('prior_application_id');
+            $priorApp = null;
+            if ($priorIdRaw !== null && $priorIdRaw !== '') {
+                $pid = (int) $priorIdRaw;
+                if ($pid > 0) {
+                    $priorApp = LoanApplication::where('id', $pid)->where('user_id', Auth::id())->first();
+                }
+            }
+            if (($priorIdRaw !== null && $priorIdRaw !== '') && ! $priorApp) {
+                return ResponseHelper::error('Invalid prior application for re-apply.', 422);
+            }
+            $canReusePriorDocs = $priorApp !== null
+                && ! empty($priorApp->bank_statement_path)
+                && ! empty($priorApp->live_photo_path);
+
             $settings = BnplSettings::get();
             $allowedDurations = $settings->loan_durations ?? [3, 6, 9, 12];
             // Validate required fields - handle both JSON and FormData formats
@@ -87,8 +102,12 @@ class BNPLController extends Controller
                 'loan_amount' => 'required|numeric|min:0',
                 'repayment_duration' => 'required|integer|in:' . implode(',', $allowedDurations),
                 'credit_check_method' => 'required|in:auto,manual',
-                'bank_statement' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
-                'live_photo' => 'required|file|mimes:jpg,jpeg,png|max:5120',
+                'bank_statement' => $canReusePriorDocs
+                    ? 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240'
+                    : 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
+                'live_photo' => $canReusePriorDocs
+                    ? 'nullable|file|mimes:jpg,jpeg,png|max:5120'
+                    : 'required|file|mimes:jpg,jpeg,png|max:5120',
             ];
 
             // Handle nested arrays - check if data comes as nested or flat (after normalization)
@@ -160,6 +179,7 @@ class BNPLController extends Controller
             }
 
             $data = $request->validate(array_merge($validationRules, [
+                'prior_application_id' => 'nullable|integer',
                 'bundle_ids' => 'nullable|array',
                 'bundle_ids.*' => 'integer|exists:bundles,id',
                 'product_ids' => 'nullable|array',
@@ -281,6 +301,17 @@ class BNPLController extends Controller
                 $livePhotoPath = 'loan_applications/' . $fileName;
             }
 
+            if ($bankStatementPath === null && $priorApp && ! empty($priorApp->bank_statement_path)) {
+                $bankStatementPath = $priorApp->bank_statement_path;
+            }
+            if ($livePhotoPath === null && $priorApp && ! empty($priorApp->live_photo_path)) {
+                $livePhotoPath = $priorApp->live_photo_path;
+            }
+
+            if (empty($bankStatementPath) || empty($livePhotoPath)) {
+                return ResponseHelper::error('Bank statement and live photo are required (upload new files or use a valid re-apply link).', 422);
+            }
+
             // Get or create loan calculation
             $loanCalculation = LoanCalculation::where('user_id', Auth::id())
                 ->where('status', 'calculated')
@@ -363,6 +394,7 @@ class BNPLController extends Controller
             // Create loan application (with optional order_items_snapshot for multi-item BNPL orders)
             $loanApplication = LoanApplication::create([
                 'user_id' => Auth::id(),
+                'prior_application_id' => $priorApp ? $priorApp->id : null,
                 'mono_loan_calculation' => $monoLoanCalculationId, // Can be null if no loan calculation exists
                 'loan_amount' => $loanAmount,
                 'repayment_duration' => $data['repayment_duration'] ?? null,
