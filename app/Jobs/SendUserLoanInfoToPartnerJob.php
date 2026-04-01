@@ -14,15 +14,18 @@ class SendUserLoanInfoToPartnerJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-     protected $user;
-    protected $loanApplications;
+    protected $user;
+
+    protected $loanApplication;
+
     protected $partner;
+
     protected $linkAccount;
 
-    public function __construct($user, $loanApplications, $partner, $linkAccount)
+    public function __construct($user, $loanApplication, $partner, $linkAccount)
     {
         $this->user = $user;
-        $this->loanApplications = $loanApplications;
+        $this->loanApplication = $loanApplication;
         $this->partner = $partner;
         $this->linkAccount = $linkAccount;
     }
@@ -32,10 +35,10 @@ class SendUserLoanInfoToPartnerJob implements ShouldQueue
      */
     public function handle(): void
     {
-                Mail::to($this->partner->email)->send(
+        Mail::to($this->partner->email)->send(
             new SendUserLoanInfoToPartner(
                 $this->user,
-                $this->loanApplications,
+                $this->loanApplication,
                 $this->partner,
                 $this->linkAccount
             )

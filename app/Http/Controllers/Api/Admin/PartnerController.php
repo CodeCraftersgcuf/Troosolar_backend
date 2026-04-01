@@ -112,14 +112,31 @@ class PartnerController extends Controller
   public function sendToPartner(Request $request, string $userId)
 {
     try {
-        $request->validate(['partner_id' => 'required|exists:partners,id']);
-        $user            = User::findOrFail($userId);
-        $loanApplication = LoanApplication::where('user_id', $userId)->latest()->first();
+        $request->validate([
+            'partner_id' => 'required|exists:partners,id',
+            'loan_application_id' => 'nullable|integer|exists:loan_applications,id',
+        ]);
+        $user = User::findOrFail($userId);
+
+        $baseQuery = LoanApplication::where('user_id', $userId);
+        if ($request->filled('loan_application_id')) {
+            $loanApplication = (clone $baseQuery)
+                ->where('id', (int) $request->loan_application_id)
+                ->with(['guarantor', 'mono'])
+                ->first();
+            if (! $loanApplication) {
+                return ResponseHelper::error('Loan application not found for this user.', 404);
+            }
+        } else {
+            $loanApplication = $baseQuery->with(['guarantor', 'mono'])->latest()->first();
+        }
+
         if (!$loanApplication) {
             return ResponseHelper::error('No loan application found for this user.', 404);
         }
-        $linkAccount     = LinkAccount::where('user_id', $userId)->latest()->first();
-        $partner         = Partner::findOrFail($request->partner_id);
+
+        $linkAccount = LinkAccount::where('user_id', $userId)->latest()->first();
+        $partner = Partner::findOrFail($request->partner_id);
 
         // Send mail instantly
         Mail::to($partner->email)->send(
