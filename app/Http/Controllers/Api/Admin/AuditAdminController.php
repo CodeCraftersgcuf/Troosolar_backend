@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Helpers\ResponseHelper;
+use App\Mail\AuditStatusEmail;
 use App\Models\AuditRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Exception;
 
 class AuditAdminController extends Controller
@@ -406,6 +408,22 @@ class AuditAdminController extends Controller
             }
 
             $auditRequest->save();
+
+            // Send approval email to customer once admin approves audit.
+            if ($data['status'] === 'approved') {
+                $auditRequest->loadMissing('user');
+                $user = $auditRequest->user;
+                if ($user && !empty($user->email)) {
+                    try {
+                        Mail::to($user->email)->send(new AuditStatusEmail($user, $auditRequest, 'approved'));
+                    } catch (\Throwable $e) {
+                        Log::warning('Audit approval email failed: ' . $e->getMessage(), [
+                            'audit_request_id' => $auditRequest->id,
+                            'user_id' => $user->id,
+                        ]);
+                    }
+                }
+            }
 
             return ResponseHelper::success([
                 'id' => $auditRequest->id,
