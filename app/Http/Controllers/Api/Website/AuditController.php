@@ -23,51 +23,53 @@ class AuditController extends Controller
     public function submit(Request $request)
     {
         try {
-            // Buy Now flow sends source=buy_now and must include full property + contact for all audit types.
-            // BNPL may omit source or send bnpl; commercial audits can still be submitted with minimal fields.
-            $isBuyNow = $request->input('source') === 'buy_now';
-            $isHomeOffice = $request->input('audit_type') === 'home-office';
+            $auditType = $request->input('audit_type');
+            $auditSubtype = $request->input('audit_subtype');
+            $isCommercial = $auditType === 'commercial';
+            $isHomeOffice = $auditType === 'home-office';
+            $isOfficeSubtype = $isHomeOffice && $auditSubtype === 'office';
+            // Home path: explicit "home" or legacy requests with no subtype
+            $isHomeSubtype = $isHomeOffice && ! $isOfficeSubtype;
 
             $data = $request->validate([
                 'audit_type' => 'required|in:home-office,commercial',
+                'audit_subtype' => 'nullable|in:home,office',
                 'customer_type' => 'nullable|in:residential,sme,commercial',
                 'source' => 'nullable|in:buy_now,bnpl',
-                'property_state' => [
-                    Rule::requiredIf(fn () => $isBuyNow || $isHomeOffice),
+                'company_name' => [
+                    Rule::requiredIf(fn () => $isCommercial || $isOfficeSubtype),
                     'nullable',
                     'string',
                     'max:255',
                 ],
-                'property_address' => [
-                    Rule::requiredIf(fn () => $isBuyNow || $isHomeOffice),
+                'facility_description' => [
+                    Rule::requiredIf(fn () => $isCommercial),
                     'nullable',
                     'string',
                 ],
+                'building_type' => [
+                    Rule::requiredIf(fn () => $isOfficeSubtype),
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
+                'property_state' => 'required|string|max:255',
+                'property_address' => ['required', 'string'],
                 'property_landmark' => 'nullable|string|max:255',
                 'property_floors' => [
-                    Rule::requiredIf(fn () => $isBuyNow || $isHomeOffice),
+                    Rule::requiredIf(fn () => $isHomeSubtype || $isOfficeSubtype),
                     'nullable',
                     'integer',
                     'min:0',
                 ],
                 'property_rooms' => [
-                    Rule::requiredIf(fn () => $isBuyNow || $isHomeOffice),
+                    Rule::requiredIf(fn () => $isHomeSubtype || $isOfficeSubtype),
                     'nullable',
                     'integer',
                     'min:0',
                 ],
-                'contact_name' => [
-                    Rule::requiredIf(fn () => $isBuyNow || $isHomeOffice),
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
-                'contact_phone' => [
-                    Rule::requiredIf(fn () => $isBuyNow || $isHomeOffice),
-                    'nullable',
-                    'string',
-                    'max:30',
-                ],
+                'contact_name' => ['required', 'string', 'max:255'],
+                'contact_phone' => ['required', 'string', 'max:30'],
                 'is_gated_estate' => 'nullable|boolean',
                 'estate_name' => 'nullable|required_if:is_gated_estate,true|string|max:255',
                 'estate_address' => 'nullable|required_if:is_gated_estate,true|string',
@@ -96,14 +98,22 @@ class AuditController extends Controller
             $status = 'pending';
 
             // Prepare data for creation - ensure proper types
+            $auditSubtypeValue = isset($data['audit_subtype']) && $data['audit_subtype'] !== ''
+                ? (string) $data['audit_subtype']
+                : null;
+
             $auditData = [
                 'user_id' => (int) $userId,
                 'audit_type' => (string) $data['audit_type'],
+                'audit_subtype' => $isHomeOffice ? $auditSubtypeValue : null,
                 'status' => (string) $status,
                 'customer_type' => !empty($data['customer_type']) ? (string) $data['customer_type'] : null,
+                'company_name' => !empty($data['company_name']) ? (string) $data['company_name'] : null,
                 'property_state' => !empty($data['property_state']) ? (string) $data['property_state'] : null,
                 'property_address' => !empty($data['property_address']) ? (string) $data['property_address'] : null,
                 'property_landmark' => !empty($data['property_landmark']) ? (string) $data['property_landmark'] : null,
+                'building_type' => !empty($data['building_type']) ? (string) $data['building_type'] : null,
+                'facility_description' => !empty($data['facility_description']) ? (string) $data['facility_description'] : null,
                 'property_floors' => isset($data['property_floors']) && $data['property_floors'] !== '' ? (int) $data['property_floors'] : null,
                 'property_rooms' => isset($data['property_rooms']) && $data['property_rooms'] !== '' ? (int) $data['property_rooms'] : null,
                 'contact_name' => !empty($data['contact_name']) ? (string) $data['contact_name'] : null,
@@ -140,18 +150,22 @@ class AuditController extends Controller
                 return ResponseHelper::error('Failed to create audit request', 500);
             }
 
-            $message = $auditRequest->audit_type === 'commercial' 
-                ? 'Commercial audit request submitted successfully. Admin will contact you for property details.'
+            $message = $auditRequest->audit_type === 'commercial'
+                ? 'Commercial audit request submitted successfully.'
                 : 'Audit request submitted successfully';
 
             return ResponseHelper::success([
                 'id' => $auditRequest->id,
                 'audit_type' => $auditRequest->audit_type,
+                'audit_subtype' => Schema::hasColumn('audit_requests', 'audit_subtype') ? $auditRequest->audit_subtype : null,
                 'customer_type' => $auditRequest->customer_type,
+                'company_name' => Schema::hasColumn('audit_requests', 'company_name') ? $auditRequest->company_name : null,
                 'status' => $auditRequest->status,
                 'property_state' => $auditRequest->property_state,
                 'property_address' => $auditRequest->property_address,
                 'property_landmark' => $auditRequest->property_landmark,
+                'building_type' => Schema::hasColumn('audit_requests', 'building_type') ? $auditRequest->building_type : null,
+                'facility_description' => Schema::hasColumn('audit_requests', 'facility_description') ? $auditRequest->facility_description : null,
                 'property_floors' => $auditRequest->property_floors,
                 'property_rooms' => $auditRequest->property_rooms,
                 'contact_name' => $auditRequest->contact_name,
@@ -232,10 +246,14 @@ class AuditController extends Controller
             return ResponseHelper::success([
                 'id' => $auditRequest->id,
                 'audit_type' => $auditRequest->audit_type,
+                'audit_subtype' => Schema::hasColumn('audit_requests', 'audit_subtype') ? $auditRequest->audit_subtype : null,
+                'company_name' => Schema::hasColumn('audit_requests', 'company_name') ? $auditRequest->company_name : null,
                 'status' => $auditRequest->status,
                 'property_state' => $auditRequest->property_state,
                 'property_address' => $auditRequest->property_address,
                 'property_landmark' => $auditRequest->property_landmark,
+                'building_type' => Schema::hasColumn('audit_requests', 'building_type') ? $auditRequest->building_type : null,
+                'facility_description' => Schema::hasColumn('audit_requests', 'facility_description') ? $auditRequest->facility_description : null,
                 'property_floors' => $auditRequest->property_floors,
                 'property_rooms' => $auditRequest->property_rooms,
                 'contact_name' => $auditRequest->contact_name,

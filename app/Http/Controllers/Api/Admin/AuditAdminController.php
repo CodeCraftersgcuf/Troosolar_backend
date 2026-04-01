@@ -147,12 +147,17 @@ class AuditAdminController extends Controller
                     return [
                         'id' => $request->id,
                         'audit_type' => $request->audit_type,
+                        'audit_subtype' => $request->audit_subtype,
                         'customer_type' => $request->customer_type,
+                        'company_name' => $request->company_name,
                         'status' => $request->status,
                         'property_state' => $request->property_state,
                         'property_address' => $request->property_address,
                         'contact_name' => $request->contact_name,
                         'contact_phone' => $request->contact_phone,
+                        'property_landmark' => $request->property_landmark,
+                        'building_type' => $request->building_type,
+                        'facility_description' => $request->facility_description,
                         'property_floors' => $request->property_floors,
                         'property_rooms' => $request->property_rooms,
                         'is_gated_estate' => $request->is_gated_estate,
@@ -235,7 +240,8 @@ class AuditAdminController extends Controller
                         ->orWhere('property_address', 'like', "%{$search}%")
                         ->orWhere('property_state', 'like', "%{$search}%")
                         ->orWhere('contact_name', 'like', "%{$search}%")
-                        ->orWhere('contact_phone', 'like', "%{$search}%");
+                        ->orWhere('contact_phone', 'like', "%{$search}%")
+                        ->orWhere('company_name', 'like', "%{$search}%");
                 });
             }
 
@@ -247,7 +253,9 @@ class AuditAdminController extends Controller
                 return [
                     'id' => $request->id,
                     'audit_type' => $request->audit_type,
+                    'audit_subtype' => $request->audit_subtype,
                     'customer_type' => $request->customer_type,
+                    'company_name' => $request->company_name,
                     'source' => $request->source,
                     'status' => $request->status,
                     'user' => $request->user ? [
@@ -261,6 +269,8 @@ class AuditAdminController extends Controller
                     'contact_name' => $request->contact_name,
                     'contact_phone' => $request->contact_phone,
                     'property_landmark' => $request->property_landmark,
+                    'building_type' => $request->building_type,
+                    'facility_description' => $request->facility_description,
                     'property_floors' => $request->property_floors,
                     'property_rooms' => $request->property_rooms,
                     'is_gated_estate' => $request->is_gated_estate,
@@ -325,13 +335,17 @@ class AuditAdminController extends Controller
                     'phone' => $auditRequest->user->phone,
                 ],
                 'audit_type' => $auditRequest->audit_type,
+                'audit_subtype' => $auditRequest->audit_subtype,
                 'customer_type' => $auditRequest->customer_type,
+                'company_name' => $auditRequest->company_name,
                 'source' => $auditRequest->source,
                 'property_state' => $auditRequest->property_state,
                 'property_address' => $auditRequest->property_address,
                 'contact_name' => $auditRequest->contact_name,
                 'contact_phone' => $auditRequest->contact_phone,
                 'property_landmark' => $auditRequest->property_landmark,
+                'building_type' => $auditRequest->building_type,
+                'facility_description' => $auditRequest->facility_description,
                 'property_floors' => $auditRequest->property_floors,
                 'property_rooms' => $auditRequest->property_rooms,
                 'is_gated_estate' => $auditRequest->is_gated_estate,
