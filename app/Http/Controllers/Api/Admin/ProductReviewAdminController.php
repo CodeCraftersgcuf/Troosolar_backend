@@ -11,12 +11,13 @@ class ProductReviewAdminController extends Controller
     private function ensureAdmin()
     {
         $role = strtolower((string) (auth()->user()->role ?? ''));
-        if ($role !== 'admin') {
+        if (! in_array($role, ['admin', 'superadmin', 'super_admin'], true)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Unauthorized',
             ], 403);
         }
+
         return null;
     }
 
@@ -74,6 +75,33 @@ class ProductReviewAdminController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Review deleted successfully',
+        ]);
+    }
+
+    /**
+     * PUT /api/admin/product-reviews/{id}/reply
+     * Store or update the public admin response shown under the customer's review.
+     */
+    public function reply(Request $request, $id)
+    {
+        if ($unauthorized = $this->ensureAdmin()) {
+            return $unauthorized;
+        }
+
+        $validated = $request->validate([
+            'admin_reply' => 'nullable|string|max:10000',
+        ]);
+
+        $review = ProductReveiews::findOrFail($id);
+        $text = isset($validated['admin_reply']) ? trim((string) $validated['admin_reply']) : '';
+        $review->admin_reply = $text !== '' ? $text : null;
+        $review->admin_replied_at = $review->admin_reply ? now() : null;
+        $review->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => $review->admin_reply ? 'Reply saved successfully' : 'Reply removed',
+            'data' => $review->load(['user:id,first_name,sur_name', 'product:id,title']),
         ]);
     }
 }

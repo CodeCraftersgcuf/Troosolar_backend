@@ -13,10 +13,13 @@ class ProductReveiews extends Model
         'user_id',
         'review',
         'rating',
+        'admin_reply',
+        'admin_replied_at',
     ];
 
     protected $casts = [
         'rating' => 'integer',
+        'admin_replied_at' => 'datetime',
     ];
 
     public function user()

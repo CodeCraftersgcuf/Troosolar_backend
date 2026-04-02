@@ -16,7 +16,7 @@ class DeliveryAddressController extends Controller
 {
     try {
         $addresses = DeliveryAddress::where('user_id', auth()->id())->get();
-        return ResponseHelper::success('Delivery addresses fetched successfully', $addresses);
+        return ResponseHelper::success($addresses, 'Delivery addresses fetched successfully');
     } catch (Exception $e) {
         Log::error("Index Error: " . $e->getMessage());
         return ResponseHelper::error('Failed to fetch addresses', 500);
@@ -31,7 +31,7 @@ class DeliveryAddressController extends Controller
         $data['user_id'] = auth()->id(); // Automatically set user_id
         $address = DeliveryAddress::create($data);
 
-        return ResponseHelper::success('Address created successfully', $address);
+        return ResponseHelper::success($address, 'Address created successfully');
     } catch (Exception $e) {
         Log::error("Store Error: " . $e->getMessage());
         return ResponseHelper::error('Failed to store address', 500);
@@ -71,7 +71,7 @@ public function show($id)
 {
     try {
         $address = DeliveryAddress::where('user_id', auth()->id())->findOrFail($id);
-        return ResponseHelper::success('Address fetched successfully', $address);
+        return ResponseHelper::success($address, 'Address fetched successfully');
     } catch (Exception $e) {
         Log::error("Show Error: " . $e->getMessage());
         return ResponseHelper::error('Address not found', 404);
@@ -84,7 +84,7 @@ public function destroy($id)
         $address = DeliveryAddress::where('user_id', auth()->id())->findOrFail($id);
         $address->delete();
 
-        return ResponseHelper::success('Address deleted successfully');
+        return ResponseHelper::success(null, 'Address deleted successfully');
     } catch (Exception $e) {
         Log::error("Delete Error: " . $e->getMessage());
         return ResponseHelper::error('Failed to delete address', 500);

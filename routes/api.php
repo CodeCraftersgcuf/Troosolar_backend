@@ -214,6 +214,7 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     });
     Route::prefix('admin/product-reviews')->group(function () {
         Route::get('/', [ProductReviewAdminController::class, 'index']);
+        Route::put('/{id}/reply', [ProductReviewAdminController::class, 'reply']);
         Route::put('/{id}', [ProductReviewAdminController::class, 'update']);
         Route::delete('/{id}', [ProductReviewAdminController::class, 'destroy']);
     });
