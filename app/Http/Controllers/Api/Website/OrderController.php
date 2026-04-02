@@ -20,6 +20,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\OrderDeliveredThankYouMail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -68,14 +70,76 @@ class OrderController extends Controller
     }
 
     /**
+     * One-line label for transactional emails (first meaningful line item or legacy product/bundle).
+     */
+    private function orderDeliveredSummaryLine(Order $order): string
+    {
+        $order->loadMissing(['items.itemable', 'product', 'bundle']);
+
+        foreach ($order->items as $item) {
+            $itemable = $item->itemable;
+            if ($itemable) {
+                $t = $itemable->title ?? $itemable->name ?? null;
+                if ($t) {
+                    return (string) $t;
+                }
+            }
+        }
+
+        if ($order->product) {
+            return (string) ($order->product->title ?? 'Your product');
+        }
+        if ($order->bundle) {
+            return (string) ($order->bundle->title ?? 'Your bundle');
+        }
+
+        return 'Your Troosolar purchase';
+    }
+
+    /**
+     * Send thank-you email when status moves into delivered/completed (once per transition).
+     */
+    private function notifyCustomerOrderDelivered(Order $order, ?string $previousStatus): void
+    {
+        $new = strtolower((string) ($order->order_status ?? ''));
+        $prev = strtolower((string) ($previousStatus ?? ''));
+        $deliveredStates = ['delivered', 'completed'];
+
+        if (! in_array($new, $deliveredStates, true)) {
+            return;
+        }
+        if (in_array($prev, $deliveredStates, true)) {
+            return;
+        }
+
+        $order->loadMissing('user');
+        $user = $order->user;
+        if (! $user || ! $user->email) {
+            return;
+        }
+
+        try {
+            $summary = $this->orderDeliveredSummaryLine($order);
+            Mail::to($user->email)->send(new OrderDeliveredThankYouMail($order, $user, $summary));
+        } catch (\Throwable $e) {
+            Log::error('Order delivered thank-you email failed: '.$e->getMessage(), [
+                'order_id' => $order->id,
+            ]);
+        }
+    }
+
+    /**
      * GET /api/orders
      * Returns orders for the authenticated user.
      */
     public function updateStatus($orderId, Request $request){
         try {
             $order = Order::findOrFail($orderId);
+            $previousStatus = $order->order_status;
             $order->order_status = $request->order_status;
             $order->save();
+            $this->notifyCustomerOrderDelivered($order, $previousStatus);
+
             return ResponseHelper::success('Order status updated successfully', 200);
         } catch (\Throwable $e) {
             Log::error("Order Update Status Error: {$e->getMessage()}");
@@ -1115,14 +1179,16 @@ class OrderController extends Controller
             ]);
 
             $order = Order::where('order_type', 'buy_now')->findOrFail($id);
+            $previousStatus = $order->order_status;
             $order->order_status = $request->order_status;
-            
+
             // Only set admin_notes if column exists and value is provided
             if ($request->has('admin_notes') && Schema::hasColumn('orders', 'admin_notes')) {
                 $order->admin_notes = $request->admin_notes;
             }
-            
+
             $order->save();
+            $this->notifyCustomerOrderDelivered($order, $previousStatus);
 
             return ResponseHelper::success($order, 'Buy Now order status updated successfully');
         } catch (\Illuminate\Validation\ValidationException $e) {
