@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\Website;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductReviewRequest;
+use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Product;
 use App\Models\ProductReveiews;
 use Illuminate\Http\Request;
 
@@ -47,15 +49,37 @@ class ProductReviewController extends Controller
         }
     }
 
+    /**
+     * Order items store polymorphic type as the model class (e.g. App\Models\Product), not the string "product".
+     * BNPL snapshots may use the short name "product". Legacy rows may only set orders.product_id.
+     */
     private function hasDeliveredOrderForProduct(int $userId, int $productId): bool
     {
-        return OrderItem::query()
-            ->where('itemable_type', 'product')
+        $statuses = ['delivered', 'completed'];
+
+        $productMorphTypes = array_values(array_unique([
+            Product::class,
+            'product',
+            class_basename(Product::class),
+        ]));
+
+        $viaLineItems = OrderItem::query()
             ->where('itemable_id', $productId)
-            ->whereHas('order', function ($q) use ($userId) {
+            ->whereIn('itemable_type', $productMorphTypes)
+            ->whereHas('order', function ($q) use ($userId, $statuses) {
                 $q->where('user_id', $userId)
-                    ->whereIn('order_status', ['delivered', 'completed']);
+                    ->whereIn('order_status', $statuses);
             })
+            ->exists();
+
+        if ($viaLineItems) {
+            return true;
+        }
+
+        return Order::query()
+            ->where('user_id', $userId)
+            ->where('product_id', $productId)
+            ->whereIn('order_status', $statuses)
             ->exists();
     }
 
