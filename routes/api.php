@@ -21,7 +21,8 @@ use App\Http\Controllers\Api\Admin\{
     InterestPercentageController,
     AnalyticController,
     BNPLAdminController,
-    CalculatorSettingsController
+    CalculatorSettingsController,
+    ProductReviewAdminController
 };
 use App\Http\Controllers\Api\Website\{
     CartController,
@@ -115,6 +116,7 @@ Route::get('/site/banner', [\App\Http\Controllers\Api\Website\SiteBannerControll
 
 // Public bundles endpoint (for Buy Now flow)
 Route::get('/bundles', [\App\Http\Controllers\Api\Website\BundleController::class, 'index']);
+Route::get('/product-reviews', [ProductReviewController::class, 'index']);
 
 // Bundle Selection endpoints (public for browsing, auth required for checkout)
 Route::get('/bundles/type/{type}', [\App\Http\Controllers\Api\Website\BundleSelectionController::class, 'getBundlesByType']);
@@ -206,8 +208,14 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
 
     // Reviews
     Route::prefix('product-reviews')->group(function () {
+        Route::get('/', [ProductReviewController::class, 'index']);
         Route::post('/', [ProductReviewController::class, 'store']);
         Route::put('/{id}', [ProductReviewController::class, 'update']);
+    });
+    Route::prefix('admin/product-reviews')->group(function () {
+        Route::get('/', [ProductReviewAdminController::class, 'index']);
+        Route::put('/{id}', [ProductReviewAdminController::class, 'update']);
+        Route::delete('/{id}', [ProductReviewAdminController::class, 'destroy']);
     });
 
     // Linked Accounts

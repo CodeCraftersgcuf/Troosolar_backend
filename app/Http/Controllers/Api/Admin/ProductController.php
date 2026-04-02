@@ -20,7 +20,7 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Product::with(['details', 'images','reviews']);
+            $query = Product::with(['details', 'images','reviews.user']);
             $includeUnavailable = $request->boolean('include_unavailable', false);
             $includeOutOfStock = $request->boolean('include_out_of_stock', false);
             $isAdmin = strtolower((string) (auth()->user()->role ?? '')) === 'admin';
@@ -44,7 +44,7 @@ class ProductController extends Controller
                     $q->where('is_available', true);
                 })
                 ->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0')
-                ->with(['details', 'images','reviews'])
+                ->with(['details', 'images','reviews.user'])
                 ->get();
             return ResponseHelper::success($products, 'Top products fetched successfully.');
         } catch (Exception $e) {
@@ -58,7 +58,7 @@ class ProductController extends Controller
         $includeUnavailable = $request->boolean('include_unavailable', false);
         $includeOutOfStock = $request->boolean('include_out_of_stock', false);
         $isAdmin = strtolower((string) (auth()->user()->role ?? '')) === 'admin';
-        $product = Product::with(['details', 'images', 'reviews'])
+        $product = Product::with(['details', 'images', 'reviews.user'])
             ->when(Schema::hasColumn('products', 'is_available') && !($includeUnavailable && $isAdmin), function ($q) {
                 $q->where('is_available', true);
             })
@@ -209,7 +209,7 @@ public function getProductsByBrand($ids)
                 $query->where('is_available', true);
             }
             $query->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0');
-            $query->with('reviews');
+            $query->with('reviews.user');
         }])->whereIn('id', $brandIds)->get();
 
         if ($brands->isEmpty()) {
@@ -237,7 +237,7 @@ public function showProductByBrand($brandIds, $productId)
                               $q->where('is_available', true);
                           })
                           ->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0')
-                          ->with(['details', 'images','reviews'])
+                          ->with(['details', 'images','reviews.user'])
                           ->first();
 
         if (!$product) {
@@ -266,7 +266,7 @@ public function showProductByCategory(
                             $q->where('is_available', true);
                         })
                         ->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0')
-                        ->with(['details', 'images', 'reviews']);
+                        ->with(['details', 'images', 'reviews.user']);
 
         if ($brandIds) {
             // $brandIdsArray = explode(',', $brandIds);
@@ -296,7 +296,7 @@ public function showProductByCategoryBrand(
                             $q->where('is_available', true);
                         })
                         ->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0')
-                        ->with(['details', 'images', 'reviews']);
+                        ->with(['details', 'images', 'reviews.user']);
 
         $product = $query->first();
 

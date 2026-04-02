@@ -51,7 +51,7 @@ class ProductSelectionController extends Controller
                 ->all();
 
             $query = Product::query()
-                ->with(['details', 'images', 'reviews', 'category']);
+                ->with(['details', 'images', 'reviews.user', 'category']);
 
             // Keep category narrowing when available, but do not hard-fail when category mapping is off.
             if (!empty($matchedCategoryIds)) {
@@ -67,7 +67,7 @@ class ProductSelectionController extends Controller
             if ($normalizedGroup === 'battery-only' && $products->isEmpty()) {
                 $this->seedBatteryProductsFromMaterials();
 
-                $retryQuery = Product::query()->with(['details', 'images', 'reviews', 'category']);
+                $retryQuery = Product::query()->with(['details', 'images', 'reviews.user', 'category']);
                 $this->applyPublicAvailabilityFilters($retryQuery);
                 $products = $this->filterProductsByGroup($retryQuery->get(), $normalizedGroup);
             }
@@ -87,7 +87,7 @@ class ProductSelectionController extends Controller
             }
 
             $query = Product::query()
-                ->with(['details', 'images', 'reviews', 'category'])
+                ->with(['details', 'images', 'reviews.user', 'category'])
                 ->where('category_id', $categoryId);
 
             $this->applyPublicAvailabilityFilters($query);
@@ -100,7 +100,7 @@ class ProductSelectionController extends Controller
                 $this->syncAllInOneProductsForCategory((int) $categoryId);
 
                 $retryQuery = Product::query()
-                    ->with(['details', 'images', 'reviews', 'category'])
+                    ->with(['details', 'images', 'reviews.user', 'category'])
                     ->where('category_id', $categoryId);
                 $this->applyPublicAvailabilityFilters($retryQuery);
                 $products = $retryQuery->get();
