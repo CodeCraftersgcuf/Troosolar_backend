@@ -23,6 +23,7 @@ class ProductRequest extends FormRequest
             'stock' => 'nullable|string',
             'installation_price' => 'nullable|numeric|min:0',
             'top_deal' => 'boolean',
+            'is_most_popular' => 'boolean',
             'installation_compulsory' => 'boolean',
             'is_available' => 'boolean',
             'description' => 'nullable|string',
@@ -57,6 +58,18 @@ class ProductRequest extends FormRequest
     {
         if ($this->has('brand_id') && $this->input('brand_id') === '') {
             $this->merge(['brand_id' => null]);
+        }
+
+        foreach (['top_deal', 'is_most_popular', 'installation_compulsory', 'is_available'] as $key) {
+            if (!$this->has($key)) {
+                continue;
+            }
+            $v = $this->input($key);
+            if ($v === '1' || $v === 1 || $v === true || $v === 'true') {
+                $this->merge([$key => true]);
+            } elseif ($v === '0' || $v === 0 || $v === false || $v === 'false' || $v === '') {
+                $this->merge([$key => false]);
+            }
         }
     }
 

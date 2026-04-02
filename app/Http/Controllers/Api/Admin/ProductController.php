@@ -30,7 +30,7 @@ class ProductController extends Controller
             if (!$isAdmin && !$includeOutOfStock) {
                 $query->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0');
             }
-            $products = $query->get();
+            $products = $query->orderByDisplayProminence()->get();
             return ResponseHelper::success($products, 'Products fetched successfully.');
         } catch (Exception $e) {
             return ResponseHelper::error('Failed to fetch products.', 500);
@@ -209,6 +209,7 @@ public function getProductsByBrand($ids)
                 $query->where('is_available', true);
             }
             $query->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0');
+            $query->orderByDisplayProminence();
             $query->with('reviews.user');
         }])->whereIn('id', $brandIds)->get();
 

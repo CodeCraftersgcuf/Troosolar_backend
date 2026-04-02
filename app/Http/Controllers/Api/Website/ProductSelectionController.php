@@ -59,6 +59,7 @@ class ProductSelectionController extends Controller
             }
 
             $this->applyPublicAvailabilityFilters($query);
+            $query->orderByDisplayProminence();
 
             $products = $this->filterProductsByGroup($query->get(), $normalizedGroup);
 
@@ -69,6 +70,7 @@ class ProductSelectionController extends Controller
 
                 $retryQuery = Product::query()->with(['details', 'images', 'reviews.user', 'category']);
                 $this->applyPublicAvailabilityFilters($retryQuery);
+                $retryQuery->orderByDisplayProminence();
                 $products = $this->filterProductsByGroup($retryQuery->get(), $normalizedGroup);
             }
 
@@ -91,6 +93,7 @@ class ProductSelectionController extends Controller
                 ->where('category_id', $categoryId);
 
             $this->applyPublicAvailabilityFilters($query);
+            $query->orderByDisplayProminence();
 
             $products = $query->get();
 
@@ -103,6 +106,7 @@ class ProductSelectionController extends Controller
                     ->with(['details', 'images', 'reviews.user', 'category'])
                     ->where('category_id', $categoryId);
                 $this->applyPublicAvailabilityFilters($retryQuery);
+                $retryQuery->orderByDisplayProminence();
                 $products = $retryQuery->get();
             }
 

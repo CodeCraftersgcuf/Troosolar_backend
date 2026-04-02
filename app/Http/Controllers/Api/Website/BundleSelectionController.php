@@ -44,6 +44,7 @@ class BundleSelectionController extends Controller
                     $q->where('is_available', true);
                 })
                 ->with(['bundleMaterials.material.category'])
+                ->orderByDisplayProminence()
                 ->orderBy('total_price')
                 ->get()
                 ->map(function ($bundle) {

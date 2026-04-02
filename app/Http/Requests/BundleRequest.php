@@ -21,6 +21,8 @@ class BundleRequest extends FormRequest
             'featured_image' => 'nullable|image|mimes:jpg,jpeg,png|max:3048',
             'bundle_type' => 'nullable|string|max:255',
             'is_available' => 'nullable|boolean',
+            'top_deal' => 'nullable|boolean',
+            'is_most_popular' => 'nullable|boolean',
             'total_price' => 'nullable|numeric|min:0',
             'discount_price' => 'nullable|numeric|min:0',
             'discount_end_date' => 'nullable|date',
@@ -92,6 +94,18 @@ class BundleRequest extends FormRequest
         }
         if ($this->has('brand_id') && $this->input('brand_id') === '') {
             $this->merge(['brand_id' => null]);
+        }
+
+        foreach (['is_available', 'top_deal', 'is_most_popular'] as $key) {
+            if (!$this->has($key)) {
+                continue;
+            }
+            $v = $this->input($key);
+            if ($v === '1' || $v === 1 || $v === true || $v === 'true') {
+                $this->merge([$key => true]);
+            } elseif ($v === '0' || $v === 0 || $v === false || $v === 'false' || $v === '') {
+                $this->merge([$key => false]);
+            }
         }
     }
 

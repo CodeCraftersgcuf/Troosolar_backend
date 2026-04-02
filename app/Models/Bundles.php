@@ -2,7 +2,9 @@
 // app/Models/Bundles.php
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -17,6 +19,8 @@ class Bundles extends Model
         'featured_image',
         'bundle_type',
         'is_available',
+        'top_deal',
+        'is_most_popular',
         'product_model',
         'system_capacity_display',
         'detailed_description',
@@ -32,6 +36,8 @@ class Bundles extends Model
     protected $casts = [
         'specifications' => 'array',
         'is_available' => 'boolean',
+        'top_deal' => 'boolean',
+        'is_most_popular' => 'boolean',
     ];
 
     protected $appends = ['featured_image_url'];
@@ -70,5 +76,18 @@ class Bundles extends Model
             return $this->featured_image;
         }
         return Storage::url($this->featured_image);
+    }
+
+    public function scopeOrderByDisplayProminence(Builder $query): Builder
+    {
+        $table = $query->getModel()->getTable();
+        if (Schema::hasColumn($table, 'top_deal')) {
+            $query->orderByDesc($table . '.top_deal');
+        }
+        if (Schema::hasColumn($table, 'is_most_popular')) {
+            $query->orderByDesc($table . '.is_most_popular');
+        }
+
+        return $query->orderByDesc($table . '.created_at');
     }
 }

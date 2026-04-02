@@ -88,6 +88,51 @@ class BundleController extends Controller
     }
 
     /**
+     * Within the same capacity tier, show top deals / highly recommended first.
+     */
+    private function compareBundlesByProminence($a, $b): int
+    {
+        if (Schema::hasColumn('bundles', 'top_deal')) {
+            $ta = (int) (bool) ($a->top_deal ?? false);
+            $tb = (int) (bool) ($b->top_deal ?? false);
+            if ($ta !== $tb) {
+                return $tb <=> $ta;
+            }
+        }
+        if (Schema::hasColumn('bundles', 'is_most_popular')) {
+            $pa = (int) (bool) ($a->is_most_popular ?? false);
+            $pb = (int) (bool) ($b->is_most_popular ?? false);
+            if ($pa !== $pb) {
+                return $pb <=> $pa;
+            }
+        }
+
+        return strcmp((string) ($b->created_at ?? ''), (string) ($a->created_at ?? ''));
+    }
+
+    /**
+     * Sort by parsed load (asc), then prominence / recency.
+     */
+    private function sortBundlesByCapacityThenProminence($bundles)
+    {
+        return $bundles->map(function ($bundle) {
+            if (!isset($bundle->_parsed_load_watts)) {
+                $bundle->_parsed_load_watts = $this->resolveBundleCapacityWatts($bundle);
+            }
+
+            return $bundle;
+        })->sort(function ($a, $b) {
+            $wa = (float) ($a->_parsed_load_watts ?? 0);
+            $wb = (float) ($b->_parsed_load_watts ?? 0);
+            if (abs($wa - $wb) >= 0.0001) {
+                return $wa <=> $wb;
+            }
+
+            return $this->compareBundlesByProminence($a, $b);
+        })->values();
+    }
+
+    /**
      * GET /api/bundles
      * Get all active bundles (Public endpoint for Buy Now flow).
      * When ?q={wattage} is present: treat q as target inverter capacity (in watts),
@@ -100,7 +145,7 @@ class BundleController extends Controller
             $bundleType = $request->query('bundle_type');
             $includeUnavailable = $request->boolean('include_unavailable', false);
             $bundlesQuery = Bundles::with(['bundleItems.product', 'customServices', 'bundleMaterials.material.category'])
-                ->orderBy('created_at', 'desc');
+                ->orderByDisplayProminence();
             if (Schema::hasColumn('bundles', 'is_available')) {
                 if (!$includeUnavailable) {
                     $bundlesQuery->where('is_available', true);
@@ -128,7 +173,7 @@ class BundleController extends Controller
                 })->values();
 
                 if (!$exact->isEmpty()) {
-                    $bundles = $exact->sortBy('_parsed_load_watts')->values();
+                    $bundles = $this->sortBundlesByCapacityThenProminence($exact);
                 } else {
                     // Prefer the closest bundle(s) at or above requested capacity.
                     $aboveOrEqual = $bundles
@@ -144,13 +189,14 @@ class BundleController extends Controller
                             })
                             ->min();
 
-                        $bundles = $aboveOrEqual
+                        $bundles = $this->sortBundlesByCapacityThenProminence(
+                            $aboveOrEqual
                             ->filter(function ($bundle) use ($targetCapacityWatts, $minAboveDelta) {
                                 $deltaAbove = ((float) ($bundle->_parsed_load_watts ?? 0)) - $targetCapacityWatts;
                                 return abs($deltaAbove - $minAboveDelta) < 0.0001;
                             })
-                            ->sortBy('_parsed_load_watts')
-                            ->values();
+                            ->values()
+                        );
                     } else {
                         // If everything is below target, return nearest overall.
                         $closestDelta = $bundles
@@ -159,13 +205,14 @@ class BundleController extends Controller
                             })
                             ->min();
 
-                        $bundles = $bundles
+                        $bundles = $this->sortBundlesByCapacityThenProminence(
+                            $bundles
                             ->filter(function ($bundle) use ($targetCapacityWatts, $closestDelta) {
                                 $delta = abs(((float) ($bundle->_parsed_load_watts ?? 0)) - $targetCapacityWatts);
                                 return abs($delta - $closestDelta) < 0.0001;
                             })
-                            ->sortBy('_parsed_load_watts')
-                            ->values();
+                            ->values()
+                        );
                     }
                 }
 
@@ -202,6 +249,10 @@ class BundleController extends Controller
                         $bundles = $bundles->concat($extra)->unique('id')->values();
                     }
                 }
+
+                if (!$bundles->isEmpty()) {
+                    $bundles = $this->sortBundlesByCapacityThenProminence($bundles);
+                }
             }
 
             $mapped = $bundles->map(function ($bundle) {
@@ -215,6 +266,8 @@ class BundleController extends Controller
                     'description' => $bundle->description ?? $bundle->detailed_description ?? null,
                     'is_active' => true,
                     'is_available' => (bool) ($bundle->is_available ?? true),
+                    'top_deal' => (bool) ($bundle->top_deal ?? false),
+                    'is_most_popular' => (bool) ($bundle->is_most_popular ?? false),
                     'total_load' => $bundle->total_load,
                     'total_output' => $bundle->total_output,
                     'inver_rating' => $bundle->inver_rating,

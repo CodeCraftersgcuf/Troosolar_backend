@@ -40,7 +40,7 @@ public function index(Request $request)
             if (!empty($bundleType)) {
                 $bundlesQuery->where('bundle_type', $bundleType);
             }
-            $bundles = $bundlesQuery->get();
+            $bundles = $bundlesQuery->orderByDisplayProminence()->get();
             $formatted = $bundles->map(fn($b) => $this->formatBundleResponse($b))->values();
             return ResponseHelper::success($formatted, 'Bundles fetched.');
         }
@@ -242,6 +242,16 @@ public function index(Request $request)
                 $createData['is_available'] = array_key_exists('is_available', $data)
                     ? (bool) $data['is_available']
                     : true;
+            }
+            if (Schema::hasColumn('bundles', 'top_deal')) {
+                $createData['top_deal'] = array_key_exists('top_deal', $data)
+                    ? (bool) $data['top_deal']
+                    : false;
+            }
+            if (Schema::hasColumn('bundles', 'is_most_popular')) {
+                $createData['is_most_popular'] = array_key_exists('is_most_popular', $data)
+                    ? (bool) $data['is_most_popular']
+                    : false;
             }
 
             if (Schema::hasColumn('bundles', 'product_model')) {
@@ -523,6 +533,16 @@ public function index(Request $request)
                     ? ($data['brand_id'] === '' || $data['brand_id'] === null ? null : (int) $data['brand_id'])
                     : $bundle->brand_id;
             }
+            if (Schema::hasColumn('bundles', 'top_deal')) {
+                $updatePayload['top_deal'] = array_key_exists('top_deal', $data)
+                    ? (bool) $data['top_deal']
+                    : (bool) ($bundle->top_deal ?? false);
+            }
+            if (Schema::hasColumn('bundles', 'is_most_popular')) {
+                $updatePayload['is_most_popular'] = array_key_exists('is_most_popular', $data)
+                    ? (bool) $data['is_most_popular']
+                    : (bool) ($bundle->is_most_popular ?? false);
+            }
             $bundle->update($updatePayload);
             if (Schema::hasColumn('bundles', 'specifications') && array_key_exists('specifications', $data)) {
                 $bundle->specifications = is_array($data['specifications']) ? $data['specifications'] : null;
@@ -670,6 +690,8 @@ public function index(Request $request)
             'featured_image_url' => $bundle->featured_image_url,
             'bundle_type' => $bundle->bundle_type,
             'is_available' => $bundle->is_available,
+            'top_deal' => (bool) ($bundle->top_deal ?? false),
+            'is_most_popular' => (bool) ($bundle->is_most_popular ?? false),
             'total_price' => (float) ($bundle->total_price ?? 0),
             'discount_price' => $bundle->discount_price ? (float) $bundle->discount_price : null,
             'discount_end_date' => $bundle->discount_end_date,

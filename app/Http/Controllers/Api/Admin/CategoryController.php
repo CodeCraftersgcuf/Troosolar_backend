@@ -163,6 +163,8 @@ public function getProducts($id)
                 ->orWhereIn($normalizedStockExpr, ['instock', 'available', 'true', 'yes']);
         });
 
+        $query->orderByDisplayProminence();
+
         $products = $query->get();
 
         // Self-heal for categories where products were uploaded under materials/wrong category.
@@ -198,6 +200,8 @@ public function getProducts($id)
                 $q->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0')
                     ->orWhereIn($normalizedStockExpr, ['instock', 'available', 'true', 'yes']);
             });
+
+            $retry->orderByDisplayProminence();
 
             $products = $retry->get();
         }
