@@ -20,26 +20,67 @@ class AuditStatusEmail extends Mailable
     public string $headingText;
     public string $bodyText;
     public string $status;
+    public string $auditTypeLabel;
+
+    /** Title-case line for the summary box (e.g. Office, Home, Commercial / Industrial). */
+    public string $auditTypeTitle;
 
     public function __construct(User $user, AuditRequest $auditRequest, string $status)
     {
         $this->user = $user;
         $this->auditRequest = $auditRequest;
         $this->status = $status;
+        $this->auditTypeLabel = self::auditTypeDisplayLabel($auditRequest);
+        $this->auditTypeTitle = self::auditTypeTitleCase($auditRequest);
 
         if ($status === 'approved') {
             $this->subjectLine = 'Your audit request has been approved - Troosolar';
             $this->headingText = 'Your audit request has been approved';
-            $this->bodyText = 'Your audit request has been approved. Our team will contact you to confirm the next steps and scheduling.';
+            $this->bodyText = 'Your '.$this->auditTypeLabel.' audit request has been approved. Our team will contact you to confirm the next steps and scheduling.';
         } elseif ($status === 'rejected') {
             $this->subjectLine = 'Update on your audit request - Troosolar';
-            $this->headingText = 'Update on your audit request';
-            $this->bodyText = 'We are unable to approve your audit request at this time. Please contact support if you need help.';
+            $this->headingText = 'Your audit request was not approved';
+            $this->bodyText = 'We are unable to approve your '.$this->auditTypeLabel.' audit request at this time. If you have questions, please reply to this email or contact support.';
         } else {
             $this->subjectLine = 'Update on your audit request - Troosolar';
             $this->headingText = 'Update on your audit request';
             $this->bodyText = 'Your audit request status has been updated.';
         }
+    }
+
+    public static function auditTypeDisplayLabel(AuditRequest $r): string
+    {
+        if ($r->audit_type === 'commercial') {
+            return 'commercial / industrial';
+        }
+        if ($r->audit_type === 'home-office') {
+            if ($r->audit_subtype === 'office') {
+                return 'office';
+            }
+            if ($r->audit_subtype === 'home') {
+                return 'home';
+            }
+
+            return 'home';
+        }
+
+        return (string) ($r->audit_type ?: 'audit');
+    }
+
+    public static function auditTypeTitleCase(AuditRequest $r): string
+    {
+        if ($r->audit_type === 'commercial') {
+            return 'Commercial / Industrial';
+        }
+        if ($r->audit_type === 'home-office') {
+            if ($r->audit_subtype === 'office') {
+                return 'Office';
+            }
+
+            return 'Home';
+        }
+
+        return $r->audit_type ? ucfirst((string) $r->audit_type) : 'Audit';
     }
 
     public function envelope(): Envelope

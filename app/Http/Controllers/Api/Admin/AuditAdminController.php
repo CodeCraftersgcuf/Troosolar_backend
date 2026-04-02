@@ -409,17 +409,18 @@ class AuditAdminController extends Controller
 
             $auditRequest->save();
 
-            // Send approval email to customer once admin approves audit.
-            if ($data['status'] === 'approved') {
+            // Customer emails: approved and rejected only (no email for "completed").
+            if (in_array($data['status'], ['approved', 'rejected'], true)) {
                 $auditRequest->loadMissing('user');
                 $user = $auditRequest->user;
                 if ($user && !empty($user->email)) {
                     try {
-                        Mail::to($user->email)->send(new AuditStatusEmail($user, $auditRequest, 'approved'));
+                        Mail::to($user->email)->send(new AuditStatusEmail($user, $auditRequest, $data['status']));
                     } catch (\Throwable $e) {
-                        Log::warning('Audit approval email failed: ' . $e->getMessage(), [
+                        Log::warning('Audit status email failed: ' . $e->getMessage(), [
                             'audit_request_id' => $auditRequest->id,
                             'user_id' => $user->id,
+                            'status' => $data['status'],
                         ]);
                     }
                 }
