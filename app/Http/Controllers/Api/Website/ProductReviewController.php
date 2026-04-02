@@ -16,7 +16,7 @@ class ProductReviewController extends Controller
     {
         try {
             $query = ProductReveiews::query()
-                ->with(['user:id,name,first_name,sur_name'])
+                ->with(['user:id,first_name,sur_name'])
                 ->orderByDesc('created_at');
 
             if ($request->filled('product_id')) {
@@ -110,7 +110,7 @@ class ProductReviewController extends Controller
                 'review' => $data['review'],
                 'rating' => $data['rating'],
             ]
-        )->load('user:id,name,first_name,sur_name');
+        )->load('user:id,first_name,sur_name');
 
         return response()->json([
             'status' => 'success',
@@ -160,7 +160,7 @@ class ProductReviewController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Review updated successfully',
-            'data' => $review->load('user:id,name,first_name,sur_name'),
+            'data' => $review->load('user:id,first_name,sur_name'),
         ]);
     } catch (\Exception $e) {
         return response()->json([

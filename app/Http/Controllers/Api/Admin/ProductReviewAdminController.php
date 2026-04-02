@@ -27,7 +27,7 @@ class ProductReviewAdminController extends Controller
         }
 
         $query = ProductReveiews::query()
-            ->with(['user:id,name,first_name,sur_name', 'product:id,title'])
+            ->with(['user:id,first_name,sur_name', 'product:id,title'])
             ->orderByDesc('created_at');
 
         if ($request->filled('product_id')) {
@@ -58,7 +58,7 @@ class ProductReviewAdminController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Review updated successfully',
-            'data' => $review->load(['user:id,name,first_name,sur_name', 'product:id,title']),
+            'data' => $review->load(['user:id,first_name,sur_name', 'product:id,title']),
         ]);
     }
 
