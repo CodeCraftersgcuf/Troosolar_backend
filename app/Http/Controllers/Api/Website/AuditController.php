@@ -48,7 +48,7 @@ class AuditController extends Controller
                     'string',
                 ],
                 'building_type' => [
-                    Rule::requiredIf(fn () => $isOfficeSubtype),
+                    Rule::requiredIf(fn () => $isOfficeSubtype || $isHomeSubtype),
                     'nullable',
                     'string',
                     'max:255',
