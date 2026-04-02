@@ -55,7 +55,7 @@ class AuditController extends Controller
                 ],
                 'property_state' => 'required|string|max:255',
                 'property_address' => ['required', 'string'],
-                'property_landmark' => 'nullable|string|max:255',
+                'property_landmark' => 'required|string|max:255',
                 'property_floors' => [
                     Rule::requiredIf(fn () => $isHomeSubtype || $isOfficeSubtype),
                     'nullable',
