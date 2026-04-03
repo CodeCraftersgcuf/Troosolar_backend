@@ -26,6 +26,7 @@ class StoreDeliveryAddressRequest extends FormRequest
         return [
             'phone_number' => 'required|string|max:20',
             'title' => 'required|string|max:255',
+            'contact_name' => 'nullable|string|max:255',
             'address' => 'required|string',
             'state' => 'required|string|max:255',
         ];

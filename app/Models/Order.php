@@ -29,10 +29,17 @@ class Order extends Model
         'order_type',
         'audit_request_id',
         'installation_requested_date',
+        'estimated_delivery_from',
+        'estimated_delivery_to',
+        'delivery_estimate_label',
+        'include_installation',
     ];
 
     protected $casts = [
         'installation_requested_date' => 'date',
+        'estimated_delivery_from' => 'date',
+        'estimated_delivery_to' => 'date',
+        'include_installation' => 'boolean',
     ];
 
     public function product()

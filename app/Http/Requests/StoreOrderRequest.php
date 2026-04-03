@@ -23,7 +23,7 @@ class StoreOrderRequest extends FormRequest
     {
            return [
         'delivery_address_id'     => 'required|exists:delivery_addresses,id',
-        'payment_method'          => 'required|in:direct,card,bank_transfer,loan,withdrawal',
+        'payment_method'          => 'required|in:direct,card,bank_transfer,loan,withdrawal,wallet',
         'note'                    => 'nullable|string|max:1000',
         'items'                   => 'required|array|min:1',
         'items.*.itemable_type'   => 'required',
@@ -31,6 +31,8 @@ class StoreOrderRequest extends FormRequest
         'items.*.quantity'        => 'required|integer|min:1',
         'installation_price'      => 'nullable|numeric',
         'mono_loan_calculation_id'=> 'nullable|exists:mono_loan_calculations,id',
+        'include_installation'    => 'nullable|boolean',
+        'installation_requested_date' => 'nullable|date|date_format:Y-m-d',
     ];
     }
 }

@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\Admin\{
     AnalyticController,
     BNPLAdminController,
     CalculatorSettingsController,
+    CheckoutSettingsController,
     ProductReviewAdminController
 };
 use App\Http\Controllers\Api\Website\{
@@ -472,6 +473,8 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     Route::prefix('admin')->group(function () {
         Route::get('/calculator-settings', [CalculatorSettingsController::class, 'show']);
         Route::put('/calculator-settings', [CalculatorSettingsController::class, 'update']);
+        Route::get('/checkout-settings', [CheckoutSettingsController::class, 'show']);
+        Route::put('/checkout-settings', [CheckoutSettingsController::class, 'update']);
     });
 
     // ================= ADMIN CUSTOM ORDER ROUTES =================

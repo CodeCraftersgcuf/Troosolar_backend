@@ -14,6 +14,7 @@ use App\Models\LoanApplication;
 use App\Models\LoanCalculation;
 use App\Helpers\ResponseHelper;
 use App\Models\CartItem;
+use App\Models\CheckoutSetting;
 use App\Models\DeliveryAddress;
 use App\Models\Transaction;
 use App\Models\User;
@@ -29,6 +30,7 @@ use Exception;
 use App\Models\ReferralSettings;
 use App\Models\AuditRequest;
 use App\Services\ReferralRewardService;
+use App\Support\CheckoutPricing;
 
 class OrderController extends Controller
 {
@@ -256,17 +258,41 @@ class OrderController extends Controller
             }
         }
 
+        $settings = CheckoutSetting::get();
+        $deliveryFee = (float) $settings->delivery_fee;
+        $installationSum = (float) CheckoutPricing::installationTotalFromCartItems($cartItems);
+        $includeInstallation = (bool) ($data['include_installation'] ?? false);
+        $insuranceFee = $includeInstallation ? (float) $settings->insurance_fee : 0.0;
+        $deliveryWindow = CheckoutPricing::deliveryWindow($settings);
+
         // 3) Create order shell
-        $order = Order::create([
-            'user_id'             => $userId,
+        $orderPayload = [
+            'user_id' => $userId,
             'delivery_address_id' => $deliveryAddressId,
-            'order_number'        => strtoupper(Str::random(10)),
-            'payment_method'      => $data['payment_method'] ?? 'cash',
-            'payment_status'      => 'paid',
-            'order_status'        => 'pending',
-            'note'                => $data['note'] ?? null,
-            'total_price'         => 0, // set later
-        ]);
+            'order_number' => strtoupper(Str::random(10)),
+            'payment_method' => $data['payment_method'] ?? 'cash',
+            'payment_status' => 'paid',
+            'order_status' => 'pending',
+            'note' => $data['note'] ?? null,
+            'total_price' => 0,
+        ];
+        if (Schema::hasColumn('orders', 'estimated_delivery_from')) {
+            $orderPayload['estimated_delivery_from'] = $deliveryWindow['estimated_from'];
+            $orderPayload['estimated_delivery_to'] = $deliveryWindow['estimated_to'];
+            $orderPayload['delivery_estimate_label'] = $deliveryWindow['label'];
+        }
+        if (Schema::hasColumn('orders', 'include_installation')) {
+            $orderPayload['include_installation'] = $includeInstallation;
+        }
+        if (
+            $includeInstallation
+            && Schema::hasColumn('orders', 'installation_requested_date')
+            && ! empty($data['installation_requested_date'] ?? null)
+        ) {
+            $orderPayload['installation_requested_date'] = $data['installation_requested_date'];
+        }
+
+        $order = Order::create($orderPayload);
 
         // 4) Create order items from cart rows
         $total            = 0;
@@ -341,11 +367,16 @@ class OrderController extends Controller
             ]);
         }
 
-        // 5) Persist totals + convenience ids
+        // 5) Persist totals + convenience ids (+ delivery / optional installation + insurance)
+        $orderTotal = $total + $deliveryFee + ($includeInstallation ? ($installationSum + $insuranceFee) : 0.0);
+
         $order->update([
-            'total_price' => $total,
-            'product_id'  => $primaryProductId,
-            'bundle_id'   => $primaryBundleId,
+            'total_price' => $orderTotal,
+            'product_id' => $primaryProductId,
+            'bundle_id' => $primaryBundleId,
+            'delivery_fee' => $deliveryFee,
+            'installation_price' => $includeInstallation ? $installationSum : 0.0,
+            'insurance_fee' => $insuranceFee,
         ]);
 
         // 6) Clear cart
@@ -568,6 +599,13 @@ class OrderController extends Controller
             'created_at'       => optional($order->created_at)->format('Y-m-d H:i:s'),
             'delivery_address' => $order->relationLoaded('deliveryAddress') ? $order->deliveryAddress : null,
             'items'            => $items,
+            'delivery_fee'     => $order->delivery_fee,
+            'insurance_fee'    => $order->insurance_fee,
+            'installation_price' => $order->installation_price,
+            'include_installation' => (bool) ($order->include_installation ?? false),
+            'estimated_delivery_from' => optional($order->estimated_delivery_from)->format('Y-m-d'),
+            'estimated_delivery_to' => optional($order->estimated_delivery_to)->format('Y-m-d'),
+            'delivery_estimate_label' => $order->delivery_estimate_label,
         ];
 
         // Order owner (always when user is loaded) — My Orders / order detail must not use the viewer's profile

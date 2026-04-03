@@ -45,6 +45,7 @@ public function update(Request $request, $id)
         $request->validate([
             'phone_number' => 'required|string|max:20',
             'title' => 'required|string|max:100',
+            'contact_name' => 'nullable|string|max:255',
             'address' => 'required|string|max:255',
             'state' => 'required|string|max:100',
         ]);

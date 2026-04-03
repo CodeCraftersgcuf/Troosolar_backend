@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Requests\StoreCartItemRequest;
 use App\Http\Requests\UpdateCartItemRequest;
 use App\Models\Bundles;
+use App\Models\CheckoutSetting;
+use App\Support\CheckoutPricing;
 use Illuminate\Support\Arr;
 
 class CartController extends Controller
@@ -77,13 +79,16 @@ class CartController extends Controller
         // }
 
         try {
-            // ---- Configurable
-            $deliveryFee       = (int) config('checkout.delivery_fee', 20000);
-            // Installation is derived from actual cart items (not hardcoded fallback).
-            $installationPrice = 0;
-            $installationText  = (string) config('checkout.installation_text',
-                'Installation will be carried out by our skilled technicians. You can choose to use our installers.'
-            );
+            $settings = CheckoutSetting::get();
+            $deliveryFee = (int) $settings->delivery_fee;
+            $installationText = trim((string) ($settings->installation_description ?? ''));
+            if ($installationText === '') {
+                $installationText = (string) config('checkout.installation_text',
+                    'Installation will be carried out by our skilled technicians. You can choose to use our installers.'
+                );
+            }
+            $insuranceFee = (int) $settings->insurance_fee;
+            $deliveryWindow = CheckoutPricing::deliveryWindow($settings);
 
             // 1) Load cart items and their polymorphic models
             $rawItems = CartItem::query()
@@ -99,13 +104,23 @@ class CartController extends Controller
                     'data'    => [
                         'cart' => ['items' => [], 'items_count' => 0, 'items_total' => 0],
                         'addresses' => [],
-                        'delivery' => ['price' => $deliveryFee],
-                        'installation' => [
-                            'description'    => $installationText,
-                            'price'          => $installationPrice,
-                            'estimated_date' => now()->addDays(7)->toDateString(),
+                        'delivery' => [
+                            'price' => $deliveryFee,
+                            'estimate_label' => $deliveryWindow['label'],
+                            'estimated_from' => $deliveryWindow['estimated_from'],
+                            'estimated_to' => $deliveryWindow['estimated_to'],
                         ],
-                        'grand_total' => $deliveryFee + $installationPrice,
+                        'installation' => [
+                            'description' => $installationText,
+                            'price' => 0,
+                            'insurance_price' => $insuranceFee,
+                            'estimated_date' => CheckoutPricing::installationEstimatedDate($settings),
+                        ],
+                        'totals' => [
+                            'grand_total_excluding_installation' => $deliveryFee,
+                            'grand_total_with_installation' => $deliveryFee + $insuranceFee,
+                        ],
+                        'grand_total' => $deliveryFee,
                     ],
                 ], 200);
             }
@@ -144,42 +159,49 @@ class CartController extends Controller
                 ], 422);
             }
 
-            // 3a) Calculate installation from cart line items using actual model values.
-            // Product API exposes installation_price (e.g. 0), so we honor that value.
-            $installationPrice = (int) round($rawItems->sum(function ($item) {
-                if (!$item->itemable) {
-                    return 0;
-                }
-                $qty = max(1, (int) ($item->quantity ?? 1));
-                $perUnitInstall = (float) (
-                    $item->itemable->installation_price
-                    ?? $item->itemable->install_price
-                    ?? $item->itemable->installation_cost
-                    ?? 0
-                );
-                return max(0, $perUnitInstall) * $qty;
-            }));
+            // 3a) Installation total from cart line items (per-product installation_price).
+            $installationPrice = CheckoutPricing::installationTotalFromCartItems($rawItems);
 
             // 3) Totals
             $itemsSubtotal = (int) $cartItems->sum('subtotal');
             $itemsCount    = (int) $cartItems->sum('quantity');
 
-            // 4) Addresses
+            // 4) Addresses (+ contact name fallback to account holder)
+            $viewer = Auth::user();
+            $fallbackName = $viewer ? trim(($viewer->first_name ?? '').' '.($viewer->sur_name ?? '')) : '';
             $addresses = DeliveryAddress::query()
                 ->where('user_id', $userID)
                 ->orderByDesc('id')
-                ->get(['id', 'title', 'address', 'state', 'phone_number']);
+                ->get(['id', 'title', 'contact_name', 'address', 'state', 'phone_number'])
+                ->map(function ($a) use ($fallbackName) {
+                    $cn = trim((string) ($a->contact_name ?? ''));
+
+                    return [
+                        'id' => $a->id,
+                        'title' => $a->title,
+                        'contact_name' => $cn !== '' ? $cn : $fallbackName,
+                        'address' => $a->address,
+                        'state' => $a->state,
+                        'phone_number' => $a->phone_number,
+                    ];
+                });
 
             // 5) Blocks
             $installation = [
-                'description'    => $installationText,
-                'price'          => $installationPrice,
-                'estimated_date' => now()->addDays(7)->toDateString(),
+                'description' => $installationText,
+                'price' => $installationPrice,
+                'insurance_price' => $insuranceFee,
+                'estimated_date' => CheckoutPricing::installationEstimatedDate($settings),
             ];
-            $delivery = ['price' => $deliveryFee];
+            $delivery = [
+                'price' => $deliveryFee,
+                'estimate_label' => $deliveryWindow['label'],
+                'estimated_from' => $deliveryWindow['estimated_from'],
+                'estimated_to' => $deliveryWindow['estimated_to'],
+            ];
 
-            // 6) Grand total
-            $grandTotal = $itemsSubtotal + $deliveryFee + $installationPrice;
+            $baseTotal = $itemsSubtotal + $deliveryFee;
+            $withInstallTotal = $baseTotal + $installationPrice + $insuranceFee;
 
             return response()->json([
                 'status'  => 'success',
@@ -190,10 +212,18 @@ class CartController extends Controller
                         'items_count' => $itemsCount,
                         'items_total' => $itemsSubtotal,
                     ],
-                    'addresses'    => $addresses,
-                    'delivery'     => $delivery,
+                    'addresses' => $addresses,
+                    'delivery' => $delivery,
                     'installation' => $installation,
-                    'grand_total'  => $grandTotal,
+                    'totals' => [
+                        'items_total' => $itemsSubtotal,
+                        'delivery' => $deliveryFee,
+                        'installation' => $installationPrice,
+                        'insurance' => $insuranceFee,
+                        'grand_total_excluding_installation' => $baseTotal,
+                        'grand_total_with_installation' => $withInstallTotal,
+                    ],
+                    'grand_total' => $baseTotal,
                 ],
             ], 200);
 
