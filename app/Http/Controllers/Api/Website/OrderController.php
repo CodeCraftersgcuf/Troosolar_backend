@@ -420,6 +420,16 @@ class OrderController extends Controller
         // 6) Clear cart
         CartItem::where('user_id', $userId)->delete();
 
+        // Online (Flutterwave): payment already succeeded — persist transaction + referral rewards.
+        if ($orderPaymentMethod === 'direct' && ! empty($data['flutterwave_transaction_id'] ?? null)) {
+            $this->recordOrderPaymentTransactionAndReferral(
+                $order->fresh(),
+                (float) $orderTotal,
+                (string) $data['flutterwave_transaction_id'],
+                'direct'
+            );
+        }
+
         // 7) Load for response
         $order->load(['items.itemable', 'deliveryAddress', 'user:id,first_name,sur_name,email,phone']);
 
@@ -788,6 +798,43 @@ class OrderController extends Controller
 
         return $row;
     }
+
+    /**
+     * Store a completed payment transaction and apply referral rewards (cart + legacy confirm flows).
+     */
+    private function recordOrderPaymentTransactionAndReferral(Order $order, float $amount, string $txId, string $type): Transaction
+    {
+        $title = match ($type) {
+            'audit' => 'Audit Payment',
+            'wallet' => 'Order Payment - Wallet',
+            default => 'Order Payment - Direct',
+        };
+
+        $transaction = Transaction::create([
+            'user_id' => $order->user_id,
+            'amount' => $amount,
+            'tx_id' => $txId,
+            'title' => $title,
+            'type' => 'outgoing',
+            'method' => $type === 'wallet' ? 'Wallet' : 'Direct',
+            'status' => 'Completed',
+            'transacted_at' => now(),
+        ]);
+
+        $isBuyNowOrder = (($order->order_type ?? null) === 'buy_now')
+            || (($order->order_type ?? null) === null
+                && ($order->payment_method ?? null) === 'direct'
+                && empty($order->mono_calculation_id));
+        if ($isBuyNowOrder) {
+            $rewardBase = Schema::hasColumn('orders', 'product_price')
+                ? (float) ($order->product_price ?? $order->total_price ?? 0)
+                : (float) ($order->total_price ?? 0);
+            app(ReferralRewardService::class)->award(Auth::user(), $rewardBase, 'buy_now_completed', $order);
+        }
+
+        return $transaction;
+    }
+
     public function paymentConfirmation(Request $request)
 {
     try {
@@ -833,35 +880,12 @@ class OrderController extends Controller
         }
     $order->update();
 
-        // Determine transaction title based on type
-        $title = match($type) {
-            'audit' => 'Audit Payment',
-            'wallet' => 'Order Payment - Wallet',
-            default => 'Order Payment - Direct'
-        };
-
-    $transaction=Transaction::create([
-        'user_id'=>$order->user_id,
-        'amount'=>$amount,
-        'tx_id'=>$tx_id,
-            "title"=>$title,
-        "type"=>"outgoing",
-            "method"=>$type === 'wallet' ? 'Wallet' : 'Direct',
-        "status"=>"Completed",
-        "transacted_at"=>now()
-        ]);
-
-        // Apply referral reward only once when Buy Now payment completes.
-        $isBuyNowOrder = (($order->order_type ?? null) === 'buy_now')
-            || (($order->order_type ?? null) === null
-                && ($order->payment_method ?? null) === 'direct'
-                && empty($order->mono_calculation_id));
-        if ($isBuyNowOrder) {
-            $rewardBase = Schema::hasColumn('orders', 'product_price')
-                ? (float) ($order->product_price ?? $order->total_price ?? 0)
-                : (float) ($order->total_price ?? 0);
-            app(ReferralRewardService::class)->award(Auth::user(), $rewardBase, 'buy_now_completed', $order);
-        }
+        $transaction = $this->recordOrderPaymentTransactionAndReferral(
+            $order,
+            (float) $amount,
+            (string) $tx_id,
+            $type
+        );
 
         return ResponseHelper::success([
             'order_id' => $order->id,
