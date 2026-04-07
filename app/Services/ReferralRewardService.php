@@ -46,13 +46,22 @@ class ReferralRewardService
         }
 
         $settings = ReferralSettings::getSettings();
-        $rewardType = strtolower((string) ($settings->referral_reward_type ?? 'percentage'));
-        $rewardValue = (float) ($settings->referral_reward_value ?? 0);
+        $rewardType = strtolower((string) ($settings->referral_reward_type ?? 'fixed'));
+
+        $fixedNgn = (float) ($settings->referral_fixed_ngn ?? 0);
+        if ($fixedNgn <= 0) {
+            $fixedNgn = (float) ($settings->referral_reward_value ?? 0);
+        }
+
+        $pct = (float) ($settings->commission_percentage ?? 0);
+        if ($pct <= 0 && $rewardType === 'percentage') {
+            $pct = (float) ($settings->referral_reward_value ?? 0);
+        }
 
         if ($rewardType === 'fixed') {
-            $rewardAmount = round(max(0, $rewardValue), 2);
+            $rewardAmount = round(max(0, $fixedNgn), 2);
         } else {
-            $rewardAmount = round(($baseAmount * max(0, $rewardValue)) / 100, 2);
+            $rewardAmount = round(($baseAmount * max(0, $pct)) / 100, 2);
         }
 
         if ($rewardAmount <= 0) {

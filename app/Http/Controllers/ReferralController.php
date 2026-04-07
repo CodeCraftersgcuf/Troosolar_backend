@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\ResponseHelper;
+use App\Models\ReferralSettings;
 use App\Models\User;
 use App\Models\Wallet;
 use Illuminate\Http\Request;
@@ -43,10 +44,49 @@ class ReferralController extends Controller
 
         $referralCount = (int) User::where('refferal_code', $referralCode)->count();
 
+        $settings = ReferralSettings::getSettings();
+        $rewardType = strtolower((string) ($settings->referral_reward_type ?? 'fixed'));
+        $rewardValue = (float) ($settings->referral_reward_value ?? 0);
+        $minWithdraw = (float) ($settings->minimum_withdrawal ?? 0);
+        $outrightDiscount = (float) ($settings->outright_discount_percentage ?? 0);
+
+        $fixedNgn = (float) ($settings->referral_fixed_ngn ?? 0);
+        if ($fixedNgn <= 0) {
+            $fixedNgn = $rewardType === 'fixed' && $rewardValue > 0 ? $rewardValue : 50000.0;
+        }
+
+        $pctVal = (float) ($settings->commission_percentage ?? 0);
+        if ($pctVal <= 0) {
+            $pctVal = $rewardType === 'percentage' && $rewardValue > 0 ? $rewardValue : 5.0;
+        }
+
+        $pctLabel = $this->formatReferralPercentLabel($pctVal);
+        $lineFixed = 'Fixed amount: ₦'.number_format($fixedNgn, 0).' per qualifying referral purchase.';
+        $linePct = "Percentage: {$pctLabel}% of each qualifying referral purchase amount.";
+
+        if ($rewardType === 'fixed') {
+            $programSummary = 'Right now you earn ₦'.number_format($fixedNgn, 0).' per qualifying referral purchase.';
+            $activeNote = 'Active payout: fixed cash amount. The percentage below is kept on file if Troosolar switches the program.';
+        } else {
+            $programSummary = "Right now you earn {$pctLabel}% of each qualifying referral purchase.";
+            $activeNote = 'Active payout: percentage of purchase. The fixed amount below is kept on file if Troosolar switches the program.';
+        }
+
         $data = [
             'referral_code' => $referralCode,
             'referral_balance' => (float) ($wallet->referral_balance ?? 0),
             'my_referrals' => $referralCount,
+            'program_summary' => $programSummary,
+            'program_line_fixed' => $lineFixed,
+            'program_line_percentage' => $linePct,
+            'program_active_rule' => $rewardType,
+            'program_active_note' => $activeNote,
+            'referral_reward_type' => $rewardType,
+            'referral_reward_value' => $rewardValue,
+            'referral_fixed_ngn' => $fixedNgn,
+            'referral_percentage' => $pctVal,
+            'minimum_withdrawal' => $minWithdraw,
+            'outright_discount_percentage' => $outrightDiscount,
         ];
 
         return ResponseHelper::success($data, 'Your Referral Balance');
@@ -76,5 +116,12 @@ class ReferralController extends Controller
         $user->save();
 
         return $candidate;
+    }
+
+    private function formatReferralPercentLabel(float $value): string
+    {
+        $isWhole = abs($value - round($value)) < 0.00001;
+
+        return $isWhole ? (string) (int) round($value) : rtrim(rtrim(number_format($value, 2), '0'), '.');
     }
 }

@@ -21,6 +21,16 @@ class UserRequest extends FormRequest
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
+    protected function prepareForValidation(): void
+    {
+        // Accept both spellings; DB column is refferal_code
+        if ($this->has('referral_code') && ! $this->filled('refferal_code')) {
+            $this->merge([
+                'refferal_code' => $this->input('referral_code'),
+            ]);
+        }
+    }
+
     public function rules(): array
     {
         // Check if this is a registration request (POST to /register)
@@ -34,6 +44,7 @@ class UserRequest extends FormRequest
         'password'         => $isRegistration ? 'required|string|min:6|max:255' : 'nullable|string|min:6|max:255',
         'phone'            => 'nullable|string|max:20',
         'profile_picture'  => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+        'referral_code'    => 'nullable|string|max:255',
         'refferal_code'    => 'nullable|string|max:255',
         'user_code'        => 'nullable|string|max:255',
         'role'             => 'nullable|string|max:255',

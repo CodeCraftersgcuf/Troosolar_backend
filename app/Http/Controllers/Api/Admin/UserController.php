@@ -41,6 +41,24 @@ public function index()
     try {
         $data = $request->validated();
 
+        // Optional referral: must match an existing user's shareable user_code (case-insensitive)
+        $refInput = isset($data['refferal_code']) ? trim((string) $data['refferal_code']) : '';
+        if ($refInput !== '') {
+            $referrer = User::whereRaw('LOWER(TRIM(user_code)) = ?', [Str::lower($refInput)])->first();
+            if (! $referrer) {
+                return ResponseHelper::error('This referral code is not valid.', 422);
+            }
+            $data['refferal_code'] = $referrer->user_code;
+            Log::info('User registered with referral code', [
+                'referrer_id' => $referrer->id,
+                'referrer_user_code' => $referrer->user_code,
+                'email' => $data['email'] ?? null,
+            ]);
+        } else {
+            $data['refferal_code'] = null;
+        }
+        unset($data['referral_code']);
+
         // Validate required fields
         if (empty($data['email'])) {
             return ResponseHelper::error('Email is required', 422);

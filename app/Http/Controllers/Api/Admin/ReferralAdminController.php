@@ -22,12 +22,19 @@ class ReferralAdminController extends Controller
         try {
             $settings = ReferralSettings::getSettings();
             
+            $fixedNgn = (float) ($settings->referral_fixed_ngn ?? 0);
+            if ($fixedNgn <= 0) {
+                $fixedNgn = (float) ($settings->referral_reward_value ?? 0);
+            }
+
             return ResponseHelper::success([
                 'commission_percentage' => (float) $settings->commission_percentage,
+                'referral_percentage' => (float) $settings->commission_percentage,
                 'minimum_withdrawal' => (float) $settings->minimum_withdrawal,
                 'outright_discount_percentage' => (float) ($settings->outright_discount_percentage ?? 0),
-                'referral_reward_type' => (string) ($settings->referral_reward_type ?? 'percentage'),
+                'referral_reward_type' => (string) ($settings->referral_reward_type ?? 'fixed'),
                 'referral_reward_value' => (float) ($settings->referral_reward_value ?? 0),
+                'referral_fixed_ngn' => $fixedNgn > 0 ? $fixedNgn : 50000.0,
             ], 'Referral settings retrieved successfully');
         } catch (\Exception $e) {
             return ResponseHelper::error('Failed to retrieve referral settings: ' . $e->getMessage(), 500);
@@ -43,6 +50,8 @@ class ReferralAdminController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'commission_percentage' => 'nullable|numeric|min:0|max:100',
+                'referral_percentage' => 'nullable|numeric|min:0|max:100',
+                'referral_fixed_ngn' => 'nullable|numeric|min:0',
                 'minimum_withdrawal' => 'nullable|numeric|min:0',
                 'outright_discount_percentage' => 'nullable|numeric|min:0|max:100',
                 'referral_reward_type' => 'nullable|in:percentage,fixed',
@@ -57,6 +66,9 @@ class ReferralAdminController extends Controller
             if ($request->has('commission_percentage')) {
                 $data['commission_percentage'] = $request->commission_percentage;
             }
+            if ($request->has('referral_percentage')) {
+                $data['commission_percentage'] = $request->referral_percentage;
+            }
             if ($request->has('minimum_withdrawal')) {
                 $data['minimum_withdrawal'] = $request->minimum_withdrawal;
             }
@@ -69,9 +81,18 @@ class ReferralAdminController extends Controller
             if ($request->has('referral_reward_value')) {
                 $data['referral_reward_value'] = $request->referral_reward_value;
             }
+            if ($request->has('referral_fixed_ngn')) {
+                $data['referral_fixed_ngn'] = $request->referral_fixed_ngn;
+            }
 
-            // Backward compatibility with older admin UI that sends commission_percentage only.
-            if ($request->has('commission_percentage') && !$request->has('referral_reward_value')) {
+            // Backward compatibility: legacy UI sends commission_percentage only (no explicit reward fields).
+            if (
+                $request->has('commission_percentage')
+                && ! $request->has('referral_reward_value')
+                && ! $request->has('referral_reward_type')
+                && ! $request->has('referral_fixed_ngn')
+                && ! $request->has('referral_percentage')
+            ) {
                 $data['referral_reward_type'] = 'percentage';
                 $data['referral_reward_value'] = $request->commission_percentage;
             }
@@ -84,14 +105,33 @@ class ReferralAdminController extends Controller
                 return ResponseHelper::error('No data provided to update', 400);
             }
 
+            $referralTouched = $request->hasAny([
+                'referral_reward_type',
+                'referral_fixed_ngn',
+                'referral_percentage',
+                'commission_percentage',
+                'referral_reward_value',
+            ]);
+
+            if ($referralTouched) {
+                $data = $this->mergeReferralRewardSnapshot($data, ReferralSettings::getSettings());
+            }
+
             $settings = ReferralSettings::updateSettings($data);
+
+            $fixedNgn = (float) ($settings->referral_fixed_ngn ?? 0);
+            if ($fixedNgn <= 0) {
+                $fixedNgn = (float) ($settings->referral_reward_value ?? 0);
+            }
 
             return ResponseHelper::success([
                 'commission_percentage' => (float) $settings->commission_percentage,
+                'referral_percentage' => (float) $settings->commission_percentage,
                 'minimum_withdrawal' => (float) $settings->minimum_withdrawal,
                 'outright_discount_percentage' => (float) ($settings->outright_discount_percentage ?? 0),
-                'referral_reward_type' => (string) ($settings->referral_reward_type ?? 'percentage'),
+                'referral_reward_type' => (string) ($settings->referral_reward_type ?? 'fixed'),
                 'referral_reward_value' => (float) ($settings->referral_reward_value ?? 0),
+                'referral_fixed_ngn' => $fixedNgn > 0 ? $fixedNgn : 50000.0,
             ], 'Referral settings updated successfully');
         } catch (\Exception $e) {
             return ResponseHelper::error('Failed to update referral settings: ' . $e->getMessage(), 500);
@@ -181,6 +221,65 @@ class ReferralAdminController extends Controller
     }
 
     /**
+     * Users who registered with another user's referral code (for admin visibility).
+     * GET /api/admin/referral/referred-signups
+     */
+    public function getReferredSignups(Request $request)
+    {
+        try {
+            $query = User::query()
+                ->whereNotNull('refferal_code')
+                ->where('refferal_code', '!=', '')
+                ->with([
+                    'referrer' => function ($q) {
+                        $q->select('id', 'first_name', 'sur_name', 'email', 'user_code');
+                    },
+                ])
+                ->orderByDesc('created_at');
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('sur_name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('refferal_code', 'like', "%{$search}%");
+                });
+            }
+
+            $perPage = min(max((int) $request->get('per_page', 15), 1), 100);
+            $paginated = $query->paginate($perPage);
+
+            $formattedData = $paginated->getCollection()->map(function ($u) {
+                $ref = $u->referrer;
+
+                return [
+                    'id' => $u->id,
+                    'name' => trim(($u->first_name ?? '').' '.($u->sur_name ?? '')),
+                    'email' => $u->email,
+                    'code_used' => $u->refferal_code,
+                    'referrer_name' => $ref ? trim(($ref->first_name ?? '').' '.($ref->sur_name ?? '')) : null,
+                    'referrer_email' => $ref->email ?? null,
+                    'referrer_user_code' => $ref->user_code ?? null,
+                    'joined_at' => $u->created_at ? $u->created_at->format('d-m-y/h:iA') : null,
+                ];
+            });
+
+            return ResponseHelper::success([
+                'data' => $formattedData,
+                'pagination' => [
+                    'current_page' => $paginated->currentPage(),
+                    'last_page' => $paginated->lastPage(),
+                    'per_page' => $paginated->perPage(),
+                    'total' => $paginated->total(),
+                ],
+            ], 'Referred signups retrieved successfully');
+        } catch (\Exception $e) {
+            return ResponseHelper::error('Failed to retrieve referred signups: '.$e->getMessage(), 500);
+        }
+    }
+
+    /**
      * Get single user referral details
      * GET /api/admin/referral/user/{userId}
      */
@@ -227,6 +326,43 @@ class ReferralAdminController extends Controller
         } catch (\Exception $e) {
             return ResponseHelper::error('Failed to retrieve user referral details: ' . $e->getMessage(), 500);
         }
+    }
+
+    /**
+     * Keep referral_fixed_ngn, commission %, referral_reward_type and referral_reward_value aligned.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function mergeReferralRewardSnapshot(array $data, ReferralSettings $current): array
+    {
+        $type = strtolower((string) ($data['referral_reward_type'] ?? $current->referral_reward_type ?? 'fixed'));
+
+        $fixed = array_key_exists('referral_fixed_ngn', $data)
+            ? (float) $data['referral_fixed_ngn']
+            : (float) ($current->referral_fixed_ngn ?? 0);
+        if ($fixed <= 0) {
+            $fallback = (float) ($current->referral_reward_value ?? 0);
+            $fixed = strtolower((string) $current->referral_reward_type) === 'fixed' && $fallback > 0 ? $fallback : 50000.0;
+        }
+
+        $pct = array_key_exists('commission_percentage', $data)
+            ? (float) $data['commission_percentage']
+            : (float) ($current->commission_percentage ?? 0);
+        if ($pct <= 0) {
+            $fallback = (float) ($current->referral_reward_value ?? 0);
+            $pct = strtolower((string) $current->referral_reward_type) === 'percentage' && $fallback > 0 ? $fallback : 5.0;
+        }
+        if ($pct > 100) {
+            $pct = 100.0;
+        }
+
+        $data['referral_reward_type'] = $type;
+        $data['referral_fixed_ngn'] = round($fixed, 2);
+        $data['commission_percentage'] = round($pct, 2);
+        $data['referral_reward_value'] = $type === 'fixed' ? $data['referral_fixed_ngn'] : $data['commission_percentage'];
+
+        return $data;
     }
 }
 

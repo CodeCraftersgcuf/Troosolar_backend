@@ -17,6 +17,7 @@ class ReferralSettings extends Model
         'outright_discount_percentage',
         'referral_reward_type',
         'referral_reward_value',
+        'referral_fixed_ngn',
     ];
 
     protected $casts = [
@@ -24,6 +25,7 @@ class ReferralSettings extends Model
         'minimum_withdrawal' => 'decimal:2',
         'outright_discount_percentage' => 'decimal:2',
         'referral_reward_value' => 'decimal:2',
+        'referral_fixed_ngn' => 'decimal:2',
     ];
 
     /**
@@ -32,11 +34,12 @@ class ReferralSettings extends Model
     public static function getSettings()
     {
         return static::first() ?? static::create([
-            'commission_percentage' => 0.00,
+            'commission_percentage' => 5.00,
             'minimum_withdrawal' => 0.00,
             'outright_discount_percentage' => 0.00,
-            'referral_reward_type' => 'percentage',
-            'referral_reward_value' => 0.00,
+            'referral_reward_type' => 'fixed',
+            'referral_reward_value' => 50000.00,
+            'referral_fixed_ngn' => 50000.00,
         ]);
     }
 

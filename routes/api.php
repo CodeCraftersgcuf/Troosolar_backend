@@ -407,6 +407,7 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
         Route::get('settings', [\App\Http\Controllers\Api\Admin\ReferralAdminController::class, 'getSettings']);
         Route::put('settings', [\App\Http\Controllers\Api\Admin\ReferralAdminController::class, 'updateSettings']);
         Route::get('list', [\App\Http\Controllers\Api\Admin\ReferralAdminController::class, 'getReferralList']);
+        Route::get('referred-signups', [\App\Http\Controllers\Api\Admin\ReferralAdminController::class, 'getReferredSignups']);
         Route::get('user/{userId}', [\App\Http\Controllers\Api\Admin\ReferralAdminController::class, 'getUserReferralDetails']);
     });
 
