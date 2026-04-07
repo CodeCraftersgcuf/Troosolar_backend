@@ -87,8 +87,11 @@ class CartController extends Controller
                     'Installation will be carried out by our skilled technicians. You can choose to use our installers.'
                 );
             }
-            $insuranceFee = (int) $settings->insurance_fee;
+            $vatPct = (float) ($settings->vat_percentage ?? config('checkout.vat_percentage', 7.5));
+            $insPct = (float) ($settings->insurance_fee_percentage ?? config('checkout.insurance_fee_percentage', 3));
+            $installationFlatAddon = (int) ($settings->installation_flat_addon ?? 0);
             $deliveryWindow = CheckoutPricing::deliveryWindow($settings);
+            $includeInstallation = $request->boolean('include_installation');
 
             // 1) Load cart items and their polymorphic models
             $rawItems = CartItem::query()
@@ -98,6 +101,19 @@ class CartController extends Controller
                 ->get();
 
             if ($rawItems->isEmpty()) {
+                $itemsSubtotal = 0;
+                $installationFromProducts = 0;
+                $installationFull = $installationFromProducts + $installationFlatAddon;
+                $insuranceAmount = $includeInstallation
+                    ? CheckoutPricing::insuranceAmountFromPercent(0.0, (float) $installationFull, $insPct)
+                    : 0;
+                $taxableBase = (float) $itemsSubtotal + (float) $deliveryFee;
+                if ($includeInstallation) {
+                    $taxableBase += (float) $installationFull + (float) $insuranceAmount;
+                }
+                $vatAmount = CheckoutPricing::vatAmount($taxableBase, $vatPct);
+                $grandTotal = (int) round($taxableBase + (float) $vatAmount);
+
                 return response()->json([
                     'status'  => 'success',
                     'message' => 'Cart is empty.',
@@ -112,15 +128,28 @@ class CartController extends Controller
                         ],
                         'installation' => [
                             'description' => $installationText,
-                            'price' => 0,
-                            'insurance_price' => $insuranceFee,
+                            'installation_products_total' => 0,
+                            'installation_flat_addon' => $installationFlatAddon,
+                            'price' => $installationFull,
+                            'insurance_fee_percentage' => $insPct,
+                            'insurance_price' => $insuranceAmount,
                             'estimated_date' => CheckoutPricing::installationEstimatedDate($settings),
                         ],
                         'totals' => [
-                            'grand_total_excluding_installation' => $deliveryFee,
-                            'grand_total_with_installation' => $deliveryFee + $insuranceFee,
+                            'items_total' => 0,
+                            'delivery' => $deliveryFee,
+                            'installation_products' => 0,
+                            'installation_flat_addon' => $installationFlatAddon,
+                            'installation_total' => $installationFull,
+                            'insurance' => $insuranceAmount,
+                            'insurance_fee_percentage' => $insPct,
+                            'vat_percentage' => $vatPct,
+                            'vat_amount' => $vatAmount,
+                            'taxable_base' => (int) round($taxableBase),
+                            'grand_total' => $grandTotal,
+                            'include_installation' => $includeInstallation,
                         ],
-                        'grand_total' => $deliveryFee,
+                        'grand_total' => $grandTotal,
                     ],
                 ], 200);
             }
@@ -159,12 +188,23 @@ class CartController extends Controller
                 ], 422);
             }
 
-            // 3a) Installation total from cart line items (per-product installation_price).
-            $installationPrice = CheckoutPricing::installationTotalFromCartItems($rawItems);
+            // 3a) Installation total from cart line items (per-product installation_price) + optional shop addon.
+            $installationFromProducts = CheckoutPricing::installationTotalFromCartItems($rawItems);
+            $installationFull = $installationFromProducts + $installationFlatAddon;
 
             // 3) Totals
             $itemsSubtotal = (int) $cartItems->sum('subtotal');
             $itemsCount    = (int) $cartItems->sum('quantity');
+
+            $insuranceAmount = $includeInstallation
+                ? CheckoutPricing::insuranceAmountFromPercent((float) $itemsSubtotal, (float) $installationFull, $insPct)
+                : 0;
+            $taxableBase = (float) $itemsSubtotal + (float) $deliveryFee;
+            if ($includeInstallation) {
+                $taxableBase += (float) $installationFull + (float) $insuranceAmount;
+            }
+            $vatAmount = CheckoutPricing::vatAmount($taxableBase, $vatPct);
+            $grandTotal = (int) round($taxableBase + (float) $vatAmount);
 
             // 4) Addresses (+ contact name fallback to account holder)
             $viewer = Auth::user();
@@ -189,8 +229,11 @@ class CartController extends Controller
             // 5) Blocks
             $installation = [
                 'description' => $installationText,
-                'price' => $installationPrice,
-                'insurance_price' => $insuranceFee,
+                'installation_products_total' => $installationFromProducts,
+                'installation_flat_addon' => $installationFlatAddon,
+                'price' => $installationFull,
+                'insurance_fee_percentage' => $insPct,
+                'insurance_price' => $insuranceAmount,
                 'estimated_date' => CheckoutPricing::installationEstimatedDate($settings),
             ];
             $delivery = [
@@ -199,9 +242,6 @@ class CartController extends Controller
                 'estimated_from' => $deliveryWindow['estimated_from'],
                 'estimated_to' => $deliveryWindow['estimated_to'],
             ];
-
-            $baseTotal = $itemsSubtotal + $deliveryFee;
-            $withInstallTotal = $baseTotal + $installationPrice + $insuranceFee;
 
             return response()->json([
                 'status'  => 'success',
@@ -218,12 +258,18 @@ class CartController extends Controller
                     'totals' => [
                         'items_total' => $itemsSubtotal,
                         'delivery' => $deliveryFee,
-                        'installation' => $installationPrice,
-                        'insurance' => $insuranceFee,
-                        'grand_total_excluding_installation' => $baseTotal,
-                        'grand_total_with_installation' => $withInstallTotal,
+                        'installation_products' => $installationFromProducts,
+                        'installation_flat_addon' => $installationFlatAddon,
+                        'installation_total' => $installationFull,
+                        'insurance' => $insuranceAmount,
+                        'insurance_fee_percentage' => $insPct,
+                        'vat_percentage' => $vatPct,
+                        'vat_amount' => $vatAmount,
+                        'taxable_base' => (int) round($taxableBase),
+                        'grand_total' => $grandTotal,
+                        'include_installation' => $includeInstallation,
                     ],
-                    'grand_total' => $baseTotal,
+                    'grand_total' => $grandTotal,
                 ],
             ], 200);
 

@@ -73,4 +73,24 @@ class CheckoutPricing
 
         return self::addWorkingDays($base, $days)->toDateString();
     }
+
+    /** Insurance as % of (items subtotal + full installation amount). */
+    public static function insuranceAmountFromPercent(float $itemsSubtotal, float $installationFull, float $percent): int
+    {
+        if ($percent <= 0) {
+            return 0;
+        }
+        $base = max(0, $itemsSubtotal) + max(0, $installationFull);
+
+        return (int) round($base * ($percent / 100.0));
+    }
+
+    public static function vatAmount(float $taxableBase, float $vatPercent): int
+    {
+        if ($vatPercent <= 0 || $taxableBase <= 0) {
+            return 0;
+        }
+
+        return (int) round($taxableBase * ($vatPercent / 100.0));
+    }
 }

@@ -25,7 +25,11 @@ class CheckoutSettingsController extends Controller
                 'delivery_fee' => (int) $s->delivery_fee,
                 'delivery_min_working_days' => (int) $s->delivery_min_working_days,
                 'delivery_max_working_days' => (int) $s->delivery_max_working_days,
+                /** @deprecated legacy flat NGN; prefer insurance_fee_percentage */
                 'insurance_fee' => (int) $s->insurance_fee,
+                'vat_percentage' => (float) ($s->vat_percentage ?? config('checkout.vat_percentage', 7.5)),
+                'insurance_fee_percentage' => (float) ($s->insurance_fee_percentage ?? config('checkout.insurance_fee_percentage', 3)),
+                'installation_flat_addon' => (int) ($s->installation_flat_addon ?? 0),
                 'installation_schedule_working_days' => (int) $s->installation_schedule_working_days,
                 'installation_description' => (string) ($s->installation_description ?? ''),
                 'preview' => [
@@ -53,6 +57,9 @@ class CheckoutSettingsController extends Controller
                 'delivery_min_working_days' => 'nullable|integer|min:1|max:90',
                 'delivery_max_working_days' => 'nullable|integer|min:1|max:90',
                 'insurance_fee' => 'nullable|integer|min:0|max:100000000',
+                'vat_percentage' => 'nullable|numeric|min:0|max:100',
+                'insurance_fee_percentage' => 'nullable|numeric|min:0|max:100',
+                'installation_flat_addon' => 'nullable|integer|min:0|max:100000000',
                 'installation_schedule_working_days' => 'nullable|integer|min:1|max:90',
                 'installation_description' => 'nullable|string|max:5000',
             ]);
@@ -69,6 +76,15 @@ class CheckoutSettingsController extends Controller
             }
             if ($request->has('insurance_fee')) {
                 $s->insurance_fee = (int) $request->insurance_fee;
+            }
+            if ($request->has('vat_percentage')) {
+                $s->vat_percentage = (float) $request->vat_percentage;
+            }
+            if ($request->has('insurance_fee_percentage')) {
+                $s->insurance_fee_percentage = (float) $request->insurance_fee_percentage;
+            }
+            if ($request->has('installation_flat_addon')) {
+                $s->installation_flat_addon = (int) $request->installation_flat_addon;
             }
             if ($request->has('installation_schedule_working_days')) {
                 $s->installation_schedule_working_days = (int) $request->installation_schedule_working_days;
@@ -88,6 +104,9 @@ class CheckoutSettingsController extends Controller
                 'delivery_min_working_days' => (int) $s->delivery_min_working_days,
                 'delivery_max_working_days' => (int) $s->delivery_max_working_days,
                 'insurance_fee' => (int) $s->insurance_fee,
+                'vat_percentage' => (float) ($s->vat_percentage ?? config('checkout.vat_percentage', 7.5)),
+                'insurance_fee_percentage' => (float) ($s->insurance_fee_percentage ?? config('checkout.insurance_fee_percentage', 3)),
+                'installation_flat_addon' => (int) ($s->installation_flat_addon ?? 0),
                 'installation_schedule_working_days' => (int) $s->installation_schedule_working_days,
                 'installation_description' => (string) ($s->installation_description ?? ''),
                 'preview' => [

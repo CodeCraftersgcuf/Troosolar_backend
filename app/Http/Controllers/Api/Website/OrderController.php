@@ -260,9 +260,12 @@ class OrderController extends Controller
 
         $settings = CheckoutSetting::get();
         $deliveryFee = (float) $settings->delivery_fee;
-        $installationSum = (float) CheckoutPricing::installationTotalFromCartItems($cartItems);
+        $installationFromProducts = (float) CheckoutPricing::installationTotalFromCartItems($cartItems);
+        $installationAddon = (float) ($settings->installation_flat_addon ?? 0);
+        $installationSumFull = $installationFromProducts + $installationAddon;
         $includeInstallation = (bool) ($data['include_installation'] ?? false);
-        $insuranceFee = $includeInstallation ? (float) $settings->insurance_fee : 0.0;
+        $insPct = (float) ($settings->insurance_fee_percentage ?? config('checkout.insurance_fee_percentage', 3));
+        $vatPct = (float) ($settings->vat_percentage ?? config('checkout.vat_percentage', 7.5));
         $deliveryWindow = CheckoutPricing::deliveryWindow($settings);
 
         // 3) Create order shell
@@ -367,17 +370,30 @@ class OrderController extends Controller
             ]);
         }
 
-        // 5) Persist totals + convenience ids (+ delivery / optional installation + insurance)
-        $orderTotal = $total + $deliveryFee + ($includeInstallation ? ($installationSum + $insuranceFee) : 0.0);
+        // 5) Persist totals (+ delivery / optional installation + insurance % + VAT)
+        $itemsSubtotalOrder = (float) $total;
+        $insuranceFee = $includeInstallation
+            ? (float) CheckoutPricing::insuranceAmountFromPercent($itemsSubtotalOrder, $installationSumFull, $insPct)
+            : 0.0;
+        $taxableBase = $itemsSubtotalOrder + $deliveryFee;
+        if ($includeInstallation) {
+            $taxableBase += $installationSumFull + $insuranceFee;
+        }
+        $vatAmount = (float) CheckoutPricing::vatAmount((float) $taxableBase, $vatPct);
+        $orderTotal = round($taxableBase + $vatAmount, 2);
 
-        $order->update([
+        $updatePayload = [
             'total_price' => $orderTotal,
             'product_id' => $primaryProductId,
             'bundle_id' => $primaryBundleId,
             'delivery_fee' => $deliveryFee,
-            'installation_price' => $includeInstallation ? $installationSum : 0.0,
+            'installation_price' => $includeInstallation ? $installationSumFull : 0.0,
             'insurance_fee' => $insuranceFee,
-        ]);
+        ];
+        if (Schema::hasColumn('orders', 'vat_amount')) {
+            $updatePayload['vat_amount'] = $vatAmount;
+        }
+        $order->update($updatePayload);
 
         // 6) Clear cart
         CartItem::where('user_id', $userId)->delete();
@@ -571,6 +587,10 @@ class OrderController extends Controller
                 ],
             ]];
         }
+        $itemsSubtotalSum = array_sum(array_map(function ($i) {
+            return (float) ($i['subtotal'] ?? 0);
+        }, $items));
+
         $totalQuantity = array_sum(array_map(fn ($i) => (int) ($i['quantity'] ?? 1), $items));
         // When items have zero unit_price/subtotal (e.g. BNPL snapshot), distribute order total proportionally
         if ($totalPrice > 0 && $totalQuantity > 0 && count($items) > 0) {
@@ -586,6 +606,10 @@ class OrderController extends Controller
             unset($item);
         }
 
+        $vatAmount = Schema::hasColumn('orders', 'vat_amount') ? (float) ($order->vat_amount ?? 0) : 0.0;
+        $settingsForVat = CheckoutSetting::get();
+        $vatPctDisplay = (float) ($settingsForVat->vat_percentage ?? config('checkout.vat_percentage', 7.5));
+
         $baseData = [
             'id'               => $order->id,
             'order_number'     => $order->order_number,
@@ -599,10 +623,13 @@ class OrderController extends Controller
             'created_at'       => optional($order->created_at)->format('Y-m-d H:i:s'),
             'delivery_address' => $order->relationLoaded('deliveryAddress') ? $order->deliveryAddress : null,
             'items'            => $items,
+            'items_subtotal'   => round($itemsSubtotalSum, 2),
             'delivery_fee'     => $order->delivery_fee,
             'insurance_fee'    => $order->insurance_fee,
             'installation_price' => $order->installation_price,
             'include_installation' => (bool) ($order->include_installation ?? false),
+            'vat_amount'       => $vatAmount,
+            'vat_percentage'   => $vatPctDisplay,
             'estimated_delivery_from' => optional($order->estimated_delivery_from)->format('Y-m-d'),
             'estimated_delivery_to' => optional($order->estimated_delivery_to)->format('Y-m-d'),
             'delivery_estimate_label' => $order->delivery_estimate_label,

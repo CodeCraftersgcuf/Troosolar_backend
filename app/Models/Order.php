@@ -26,6 +26,7 @@ class Order extends Model
         'delivery_fee',
         'inspection_fee',
         'insurance_fee',
+        'vat_amount',
         'order_type',
         'audit_request_id',
         'installation_requested_date',
@@ -40,6 +41,7 @@ class Order extends Model
         'estimated_delivery_from' => 'date',
         'estimated_delivery_to' => 'date',
         'include_installation' => 'boolean',
+        'vat_amount' => 'decimal:2',
     ];
 
     public function product()
