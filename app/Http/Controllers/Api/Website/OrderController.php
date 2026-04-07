@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\OrderDeliveredThankYouMail;
+use App\Mail\OrderPlacedConfirmationMail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -125,6 +126,27 @@ class OrderController extends Controller
             Mail::to($user->email)->send(new OrderDeliveredThankYouMail($order, $user, $summary));
         } catch (\Throwable $e) {
             Log::error('Order delivered thank-you email failed: '.$e->getMessage(), [
+                'order_id' => $order->id,
+            ]);
+        }
+    }
+
+    /**
+     * Send confirmation email when a cart order is placed (POST /orders).
+     */
+    private function notifyCustomerOrderPlaced(Order $order): void
+    {
+        $order->loadMissing('user');
+        $user = $order->user;
+        if (! $user || ! $user->email) {
+            return;
+        }
+
+        try {
+            $summary = $this->orderDeliveredSummaryLine($order);
+            Mail::to($user->email)->send(new OrderPlacedConfirmationMail($order, $user, $summary));
+        } catch (\Throwable $e) {
+            Log::error('Order placed confirmation email failed: '.$e->getMessage(), [
                 'order_id' => $order->id,
             ]);
         }
@@ -442,6 +464,8 @@ class OrderController extends Controller
         }
 
         $response = $this->formatOrder($order, $extras);
+
+        $this->notifyCustomerOrderPlaced($order);
 
         return ResponseHelper::success($response, 'Order placed successfully');
     });
