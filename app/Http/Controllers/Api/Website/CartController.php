@@ -15,6 +15,7 @@ use App\Http\Requests\StoreCartItemRequest;
 use App\Http\Requests\UpdateCartItemRequest;
 use App\Models\Bundles;
 use App\Models\CheckoutSetting;
+use App\Models\ReferralSettings;
 use App\Support\CheckoutPricing;
 use Illuminate\Support\Arr;
 
@@ -35,6 +36,16 @@ class CartController extends Controller
         }
 
         return (float) ($model->price ?? $model->total_price ?? 0);
+    }
+
+    private function applyOutrightDiscount(float $amount, ?float $percentage): float
+    {
+        $pct = max(0, (float) ($percentage ?? 0));
+        if ($pct <= 0 || $amount <= 0) {
+            return $amount;
+        }
+
+        return max(0, round($amount - (($amount * $pct) / 100), 2));
     }
 
     public function index()
@@ -154,20 +165,31 @@ class CartController extends Controller
                 ], 200);
             }
 
+            // Align line pricing with OrderController::store (referral outright discount on direct/cash).
+            $paymentMethod = strtolower((string) $request->input('payment_method', 'direct'));
+            $isOutrightCheckout = in_array($paymentMethod, ['direct', 'cash'], true);
+            $outrightPct = $isOutrightCheckout
+                ? (float) (ReferralSettings::getSettings()->outright_discount_percentage ?? 0)
+                : 0.0;
+
             // 2) Build items with product details
-            $cartItems = $rawItems->map(function ($item) {
-                $qty      = max(1, (int) $item->quantity);
-                $unit     = max(0, (int) $item->unit_price);
-                $subtotal = $item->subtotal !== null ? max(0, (int) $item->subtotal) : $qty * $unit;
+            $cartItems = $rawItems->map(function ($item) use ($outrightPct) {
+                $qty = max(1, (int) $item->quantity);
 
                 if (!$item->itemable) {
                     Log::warning('CartItem missing itemable', ['cart_item_id' => $item->id]);
                     return null;
                 }
 
+                $catalogUnit = $this->resolveItemUnitPrice($item->itemable);
+                $unit = $outrightPct > 0
+                    ? $this->applyOutrightDiscount($catalogUnit, $outrightPct)
+                    : $catalogUnit;
+                $subtotal = round($unit * $qty, 2);
+
                 $product = $this->transformItemable($item->itemable);
 
-                return [
+                $row = [
                     'id'         => (int) $item->id,
                     'type'       => class_basename($item->itemable_type),
                     'ref_id'     => (int) $item->itemable_id,
@@ -178,6 +200,13 @@ class CartController extends Controller
                     'image'      => $product['image'] ?? null,
                     'product'    => $product,           // <── full product/bundle details
                 ];
+
+                if ($outrightPct > 0 && $catalogUnit > $unit + 0.005) {
+                    $row['list_unit_price'] = round($catalogUnit, 2);
+                    $row['referral_outright_discount_percent'] = $outrightPct;
+                }
+
+                return $row;
             })->filter()->values();
 
             if ($cartItems->isEmpty()) {
@@ -193,7 +222,7 @@ class CartController extends Controller
             $installationFull = $installationFromProducts + $installationFlatAddon;
 
             // 3) Totals
-            $itemsSubtotal = (int) $cartItems->sum('subtotal');
+            $itemsSubtotal = (float) round($cartItems->sum('subtotal'), 2);
             $itemsCount    = (int) $cartItems->sum('quantity');
 
             $insuranceAmount = $includeInstallation

@@ -593,7 +593,7 @@ class OrderController extends Controller
     {
         $order->loadMissing(['items.itemable']);
         $items = $order->items->isNotEmpty()
-            ? $order->items->map(fn ($i) => $this->formatOrderItem($i))->all()
+            ? $order->items->map(fn ($i) => $this->formatOrderItem($i, $order))->all()
             : $this->buildSyntheticFormattedOrderItems($order);
         $totalPrice = (float) $order->total_price;
         // Amount-only checkout (no product_id / bundle_id) — still return one line for the dashboard
@@ -691,7 +691,7 @@ class OrderController extends Controller
                 ]);
                 $fake->setRelation('itemable', $bundle);
 
-                return [$this->formatOrderItem($fake)];
+                return [$this->formatOrderItem($fake, $order)];
             }
         }
 
@@ -708,14 +708,14 @@ class OrderController extends Controller
                 ]);
                 $fake->setRelation('itemable', $product);
 
-                return [$this->formatOrderItem($fake)];
+                return [$this->formatOrderItem($fake, $order)];
             }
         }
 
         return [];
     }
 
-    private function formatOrderItem(OrderItem $item): array
+    private function formatOrderItem(OrderItem $item, ?Order $order = null): array
     {
         $itemable = $item->itemable; // Product | Bundles | null
 
@@ -744,18 +744,30 @@ class OrderController extends Controller
         }
 
         $qty = max(1, (int) ($item->quantity ?? 1));
+        $catalogUnit = $itemable ? $this->resolveCatalogUnitPrice($itemable) : 0.0;
         $unit = (float) ($item->unit_price ?? 0);
         $subtotal = (float) ($item->subtotal ?? 0);
 
         if ($unit <= 0 && $itemable) {
-            $unit = $this->resolveCatalogUnitPrice($itemable);
+            $unit = $catalogUnit;
         }
         $unitRounded = round($unit, 2);
         if ($subtotal <= 0 && $unitRounded > 0) {
             $subtotal = round($unitRounded * $qty, 2);
         }
 
-        return [
+        $paymentMethod = $order ? strtolower((string) ($order->payment_method ?? '')) : '';
+        $isOutrightCheckout = in_array($paymentMethod, ['direct', 'cash'], true);
+        $outrightPct = $isOutrightCheckout
+            ? (float) (ReferralSettings::getSettings()->outright_discount_percentage ?? 0)
+            : 0.0;
+        $showReferralList = $isOutrightCheckout
+            && $outrightPct > 0
+            && $itemable
+            && $catalogUnit > 0
+            && abs($catalogUnit - $unitRounded) > 0.005;
+
+        $row = [
             'itemable_type' => strtolower(class_basename($item->itemable_type)), // "product" | "bundles"
             'itemable_id'   => $item->itemable_id,
             'quantity'      => $item->quantity,
@@ -768,6 +780,13 @@ class OrderController extends Controller
                 'featured_image' => $featured,
             ] : null,
         ];
+
+        if ($showReferralList) {
+            $row['list_unit_price'] = round($catalogUnit, 2);
+            $row['referral_outright_discount_percent'] = $outrightPct;
+        }
+
+        return $row;
     }
     public function paymentConfirmation(Request $request)
 {
