@@ -16,6 +16,7 @@ use App\Http\Requests\UpdateCartItemRequest;
 use App\Models\Bundles;
 use App\Models\CheckoutSetting;
 use App\Models\ReferralSettings;
+use App\Models\User;
 use App\Support\CheckoutPricing;
 use Illuminate\Support\Arr;
 

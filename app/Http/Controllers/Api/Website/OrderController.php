@@ -316,6 +316,9 @@ class OrderController extends Controller
         ) {
             $orderPayload['installation_requested_date'] = $data['installation_requested_date'];
         }
+        if (Schema::hasColumn('orders', 'order_type')) {
+            $orderPayload['order_type'] = 'shop';
+        }
 
         $order = Order::create($orderPayload);
 
@@ -325,10 +328,25 @@ class OrderController extends Controller
         $primaryBundleId  = null;
         $orderPaymentMethod = strtolower((string) ($data['payment_method'] ?? ''));
         $isOutrightCheckout = in_array($orderPaymentMethod, ['direct', 'cash'], true);
-        $referralSettings = $isOutrightCheckout ? ReferralSettings::getSettings() : null;
-        $outrightDiscountPercentage = $isOutrightCheckout
+
+        $referralCodeInput = trim((string) ($data['referral_code'] ?? ''));
+        $referralEligible = false;
+        if ($referralCodeInput !== '') {
+            $referrer = User::referrerForCheckoutCode($referralCodeInput, (int) $userId);
+            if (! $referrer) {
+                throw ValidationException::withMessages([
+                    'referral_code' => ['This referral code is not valid.'],
+                ]);
+            }
+            $referralEligible = true;
+        }
+
+        // Solar store (cart) checkout: apply admin "outright" % only with a valid referral code — not global Buy Now discount.
+        $applyOutrightDiscount = $isOutrightCheckout && $referralEligible;
+        $referralSettings = $applyOutrightDiscount ? ReferralSettings::getSettings() : null;
+        $outrightDiscountPercentage = $applyOutrightDiscount
             ? (float) ($referralSettings->outright_discount_percentage ?? 0)
-            : 0;
+            : 0.0;
 
         foreach ($cartItems as $ci) {
             $itemable = $ci->itemable; // Product|Bundles|null
@@ -768,14 +786,10 @@ class OrderController extends Controller
 
         $paymentMethod = $order ? strtolower((string) ($order->payment_method ?? '')) : '';
         $isOutrightCheckout = in_array($paymentMethod, ['direct', 'cash'], true);
-        $outrightPct = $isOutrightCheckout
-            ? (float) (ReferralSettings::getSettings()->outright_discount_percentage ?? 0)
-            : 0.0;
         $showReferralList = $isOutrightCheckout
-            && $outrightPct > 0
             && $itemable
             && $catalogUnit > 0
-            && abs($catalogUnit - $unitRounded) > 0.005;
+            && $catalogUnit > $unitRounded + 0.005;
 
         $row = [
             'itemable_type' => strtolower(class_basename($item->itemable_type)), // "product" | "bundles"
@@ -793,7 +807,10 @@ class OrderController extends Controller
 
         if ($showReferralList) {
             $row['list_unit_price'] = round($catalogUnit, 2);
-            $row['referral_outright_discount_percent'] = $outrightPct;
+            $derivedPct = $catalogUnit > 0
+                ? round(100 * (1 - min($unitRounded, $catalogUnit) / $catalogUnit), 2)
+                : 0.0;
+            $row['referral_outright_discount_percent'] = $derivedPct;
         }
 
         return $row;
@@ -821,10 +838,7 @@ class OrderController extends Controller
             'transacted_at' => now(),
         ]);
 
-        $isBuyNowOrder = (($order->order_type ?? null) === 'buy_now')
-            || (($order->order_type ?? null) === null
-                && ($order->payment_method ?? null) === 'direct'
-                && empty($order->mono_calculation_id));
+        $isBuyNowOrder = (($order->order_type ?? null) === 'buy_now');
         if ($isBuyNowOrder) {
             $rewardBase = Schema::hasColumn('orders', 'product_price')
                 ? (float) ($order->product_price ?? $order->total_price ?? 0)

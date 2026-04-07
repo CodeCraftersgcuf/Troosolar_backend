@@ -93,6 +93,23 @@ public function referrer()
 }
 
     /**
+     * Another user's shareable code (user_code) for shop checkout discount — not the buyer's own code.
+     */
+    public static function referrerForCheckoutCode(string $code, int $buyerUserId): ?self
+    {
+        $normalized = strtolower(trim($code));
+        if ($normalized === '') {
+            return null;
+        }
+
+        return static::query()
+            ->whereNotNull('user_code')
+            ->whereRaw('LOWER(TRIM(user_code)) = ?', [$normalized])
+            ->where('id', '!=', $buyerUserId)
+            ->first();
+    }
+
+    /**
      * The attributes that should be hidden for serialization.
      *
      * @var array<int, string>

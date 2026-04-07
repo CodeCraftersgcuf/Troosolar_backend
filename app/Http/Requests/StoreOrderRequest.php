@@ -41,6 +41,8 @@ class StoreOrderRequest extends FormRequest
             'string',
             'max:255',
         ],
+        /** Optional: another user's referral user_code — required for shop cart outright discount. */
+        'referral_code' => 'nullable|string|max:64',
     ];
     }
 }
