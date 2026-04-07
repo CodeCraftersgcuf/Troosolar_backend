@@ -615,21 +615,6 @@ class OrderController extends Controller
             return (float) ($i['subtotal'] ?? 0);
         }, $items));
 
-        $totalQuantity = array_sum(array_map(fn ($i) => (int) ($i['quantity'] ?? 1), $items));
-        // When items have zero unit_price/subtotal (e.g. BNPL snapshot), distribute order total proportionally
-        if ($totalPrice > 0 && $totalQuantity > 0 && count($items) > 0) {
-            $unitPrice = $totalPrice / $totalQuantity;
-            foreach ($items as &$item) {
-                $qty = (int) ($item['quantity'] ?? 1);
-                $itemSubtotal = (float) ($item['subtotal'] ?? 0);
-                if ($itemSubtotal <= 0) {
-                    $item['unit_price'] = (string) round($unitPrice, 2);
-                    $item['subtotal'] = (string) round($unitPrice * $qty, 2);
-                }
-            }
-            unset($item);
-        }
-
         $vatAmount = Schema::hasColumn('orders', 'vat_amount') ? (float) ($order->vat_amount ?? 0) : 0.0;
         $settingsForVat = CheckoutSetting::get();
         $vatPctDisplay = (float) ($settingsForVat->vat_percentage ?? config('checkout.vat_percentage', 7.5));
@@ -658,6 +643,14 @@ class OrderController extends Controller
             'estimated_delivery_to' => optional($order->estimated_delivery_to)->format('Y-m-d'),
             'delivery_estimate_label' => $order->delivery_estimate_label,
         ];
+
+        if (Schema::hasColumn('orders', 'installation_requested_date')) {
+            $baseData['installation_requested_date'] = $order->installation_requested_date
+                ? ($order->installation_requested_date instanceof \Carbon\CarbonInterface
+                    ? $order->installation_requested_date->format('Y-m-d')
+                    : (string) $order->installation_requested_date)
+                : null;
+        }
 
         // Order owner (always when user is loaded) — My Orders / order detail must not use the viewer's profile
         if ($order->relationLoaded('user') && $order->user) {
@@ -750,12 +743,24 @@ class OrderController extends Controller
             }
         }
 
+        $qty = max(1, (int) ($item->quantity ?? 1));
+        $unit = (float) ($item->unit_price ?? 0);
+        $subtotal = (float) ($item->subtotal ?? 0);
+
+        if ($unit <= 0 && $itemable) {
+            $unit = $this->resolveCatalogUnitPrice($itemable);
+        }
+        $unitRounded = round($unit, 2);
+        if ($subtotal <= 0 && $unitRounded > 0) {
+            $subtotal = round($unitRounded * $qty, 2);
+        }
+
         return [
             'itemable_type' => strtolower(class_basename($item->itemable_type)), // "product" | "bundles"
             'itemable_id'   => $item->itemable_id,
             'quantity'      => $item->quantity,
-            'unit_price'    => $item->unit_price,
-            'subtotal'      => $item->subtotal,
+            'unit_price'    => $unitRounded,
+            'subtotal'      => round($subtotal, 2),
             'item'          => $itemable ? [
                 'id'             => $itemable->id,
                 'title'          => $title,
