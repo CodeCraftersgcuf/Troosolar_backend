@@ -61,15 +61,13 @@ class ReferralController extends Controller
         }
 
         $pctLabel = $this->formatReferralPercentLabel($pctVal);
-        $lineFixed = 'Fixed amount: ₦'.number_format($fixedNgn, 0).' per qualifying referral purchase.';
-        $linePct = "Percentage: {$pctLabel}% of each qualifying referral purchase amount.";
 
+        // Single short line for the dashboard (matches active setting only).
         if ($rewardType === 'fixed') {
-            $programSummary = 'Right now you earn ₦'.number_format($fixedNgn, 0).' per qualifying referral purchase.';
-            $activeNote = 'Active payout: fixed cash amount. The percentage below is kept on file if Troosolar switches the program.';
+            $amountLabel = number_format($fixedNgn, 0);
+            $programSummary = "Earn {$amountLabel} Naira referral bonus from the people you refer.";
         } else {
-            $programSummary = "Right now you earn {$pctLabel}% of each qualifying referral purchase.";
-            $activeNote = 'Active payout: percentage of purchase. The fixed amount below is kept on file if Troosolar switches the program.';
+            $programSummary = "Earn {$pctLabel}% referral bonus from the people you refer.";
         }
 
         $data = [
@@ -77,10 +75,10 @@ class ReferralController extends Controller
             'referral_balance' => (float) ($wallet->referral_balance ?? 0),
             'my_referrals' => $referralCount,
             'program_summary' => $programSummary,
-            'program_line_fixed' => $lineFixed,
-            'program_line_percentage' => $linePct,
+            'program_line_fixed' => '',
+            'program_line_percentage' => '',
             'program_active_rule' => $rewardType,
-            'program_active_note' => $activeNote,
+            'program_active_note' => '',
             'referral_reward_type' => $rewardType,
             'referral_reward_value' => $rewardValue,
             'referral_fixed_ngn' => $fixedNgn,

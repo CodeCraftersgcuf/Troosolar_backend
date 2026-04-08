@@ -338,23 +338,44 @@ class ReferralAdminController extends Controller
     {
         $type = strtolower((string) ($data['referral_reward_type'] ?? $current->referral_reward_type ?? 'fixed'));
 
-        $fixed = array_key_exists('referral_fixed_ngn', $data)
-            ? (float) $data['referral_fixed_ngn']
-            : (float) ($current->referral_fixed_ngn ?? 0);
-        if ($fixed <= 0) {
-            $fallback = (float) ($current->referral_reward_value ?? 0);
-            $fixed = strtolower((string) $current->referral_reward_type) === 'fixed' && $fallback > 0 ? $fallback : 50000.0;
+        // Fixed ₦: only overwrite when the request included it; otherwise keep DB value.
+        if (array_key_exists('referral_fixed_ngn', $data)) {
+            $fixed = max(0, (float) $data['referral_fixed_ngn']);
+        } else {
+            $fixed = (float) ($current->referral_fixed_ngn ?? 0);
+            if ($fixed <= 0) {
+                $fb = (float) ($current->referral_reward_value ?? 0);
+                if (strtolower((string) $current->referral_reward_type) === 'fixed' && $fb > 0) {
+                    $fixed = $fb;
+                }
+            }
         }
 
-        $pct = array_key_exists('commission_percentage', $data)
-            ? (float) $data['commission_percentage']
-            : (float) ($current->commission_percentage ?? 0);
-        if ($pct <= 0) {
-            $fallback = (float) ($current->referral_reward_value ?? 0);
-            $pct = strtolower((string) $current->referral_reward_type) === 'percentage' && $fallback > 0 ? $fallback : 5.0;
+        // Percentage: only overwrite when commission_percentage was set (from referral_percentage input).
+        if (array_key_exists('commission_percentage', $data)) {
+            $pct = (float) $data['commission_percentage'];
+        } else {
+            $pct = (float) ($current->commission_percentage ?? 0);
+            if ($pct <= 0) {
+                $fb = (float) ($current->referral_reward_value ?? 0);
+                if (strtolower((string) $current->referral_reward_type) === 'percentage' && $fb > 0) {
+                    $pct = $fb;
+                }
+            }
         }
         if ($pct > 100) {
             $pct = 100.0;
+        }
+        if ($pct < 0) {
+            $pct = 0.0;
+        }
+
+        // Ensure the *active* rule has a usable value (first-time / edge cases).
+        if ($type === 'fixed' && $fixed <= 0) {
+            $fixed = 50000.0;
+        }
+        if ($type === 'percentage' && $pct <= 0) {
+            $pct = 5.0;
         }
 
         $data['referral_reward_type'] = $type;
