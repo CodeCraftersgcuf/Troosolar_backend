@@ -1,3 +1,7 @@
+@php
+    $items = isset($orderView['items']) && is_array($orderView['items']) ? $orderView['items'] : [];
+    $orderTotal = (float) ($orderView['total_price'] ?? $order->total_price ?? 0);
+@endphp
 <!DOCTYPE html>
 <html>
 <head>
@@ -11,14 +15,11 @@
         .message { color: #444; margin: 20px 0; }
         .details { background: #fff; border-radius: 8px; padding: 16px 20px; margin: 16px 0; font-size: 14px; border: 1px solid #e2e8f0; }
         .details p { margin: 8px 0; }
-        table.items { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
-        table.items th, table.items td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
-        table.items th { color: #64748b; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
-        .amount-paid { font-size: 18px; font-weight: 700; color: #273e8e; margin-top: 12px; padding-top: 12px; border-top: 2px solid #273e8e; }
+        .item-list { margin: 12px 0 0 0; padding-left: 0; list-style: none; }
+        .item-list li { margin: 6px 0; padding-left: 0; }
         .btn { display: inline-block; background-color: #273e8e; color: #fff !important; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; margin: 16px 0; }
         .footer { margin-top: 28px; padding-top: 20px; border-top: 1px solid #cbd5e1; font-size: 12px; color: #64748b; text-align: center; }
-        .muted { color: #64748b; font-size: 12px; }
-        .discount { color: #b45309; }
+        .muted { color: #64748b; font-size: 13px; }
     </style>
 </head>
 <body>
@@ -28,11 +29,39 @@
         <p>Hello {{ trim($user->first_name . ' ' . $user->sur_name) }},</p>
 
         <div class="message">
-            <p>Thank you for shopping with Troosolar. We have received your order and payment. Our team will contact you with delivery updates.</p>
-            <p>You can review your full order details anytime in your account.</p>
+            <p>Thank you for shopping with Troosolar. We have received your order and our team will contact you with delivery updates.</p>
+            <p>You can review your order details anytime in your account.</p>
         </div>
 
-        @include('emails.partials.order_email_line_items_and_payment', ['order' => $order, 'orderView' => $orderView])
+        <div class="details">
+            <p><strong>Order number:</strong> {{ $order->order_number ?? ('#' . $order->id) }}</p>
+
+            @if(count($items) > 0)
+                <p style="margin-top: 16px; margin-bottom: 4px;"><strong>{{ count($items) === 1 ? 'Item' : 'Items' }}</strong></p>
+                <ul class="item-list">
+                    @foreach($items as $row)
+                        @php
+                            $title = $row['item']['title'] ?? $row['item']['name'] ?? 'Item';
+                            $sub = $row['item']['subtitle'] ?? null;
+                            $qty = max(1, (int) ($row['quantity'] ?? 1));
+                        @endphp
+                        <li>
+                            <strong>{{ $title }}</strong>
+                            @if(!empty($sub))
+                                <br><span class="muted">{{ $sub }}</span>
+                            @endif
+                            @if($qty > 1)
+                                <span class="muted"> — Qty {{ $qty }}</span>
+                            @endif
+                        </li>
+                    @endforeach
+                </ul>
+            @else
+                <p style="margin-top: 12px;"><strong>Item:</strong> Your Troosolar purchase</p>
+            @endif
+
+            <p style="margin-top: 16px;"><strong>Order total:</strong> ₦{{ number_format($orderTotal, 2) }}</p>
+        </div>
 
         <p>
             <a href="{{ $orderDetailUrl }}" class="btn" target="_blank" rel="noopener noreferrer">See order details</a>
