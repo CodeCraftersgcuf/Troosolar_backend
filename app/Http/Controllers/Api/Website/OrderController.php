@@ -22,8 +22,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use App\Mail\OrderDeliveredThankYouMail;
 use App\Mail\OrderPlacedConfirmationMail;
+use App\Mail\OrderStatusUpdatedMail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -99,19 +99,33 @@ class OrderController extends Controller
         return 'Your Troosolar purchase';
     }
 
-    /**
-     * Send thank-you email when status moves into delivered/completed (once per transition).
-     */
-    private function notifyCustomerOrderDelivered(Order $order, ?string $previousStatus): void
+    /** Customer-facing label for order_status values. */
+    private function humanizeOrderStatus(?string $status): string
     {
-        $new = strtolower((string) ($order->order_status ?? ''));
-        $prev = strtolower((string) ($previousStatus ?? ''));
-        $deliveredStates = ['delivered', 'completed'];
-
-        if (! in_array($new, $deliveredStates, true)) {
-            return;
+        $k = strtolower(trim((string) ($status ?? '')));
+        if ($k === '') {
+            return '—';
         }
-        if (in_array($prev, $deliveredStates, true)) {
+
+        return match ($k) {
+            'pending' => 'Pending',
+            'processing' => 'Processing',
+            'shipped' => 'Shipped',
+            'delivered', 'completed' => 'Delivered',
+            'cancelled' => 'Cancelled',
+            'refunded' => 'Refunded',
+            default => ucfirst($k),
+        };
+    }
+
+    /**
+     * Notify the customer by email whenever the order status actually changes.
+     */
+    private function notifyCustomerOrderStatusChange(Order $order, ?string $previousStatus): void
+    {
+        $new = strtolower(trim((string) ($order->order_status ?? '')));
+        $prev = strtolower(trim((string) ($previousStatus ?? '')));
+        if ($new === '' || $new === $prev) {
             return;
         }
 
@@ -123,9 +137,11 @@ class OrderController extends Controller
 
         try {
             $summary = $this->orderDeliveredSummaryLine($order);
-            Mail::to($user->email)->send(new OrderDeliveredThankYouMail($order, $user, $summary));
+            $prevHuman = $this->humanizeOrderStatus($previousStatus);
+            $newHuman = $this->humanizeOrderStatus($order->order_status);
+            Mail::to($user->email)->send(new OrderStatusUpdatedMail($order, $user, $prevHuman, $newHuman, $summary));
         } catch (\Throwable $e) {
-            Log::error('Order delivered thank-you email failed: '.$e->getMessage(), [
+            Log::error('Order status update email failed: '.$e->getMessage(), [
                 'order_id' => $order->id,
             ]);
         }
@@ -143,8 +159,9 @@ class OrderController extends Controller
         }
 
         try {
-            $summary = $this->orderDeliveredSummaryLine($order);
-            Mail::to($user->email)->send(new OrderPlacedConfirmationMail($order, $user, $summary));
+            $order->loadMissing(['items.itemable', 'deliveryAddress']);
+            $orderView = $this->formatOrder($order->fresh(['items.itemable', 'deliveryAddress']), []);
+            Mail::to($user->email)->send(new OrderPlacedConfirmationMail($order, $user, $orderView));
         } catch (\Throwable $e) {
             Log::error('Order placed confirmation email failed: '.$e->getMessage(), [
                 'order_id' => $order->id,
@@ -157,12 +174,16 @@ class OrderController extends Controller
      * Returns orders for the authenticated user.
      */
     public function updateStatus($orderId, Request $request){
+        $request->validate([
+            'order_status' => 'required|string|in:pending,processing,shipped,delivered,cancelled,refunded,completed',
+        ]);
+
         try {
             $order = Order::findOrFail($orderId);
             $previousStatus = $order->order_status;
             $order->order_status = $request->order_status;
             $order->save();
-            $this->notifyCustomerOrderDelivered($order, $previousStatus);
+            $this->notifyCustomerOrderStatusChange($order, $previousStatus);
 
             return ResponseHelper::success('Order status updated successfully', 200);
         } catch (\Throwable $e) {
@@ -330,7 +351,6 @@ class OrderController extends Controller
         $isOutrightCheckout = in_array($orderPaymentMethod, ['direct', 'cash'], true);
 
         $referralCodeInput = trim((string) ($data['referral_code'] ?? ''));
-        $referralEligible = false;
         if ($referralCodeInput !== '') {
             $referrer = User::referrerForCheckoutCode($referralCodeInput, (int) $userId);
             if (! $referrer) {
@@ -338,11 +358,11 @@ class OrderController extends Controller
                     'referral_code' => ['This referral code is not valid.'],
                 ]);
             }
-            $referralEligible = true;
         }
 
-        // Solar store (cart) checkout: apply admin "outright" % only with a valid referral code — not global Buy Now discount.
-        $applyOutrightDiscount = $isOutrightCheckout && $referralEligible;
+        // Must match CartController::checkoutSummary: direct/cash checkout uses admin outright % on line items.
+        // (Referral code is validated separately when supplied; it does not gate the checkout discount.)
+        $applyOutrightDiscount = $isOutrightCheckout;
         $referralSettings = $applyOutrightDiscount ? ReferralSettings::getSettings() : null;
         $outrightDiscountPercentage = $applyOutrightDiscount
             ? (float) ($referralSettings->outright_discount_percentage ?? 0)
@@ -643,6 +663,25 @@ class OrderController extends Controller
             return (float) ($i['subtotal'] ?? 0);
         }, $items));
 
+        // Receipt: pre-discount catalog subtotal vs charged (same idea as cart checkout-summary).
+        $catalogItemsSubtotal = 0.0;
+        $hasListPrices = false;
+        foreach ($items as $i) {
+            $qty = max(1, (int) ($i['quantity'] ?? 1));
+            $sub = (float) ($i['subtotal'] ?? 0);
+            $listUnit = isset($i['list_unit_price']) ? (float) $i['list_unit_price'] : 0.0;
+            if ($listUnit > 0) {
+                $hasListPrices = true;
+                $catalogItemsSubtotal += round($listUnit * $qty, 2);
+            } else {
+                $catalogItemsSubtotal += $sub;
+            }
+        }
+        $onlineCheckoutDiscount = 0.0;
+        if ($hasListPrices) {
+            $onlineCheckoutDiscount = max(0.0, round($catalogItemsSubtotal - $itemsSubtotalSum, 2));
+        }
+
         $vatAmount = Schema::hasColumn('orders', 'vat_amount') ? (float) ($order->vat_amount ?? 0) : 0.0;
         $settingsForVat = CheckoutSetting::get();
         $vatPctDisplay = (float) ($settingsForVat->vat_percentage ?? config('checkout.vat_percentage', 7.5));
@@ -661,6 +700,8 @@ class OrderController extends Controller
             'delivery_address' => $order->relationLoaded('deliveryAddress') ? $order->deliveryAddress : null,
             'items'            => $items,
             'items_subtotal'   => round($itemsSubtotalSum, 2),
+            'catalog_items_subtotal' => $hasListPrices ? round($catalogItemsSubtotal, 2) : null,
+            'online_checkout_discount_amount' => $onlineCheckoutDiscount > 0.005 ? round($onlineCheckoutDiscount, 2) : null,
             'delivery_fee'     => $order->delivery_fee,
             'insurance_fee'    => $order->insurance_fee,
             'installation_price' => $order->installation_price,
@@ -1325,7 +1366,7 @@ class OrderController extends Controller
     {
         try {
             $request->validate([
-                'order_status' => 'required|in:pending,processing,shipped,delivered,cancelled',
+                'order_status' => 'required|in:pending,processing,shipped,delivered,cancelled,refunded,completed',
                 'admin_notes' => 'nullable|string|max:1000',
             ]);
 
@@ -1339,7 +1380,7 @@ class OrderController extends Controller
             }
 
             $order->save();
-            $this->notifyCustomerOrderDelivered($order, $previousStatus);
+            $this->notifyCustomerOrderStatusChange($order, $previousStatus);
 
             return ResponseHelper::success($order, 'Buy Now order status updated successfully');
         } catch (\Illuminate\Validation\ValidationException $e) {

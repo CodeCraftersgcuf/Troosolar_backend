@@ -18,17 +18,24 @@ class OrderPlacedConfirmationMail extends Mailable
 
     public User $user;
 
-    /** One-line description of the main item(s). */
-    public string $orderSummaryLine;
+    /**
+     * Formatted order payload from OrderController::formatOrder() (all line items + totals).
+     *
+     * @var array<string, mixed>
+     */
+    public array $orderView;
 
     /** Deep link to this order in the customer dashboard. */
     public string $orderDetailUrl;
 
-    public function __construct(Order $order, User $user, string $orderSummaryLine)
+    /**
+     * @param  array<string, mixed>  $orderView
+     */
+    public function __construct(Order $order, User $user, array $orderView)
     {
         $this->order = $order;
         $this->user = $user;
-        $this->orderSummaryLine = $orderSummaryLine;
+        $this->orderView = $orderView;
         $base = rtrim((string) config('app.frontend_url', 'https://app.troosolar.io'), '/');
         $this->orderDetailUrl = $base.'/more?section=myOrders&orderId='.$order->id;
     }
