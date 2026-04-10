@@ -16,8 +16,14 @@
         .details { background: #fff; border-radius: 8px; padding: 16px 20px; margin: 16px 0; font-size: 14px; border: 1px solid #e2e8f0; }
         .details p { margin: 8px 0; }
         .status-badge { display: inline-block; background: #273e8e; color: #fff; padding: 6px 14px; border-radius: 999px; font-weight: 600; font-size: 14px; }
+        table.items { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+        table.items th, table.items td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+        table.items th { color: #64748b; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+        .amount-paid { font-size: 18px; font-weight: 700; color: #273e8e; margin-top: 12px; padding-top: 12px; border-top: 2px solid #273e8e; }
         .btn { display: inline-block; background-color: #273e8e; color: #fff !important; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; margin: 16px 0; }
         .footer { margin-top: 28px; padding-top: 20px; border-top: 1px solid #cbd5e1; font-size: 12px; color: #64748b; text-align: center; }
+        .muted { color: #64748b; font-size: 12px; }
+        .discount { color: #b45309; }
     </style>
 </head>
 <body>
@@ -34,29 +40,25 @@
             @if($isDelivered)
                 <p>Great news: your Troosolar order has been marked as <strong>delivered</strong>. We hope everything arrived safely and that you are happy with your purchase.</p>
                 <p>If you have a moment, we would love to hear from you. Your feedback helps other customers and helps us improve.</p>
+                <p style="font-size: 14px; color: #444;">Below is your full order: every item, discounts, delivery, VAT, and amount paid — matching your order confirmation.</p>
             @else
                 <p>We have updated your order. The status is now:</p>
                 <p><span class="status-badge">{{ $newStatusHuman }}</span></p>
                 @if($previousStatusHuman !== '' && $previousStatusHuman !== '—' && strcasecmp($previousStatusHuman, $newStatusHuman) !== 0)
                     <p style="font-size: 14px; color: #64748b;">Previous status: {{ $previousStatusHuman }}</p>
                 @endif
+                <p style="font-size: 14px; color: #444;">Below is a full recap of your order and payment — the same detail as your confirmation email.</p>
             @endif
         </div>
 
-        <div class="details">
-            <p><strong>Order number:</strong> {{ $order->order_number ?? ('#' . $order->id) }}</p>
-            <p><strong>Item:</strong> {{ $orderSummaryLine }}</p>
-            @if(!empty($order->total_price))
-                <p><strong>Order total:</strong> ₦{{ number_format((float) $order->total_price, 2) }}</p>
-            @endif
-        </div>
+        @include('emails.partials.order_email_line_items_and_payment', ['order' => $order, 'orderView' => $orderView])
 
         <p>
-            <a href="{{ $dashboardOrdersUrl }}" class="btn" target="_blank" rel="noopener noreferrer">Open My orders</a>
+            <a href="{{ $orderDetailUrl }}" class="btn" target="_blank" rel="noopener noreferrer">See order details</a>
         </p>
         <p style="font-size: 14px; color: #64748b;">
             Or copy this link into your browser:<br>
-            <a href="{{ $dashboardOrdersUrl }}" style="word-break: break-all; color: #273e8e;">{{ $dashboardOrdersUrl }}</a>
+            <a href="{{ $orderDetailUrl }}" style="word-break: break-all; color: #273e8e;">{{ $orderDetailUrl }}</a>
         </p>
 
         <p class="message" style="font-size: 14px;">

@@ -136,10 +136,11 @@ class OrderController extends Controller
         }
 
         try {
-            $summary = $this->orderDeliveredSummaryLine($order);
+            $order->loadMissing(['user', 'items.itemable', 'deliveryAddress']);
+            $orderView = $this->formatOrder($order->fresh(['user', 'items.itemable', 'deliveryAddress']), []);
             $prevHuman = $this->humanizeOrderStatus($previousStatus);
             $newHuman = $this->humanizeOrderStatus($order->order_status);
-            Mail::to($user->email)->send(new OrderStatusUpdatedMail($order, $user, $prevHuman, $newHuman, $summary));
+            Mail::to($user->email)->send(new OrderStatusUpdatedMail($order, $user, $prevHuman, $newHuman, $orderView));
         } catch (\Throwable $e) {
             Log::error('Order status update email failed: '.$e->getMessage(), [
                 'order_id' => $order->id,

@@ -24,24 +24,33 @@ class OrderStatusUpdatedMail extends Mailable
     /** Human-readable new status (e.g. "Shipped"). */
     public string $newStatusHuman;
 
-    /** Short one-line summary of the purchase. */
-    public string $orderSummaryLine;
+    /**
+     * Formatted order from OrderController::formatOrder() (all line items + totals).
+     *
+     * @var array<string, mixed>
+     */
+    public array $orderView;
 
-    public string $dashboardOrdersUrl;
+    /** Deep link to this order in the customer dashboard. */
+    public string $orderDetailUrl;
 
+    /**
+     * @param  array<string, mixed>  $orderView
+     */
     public function __construct(
         Order $order,
         User $user,
         string $previousStatusHuman,
         string $newStatusHuman,
-        string $orderSummaryLine
+        array $orderView
     ) {
         $this->order = $order;
         $this->user = $user;
         $this->previousStatusHuman = $previousStatusHuman;
         $this->newStatusHuman = $newStatusHuman;
-        $this->orderSummaryLine = $orderSummaryLine;
-        $this->dashboardOrdersUrl = rtrim((string) config('app.frontend_url', 'https://app.troosolar.io'), '/').'/more?section=myOrders';
+        $this->orderView = $orderView;
+        $base = rtrim((string) config('app.frontend_url', 'https://app.troosolar.io'), '/');
+        $this->orderDetailUrl = $base.'/more?section=myOrders&orderId='.$order->id;
     }
 
     public function envelope(): Envelope
