@@ -14,6 +14,13 @@ class StoreProductReviewRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'review' => trim((string) $this->input('review', '')),
+        ]);
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -21,9 +28,9 @@ class StoreProductReviewRequest extends FormRequest
      */
     public function rules(): array
     {
-         return [
+        return [
             'product_id' => 'required|exists:products,id',
-            'review' => 'required|string',
+            'review' => 'nullable|string|max:10000',
             'rating' => 'required|in:1,2,3,4,5',
         ];
     }

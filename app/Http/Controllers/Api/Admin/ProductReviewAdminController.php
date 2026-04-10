@@ -49,9 +49,10 @@ class ProductReviewAdminController extends Controller
         }
 
         $validated = $request->validate([
-            'review' => 'required|string',
+            'review' => 'nullable|string|max:10000',
             'rating' => 'required|in:1,2,3,4,5',
         ]);
+        $validated['review'] = trim((string) ($validated['review'] ?? ''));
 
         $review = ProductReveiews::findOrFail($id);
         $review->update($validated);
