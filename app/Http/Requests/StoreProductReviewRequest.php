@@ -30,6 +30,7 @@ class StoreProductReviewRequest extends FormRequest
     {
         return [
             'product_id' => 'required|exists:products,id',
+            'order_id' => 'nullable|integer|exists:orders,id',
             'review' => 'nullable|string|max:10000',
             'rating' => 'required|in:1,2,3,4,5',
         ];

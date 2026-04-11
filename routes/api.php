@@ -209,6 +209,7 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
 
     // Reviews
     Route::prefix('product-reviews')->group(function () {
+        Route::get('review-eligibility', [ProductReviewController::class, 'reviewEligibility']);
         Route::get('/', [ProductReviewController::class, 'index']);
         Route::post('/', [ProductReviewController::class, 'store']);
         Route::put('/{id}', [ProductReviewController::class, 'update']);

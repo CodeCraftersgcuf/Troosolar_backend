@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Api\Website;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductReviewRequest;
+use App\Models\BundleItems;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\Product;
 use App\Models\ProductReveiews;
 use Illuminate\Http\Request;
 
@@ -25,7 +25,7 @@ class ProductReviewController extends Controller
 
             $mine = filter_var($request->input('mine'), FILTER_VALIDATE_BOOLEAN);
             if ($mine) {
-                if (!auth()->check()) {
+                if (! auth()->check()) {
                     return response()->json([
                         'status' => 'error',
                         'message' => 'Unauthorized',
@@ -44,129 +44,224 @@ class ProductReviewController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to fetch reviews: ' . $e->getMessage(),
+                'message' => 'Failed to fetch reviews: '.$e->getMessage(),
             ], 500);
         }
     }
 
     /**
-     * Order items store polymorphic type as the model class (e.g. App\Models\Product), not the string "product".
-     * BNPL snapshots may use the short name "product". Legacy rows may only set orders.product_id.
+     * GET ?product_id=&order_id= — whether the current user may review this product (optionally scoped to one order).
      */
-    private function hasDeliveredOrderForProduct(int $userId, int $productId): bool
+    public function reviewEligibility(Request $request)
     {
-        $statuses = ['delivered', 'completed'];
+        if (! auth()->check()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized',
+            ], 401);
+        }
 
-        $productMorphTypes = array_values(array_unique([
-            Product::class,
-            'product',
-            class_basename(Product::class),
-        ]));
+        $request->validate([
+            'product_id' => 'required|integer|exists:products,id',
+            'order_id' => 'nullable|integer|exists:orders,id',
+        ]);
 
-        $viaLineItems = OrderItem::query()
-            ->where('itemable_id', $productId)
-            ->whereIn('itemable_type', $productMorphTypes)
-            ->whereHas('order', function ($q) use ($userId, $statuses) {
-                $q->where('user_id', $userId)
-                    ->whereIn('order_status', $statuses);
-            })
-            ->exists();
+        $userId = (int) auth()->id();
+        $productId = (int) $request->input('product_id');
+        $orderId = $request->filled('order_id') ? (int) $request->input('order_id') : null;
 
-        if ($viaLineItems) {
+        $eligible = $this->userCanReviewProduct($userId, $productId, $orderId);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => ['eligible' => $eligible],
+        ]);
+    }
+
+    private function normalizeOrderStatus(?string $s): string
+    {
+        return strtolower(trim((string) ($s ?? '')));
+    }
+
+    private function isDeliveredStatus(string $normalized): bool
+    {
+        return in_array($normalized, ['delivered', 'completed'], true);
+    }
+
+    /**
+     * True if this order line is a direct product match or a bundle that includes the product.
+     */
+    private function orderLineContainsProduct(OrderItem $item, int $productId): bool
+    {
+        $type = (string) $item->itemable_type;
+        $basename = class_basename($type);
+        $itemableId = (int) $item->itemable_id;
+
+        if ($itemableId <= 0) {
+            return false;
+        }
+
+        if (strcasecmp($basename, 'Product') === 0) {
+            return $itemableId === $productId;
+        }
+
+        if (strcasecmp($basename, 'Bundles') === 0) {
+            return BundleItems::query()
+                ->where('bundle_id', $itemableId)
+                ->where('product_id', $productId)
+                ->exists();
+        }
+
+        return false;
+    }
+
+    private function orderContainsPurchasedProduct(Order $order, int $productId): bool
+    {
+        if ((int) ($order->product_id ?? 0) === $productId) {
             return true;
         }
 
-        return Order::query()
+        $items = OrderItem::query()
+            ->where('order_id', $order->id)
+            ->get(['itemable_type', 'itemable_id']);
+
+        foreach ($items as $item) {
+            if ($this->orderLineContainsProduct($item, $productId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function orderAllowsProductReview(int $orderId, int $userId, int $productId): bool
+    {
+        $order = Order::query()->whereKey($orderId)->where('user_id', $userId)->first();
+        if (! $order) {
+            return false;
+        }
+
+        if (! $this->isDeliveredStatus($this->normalizeOrderStatus($order->order_status))) {
+            return false;
+        }
+
+        return $this->orderContainsPurchasedProduct($order, $productId);
+    }
+
+    private function hasDeliveredOrderForProduct(int $userId, int $productId): bool
+    {
+        $orders = Order::query()
             ->where('user_id', $userId)
-            ->where('product_id', $productId)
-            ->whereIn('order_status', $statuses)
-            ->exists();
+            ->get(['id', 'order_status', 'product_id']);
+
+        foreach ($orders as $order) {
+            if (! $this->isDeliveredStatus($this->normalizeOrderStatus($order->order_status))) {
+                continue;
+            }
+            if ($this->orderContainsPurchasedProduct($order, $productId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function userCanReviewProduct(int $userId, int $productId, ?int $orderId = null): bool
+    {
+        if ($orderId !== null && $this->orderAllowsProductReview($orderId, $userId, $productId)) {
+            return true;
+        }
+
+        return $this->hasDeliveredOrderForProduct($userId, $productId);
     }
 
     public function store(StoreProductReviewRequest $request)
     {
-    try {
-        if (!auth()->check()) {
+        try {
+            if (! auth()->check()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized',
+                ], 401);
+            }
+
+            $data = $request->validated();
+            $userId = (int) auth()->id();
+            $productId = (int) $data['product_id'];
+            $orderId = ! empty($data['order_id']) ? (int) $data['order_id'] : null;
+
+            if (! $this->userCanReviewProduct($userId, $productId, $orderId)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'You can only review products from delivered/completed orders.',
+                ], 422);
+            }
+
+            $review = ProductReveiews::updateOrCreate(
+                ['user_id' => $userId, 'product_id' => $productId],
+                [
+                    'review' => $data['review'],
+                    'rating' => $data['rating'],
+                ]
+            )->load('user:id,first_name,sur_name');
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Review saved successfully',
+                'data' => $review,
+            ]);
+        } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Unauthorized',
-            ], 401);
+                'message' => 'Failed to save review: '.$e->getMessage(),
+            ], 500);
         }
-
-        $data = $request->validated();
-        $userId = (int) auth()->id();
-        $productId = (int) $data['product_id'];
-
-        if (!$this->hasDeliveredOrderForProduct($userId, $productId)) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'You can only review products from delivered/completed orders.',
-            ], 422);
-        }
-
-        $review = ProductReveiews::updateOrCreate(
-            ['user_id' => $userId, 'product_id' => $productId],
-            [
-                'review' => $data['review'],
-                'rating' => $data['rating'],
-            ]
-        )->load('user:id,first_name,sur_name');
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Review saved successfully',
-            'data' => $review,
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Failed to save review: ' . $e->getMessage(),
-        ], 500);
-    }
     }
 
     public function update(StoreProductReviewRequest $request, $id)
     {
-    try {
-        if (!auth()->check()) {
+        try {
+            if (! auth()->check()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized',
+                ], 401);
+            }
+
+            $review = ProductReveiews::findOrFail($id);
+
+            if ($review->user_id !== auth()->id()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized',
+                ], 403);
+            }
+
+            $data = $request->validated();
+            $orderId = ! empty($data['order_id']) ? (int) $data['order_id'] : null;
+
+            if (! $this->userCanReviewProduct((int) auth()->id(), (int) $review->product_id, $orderId)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'You can only review products from delivered/completed orders.',
+                ], 422);
+            }
+
+            $review->update([
+                'review' => $data['review'],
+                'rating' => $data['rating'],
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Review updated successfully',
+                'data' => $review->load('user:id,first_name,sur_name'),
+            ]);
+        } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Unauthorized',
-            ], 401);
+                'message' => 'Update failed: '.$e->getMessage(),
+            ], 500);
         }
-
-        $review = ProductReveiews::findOrFail($id);
-
-        if ($review->user_id !== auth()->id()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized',
-            ], 403);
-        }
-
-        $data = $request->validated();
-        if (!$this->hasDeliveredOrderForProduct((int) auth()->id(), (int) $review->product_id)) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'You can only review products from delivered/completed orders.',
-            ], 422);
-        }
-
-        $review->update([
-            'review' => $data['review'],
-            'rating' => $data['rating'],
-        ]);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Review updated successfully',
-            'data' => $review->load('user:id,first_name,sur_name'),
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Update failed: ' . $e->getMessage(),
-        ], 500);
-    }
     }
 }
