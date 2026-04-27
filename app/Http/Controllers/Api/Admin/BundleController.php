@@ -320,11 +320,7 @@ public function index(Request $request)
 
             if (!empty($data['custom_services'])) {
                 foreach ($data['custom_services'] as $service) {
-                    CustomService::create([
-                        'bundle_id' => $bundle->id,
-                        'title' => $service['title'] ?? null,
-                        'service_amount' => $service['service_amount'] ?? 0,
-                    ]);
+                    CustomService::create($this->buildCustomServiceRow($bundle->id, $service));
                 }
             }
 
@@ -410,11 +406,7 @@ public function index(Request $request)
 
             // Format custom services
             $customServices = $bundle->customServices->map(function ($service) {
-                return [
-                    'id' => $service->id,
-                    'title' => $service->title,
-                    'service_amount' => (float) ($service->service_amount ?? 0),
-                ];
+                return $this->serializeCustomServiceForApi($service);
             });
 
             // Format custom appliances
@@ -600,11 +592,7 @@ public function index(Request $request)
             if (isset($data['custom_services'])) {
                 CustomService::where('bundle_id', $bundle->id)->delete();
                 foreach ($data['custom_services'] as $service) {
-                    CustomService::create([
-                        'bundle_id' => $bundle->id,
-                        'title' => $service['title'] ?? null,
-                        'service_amount' => $service['service_amount'] ?? 0,
-                    ]);
+                    CustomService::create($this->buildCustomServiceRow($bundle->id, $service));
                 }
             }
 
@@ -665,7 +653,7 @@ public function index(Request $request)
             ];
         });
         $customServices = $bundle->customServices->map(function ($s) {
-            return ['id' => $s->id, 'title' => $s->title, 'service_amount' => (float) ($s->service_amount ?? 0)];
+            return $this->serializeCustomServiceForApi($s);
         });
         $customAppliances = Schema::hasTable('bundle_custom_appliances') && $bundle->relationLoaded('customAppliances')
             ? $bundle->customAppliances->map(function ($a) {
@@ -728,5 +716,57 @@ public function index(Request $request)
             Log::error('Error deleting bundle: ' . $e->getMessage());
             return ResponseHelper::error('Failed to delete bundle.', 500);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $service
+     * @return array<string, mixed>
+     */
+    private function buildCustomServiceRow(int $bundleId, array $service): array
+    {
+        $row = [
+            'bundle_id' => $bundleId,
+            'title' => $service['title'] ?? null,
+            'service_amount' => $service['service_amount'] ?? 0,
+        ];
+
+        if (!Schema::hasColumn('custom_services', 'quantity')) {
+            return $row;
+        }
+
+        $qty = isset($service['quantity']) ? (int) $service['quantity'] : 1;
+        $row['quantity'] = max(1, $qty);
+        $unit = isset($service['unit']) && is_string($service['unit']) ? trim($service['unit']) : '';
+        $row['unit'] = $unit !== '' ? mb_substr($unit, 0, 32) : 'Nos';
+
+        $qa = $service['quantity_applies'] ?? true;
+        if (is_string($qa)) {
+            $row['quantity_applies'] = !in_array(strtolower(trim($qa)), ['0', 'false', 'no'], true);
+        } else {
+            $row['quantity_applies'] = (bool) $qa;
+        }
+
+        return $row;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeCustomServiceForApi(CustomService $service): array
+    {
+        $base = [
+            'id' => $service->id,
+            'title' => $service->title,
+            'service_amount' => (float) ($service->service_amount ?? 0),
+        ];
+        if (!Schema::hasColumn('custom_services', 'quantity')) {
+            return $base;
+        }
+
+        return array_merge($base, [
+            'quantity' => (int) max(1, (int) ($service->quantity ?? 1)),
+            'unit' => ($service->unit !== null && (string) $service->unit !== '') ? (string) $service->unit : 'Nos',
+            'quantity_applies' => (bool) ($service->quantity_applies ?? true),
+        ]);
     }
 }

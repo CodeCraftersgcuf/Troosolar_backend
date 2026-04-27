@@ -8,11 +8,22 @@ class CustomService extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['bundle_id', 'title', 'service_amount'];
+    protected $fillable = [
+        'bundle_id',
+        'title',
+        'service_amount',
+        'quantity',
+        'unit',
+        'quantity_applies',
+    ];
 
-// App\Models\CustomService.php
+    protected $casts = [
+        'service_amount' => 'float',
+        'quantity' => 'integer',
+        'quantity_applies' => 'boolean',
+    ];
 
-public function bundle()
+    public function bundle()
 {
     return $this->belongsTo(Bundles::class);
 }

@@ -154,11 +154,18 @@ class BundleSelectionController extends Controller
             });
 
             $customServices = $bundle->customServices->map(function ($service) {
-                return [
+                $row = [
                     'id' => $service->id,
                     'title' => $service->title,
                     'service_amount' => (float) ($service->service_amount ?? 0),
                 ];
+                if (Schema::hasColumn('custom_services', 'quantity')) {
+                    $row['quantity'] = (int) max(1, (int) ($service->quantity ?? 1));
+                    $row['unit'] = ($service->unit !== null && (string) $service->unit !== '') ? (string) $service->unit : 'Nos';
+                    $row['quantity_applies'] = (bool) ($service->quantity_applies ?? true);
+                }
+
+                return $row;
             });
 
             $response = [
