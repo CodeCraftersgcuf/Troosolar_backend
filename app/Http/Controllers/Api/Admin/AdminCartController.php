@@ -21,6 +21,20 @@ use Illuminate\Validation\ValidationException;
 class AdminCartController extends Controller
 {
     /**
+     * Customer dashboard URL for admin-pushed cart / custom order (SPA routes).
+     * BNPL → /bnpl?token=…&type=bnpl ; Buy Now → /buy-now?token=…&type=buy_now (not Laravel /cart).
+     */
+    private function buildDashboardCustomOrderUrl(string $accessToken, string $orderType): string
+    {
+        $base = rtrim((string) config('app.frontend_url', 'https://app.troosolar.io'), '/');
+        $tokenEnc = rawurlencode($accessToken);
+
+        return $orderType === 'bnpl'
+            ? "{$base}/bnpl?token={$tokenEnc}&type=bnpl"
+            : "{$base}/buy-now?token={$tokenEnc}&type=buy_now";
+    }
+
+    /**
      * Create custom order for user
      * POST /api/admin/cart/create-custom-order
      */
@@ -30,13 +44,26 @@ class AdminCartController extends Controller
             $data = $request->validate([
                 'user_id' => 'required|exists:users,id',
                 'order_type' => 'required|in:buy_now,bnpl',
-                'items' => 'required|array|min:1',
-                'items.*.type' => 'required|in:product,bundle',
-                'items.*.id' => 'required|integer',
+                'items' => 'nullable|array',
+                'items.*.type' => 'required_with:items|in:product,bundle',
+                'items.*.id' => 'required_with:items|integer',
                 'items.*.quantity' => 'nullable|integer|min:1',
+                'custom_items' => 'nullable|array',
+                'custom_items.*.name' => 'required_with:custom_items|string|max:255',
+                'custom_items.*.description' => 'nullable|string|max:2000',
+                'custom_items.*.price' => 'required_with:custom_items|numeric|min:0',
+                'custom_items.*.quantity' => 'nullable|integer|min:1',
                 'send_email' => 'nullable|boolean',
-                'email_message' => 'nullable|string|max:1000',
+                'email_message' => 'nullable|string|max:10000',
             ]);
+
+            $items = $data['items'] ?? [];
+            $customItems = $data['custom_items'] ?? [];
+            if (count($items) === 0 && count($customItems) === 0) {
+                throw ValidationException::withMessages([
+                    'items' => ['Add at least one product/bundle or one custom line item.'],
+                ]);
+            }
 
             $userId = $data['user_id'];
             $orderType = $data['order_type'];
@@ -46,7 +73,7 @@ class AdminCartController extends Controller
             $cartItems = [];
             $errors = [];
 
-            foreach ($data['items'] as $item) {
+            foreach ($items as $item) {
                 $type = $item['type'];
                 $itemId = $item['id'];
                 $quantity = $item['quantity'] ?? 1;
@@ -96,11 +123,48 @@ class AdminCartController extends Controller
             $token = Str::random(64);
             $user->update(['cart_access_token' => $token]);
 
+            $emailMessage = $data['email_message'] ?? null;
+            if (count($customItems) > 0) {
+                $customBlock = collect($customItems)->map(function ($row) {
+                    $name = trim((string) ($row['name'] ?? ''));
+                    $desc = trim((string) ($row['description'] ?? ''));
+                    $price = (float) ($row['price'] ?? 0);
+                    $qty = (int) ($row['quantity'] ?? 1);
+                    $qty = $qty < 1 ? 1 : $qty;
+                    $line = "\n\n--- Custom Product/Service ---\n{$name}";
+                    if ($desc !== '') {
+                        $line .= "\nDescription: {$desc}";
+                    }
+                    $lineTotal = round($price * $qty, 2);
+                    $line .= "\nPrice: ₦".number_format($price, 2)." x {$qty} = ₦".number_format($lineTotal, 2);
+
+                    return $line;
+                })->implode('');
+                $emailMessage = trim((string) $emailMessage).$customBlock;
+            }
+
+            $cartSubtotal = collect($cartItems)->sum(fn ($row) => (float) ($row->subtotal ?? 0));
+            $customSubtotal = collect($customItems)->reduce(function ($carry, $row) {
+                $price = (float) ($row['price'] ?? 0);
+                $qty = max(1, (int) ($row['quantity'] ?? 1));
+
+                return $carry + ($price * $qty);
+            }, 0.0);
+            $summaryTotal = round($cartSubtotal + $customSubtotal, 2);
+
             // Send email if requested
             if ($data['send_email'] ?? true) {
                 try {
-                    $cartLink = url("/cart?token={$token}&type={$orderType}");
-                    Mail::to($user->email)->send(new CartLinkEmail($user, $cartItems, $cartLink, $orderType, $data['email_message'] ?? null));
+                    $cartLink = $this->buildDashboardCustomOrderUrl($token, $orderType);
+                    Mail::to($user->email)->send(new CartLinkEmail(
+                        $user,
+                        collect($cartItems),
+                        $cartLink,
+                        $orderType,
+                        $emailMessage,
+                        $summaryTotal,
+                        $customItems
+                    ));
                 } catch (Exception $e) {
                     Log::warning('Failed to send cart link email', [
                         'user_id' => $userId,
@@ -125,7 +189,7 @@ class AdminCartController extends Controller
                         'subtotal' => $item->subtotal,
                     ];
                 })->values(),
-                'cart_link' => url("/cart?token={$token}&type={$orderType}"),
+                'cart_link' => $this->buildDashboardCustomOrderUrl($token, $orderType),
                 'email_sent' => $data['send_email'] ?? true,
             ], 'Custom order created and added to user cart successfully');
 
@@ -418,7 +482,7 @@ class AdminCartController extends Controller
         try {
             $data = $request->validate([
                 'order_type' => 'required|in:buy_now,bnpl',
-                'email_message' => 'nullable|string|max:1000',
+                'email_message' => 'nullable|string|max:10000',
             ]);
 
             $user = User::findOrFail($userId);
@@ -434,13 +498,16 @@ class AdminCartController extends Controller
             $token = Str::random(64);
             $user->update(['cart_access_token' => $token]);
 
-            $cartLink = url("/cart?token={$token}&type={$data['order_type']}");
+            $cartLink = $this->buildDashboardCustomOrderUrl($token, $data['order_type']);
+            $summaryTotal = round((float) $cartItems->sum('subtotal'), 2);
             Mail::to($user->email)->send(new CartLinkEmail(
                 $user,
                 $cartItems,
                 $cartLink,
                 $data['order_type'],
-                $data['email_message'] ?? null
+                $data['email_message'] ?? null,
+                $summaryTotal,
+                []
             ));
 
             return ResponseHelper::success([
