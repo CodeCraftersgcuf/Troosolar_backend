@@ -253,6 +253,9 @@ class BundleController extends Controller
                 if (!$bundles->isEmpty()) {
                     $bundles = $this->sortBundlesByCapacityThenProminence($bundles);
                 }
+            } else {
+                // All bundles (no load filter): smallest capacity first.
+                $bundles = $this->sortBundlesByCapacityThenProminence($bundles);
             }
 
             $mapped = $bundles->map(function ($bundle) {
