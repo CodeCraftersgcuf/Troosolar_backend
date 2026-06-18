@@ -1411,7 +1411,7 @@ class OrderController extends Controller
                 'deliveryAddress',
                 'user:id,first_name,sur_name,email,phone',
                 'monoCalculation',
-                'loanApplication:id,user_id,mono_loan_calculation,customer_type,product_category,property_state,property_address,property_landmark,property_floors,property_rooms,is_gated_estate,estate_name,estate_address,credit_check_method,social_media_handle,repayment_duration,loan_amount,order_items_snapshot,loan_plan_snapshot,created_at',
+                'loanApplication:id,user_id,mono_loan_calculation,customer_type,product_category,property_state,property_address,property_landmark,property_floors,property_rooms,is_gated_estate,estate_name,estate_address,credit_check_method,mono_account_id,mono_customer_id,mono_credit_status,mono_can_afford,mono_monthly_payment_kobo,mono_credit_report,bank_statement_path,live_photo_path,social_media_handle,repayment_duration,loan_amount,order_items_snapshot,loan_plan_snapshot,created_at',
             ]);
             
             // BNPL orders: either have order_type='bnpl' OR have mono_calculation_id (for backward compatibility)
@@ -1476,7 +1476,7 @@ class OrderController extends Controller
                 'auditRequest',
                 'monoCalculation.loanInstallments.transaction.user',
                 'monoCalculation.loanRepayments.user',
-                'loanApplication:id,user_id,mono_loan_calculation,customer_type,product_category,property_state,property_address,property_landmark,property_floors,property_rooms,is_gated_estate,estate_name,estate_address,credit_check_method,social_media_handle,repayment_duration,loan_amount,order_items_snapshot,loan_plan_snapshot,created_at',
+                'loanApplication:id,user_id,mono_loan_calculation,customer_type,product_category,property_state,property_address,property_landmark,property_floors,property_rooms,is_gated_estate,estate_name,estate_address,credit_check_method,mono_account_id,mono_customer_id,mono_credit_status,mono_can_afford,mono_monthly_payment_kobo,mono_credit_report,bank_statement_path,live_photo_path,social_media_handle,repayment_duration,loan_amount,order_items_snapshot,loan_plan_snapshot,created_at',
             ]);
             
             // BNPL orders: either have order_type='bnpl' OR have mono_calculation_id

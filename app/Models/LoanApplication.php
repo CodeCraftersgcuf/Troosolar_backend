@@ -33,6 +33,13 @@ class LoanApplication extends Model
     'estate_name',
     'estate_address',
     'credit_check_method',
+    'mono_account_id',
+    'mono_customer_id',
+    'mono_credit_status',
+    'mono_can_afford',
+    'mono_monthly_payment_kobo',
+    'mono_credit_report',
+    'mono_credit_session_id',
     'bank_statement_path',
     'live_photo_path',
     'social_media_handle',
@@ -52,6 +59,8 @@ class LoanApplication extends Model
         'order_items_snapshot' => 'array',
         'loan_plan_snapshot' => 'array',
         'installation_rejected_dates' => 'array',
+        'mono_credit_report' => 'array',
+        'mono_can_afford' => 'boolean',
     ];
 
 // loan history

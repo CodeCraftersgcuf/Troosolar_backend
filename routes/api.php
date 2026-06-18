@@ -111,6 +111,10 @@ Route::get('/config/loan-configuration', [ConfigurationController::class, 'getLo
 Route::get('/config/add-ons', [ConfigurationController::class, 'getAddOns']);
 Route::get('/config/delivery-locations', [ConfigurationController::class, 'getDeliveryLocations']);
 Route::get('/config/calculator-settings', [ConfigurationController::class, 'getCalculatorSettings']);
+Route::get('/config/mono', [ConfigurationController::class, 'getMonoConfig']);
+
+// Mono webhooks (public, verified via mono-webhook-secret header)
+Route::post('/webhooks/mono', [\App\Http\Controllers\Api\MonoWebhookController::class, 'handle']);
 
 // Site banner (public - dashboard home promo)
 Route::get('/site/banner', [\App\Http\Controllers\Api\Website\SiteBannerController::class, 'show']);
@@ -251,6 +255,8 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     // BNPL Flow endpoints
     Route::get('/bnpl/applications', [BNPLController::class, 'getApplications']); // List all user's BNPL applications
     Route::post('/bnpl/apply', [BNPLController::class, 'apply']);
+    Route::post('/bnpl/process-credit-check', [BNPLController::class, 'processCreditCheck']);
+    Route::get('/bnpl/mono-credit-status/{session_id}', [BNPLController::class, 'monoCreditStatus']);
     Route::get('/bnpl/status/{application_id}', [BNPLController::class, 'getStatus']); // Get single application details
     Route::get('/bnpl/applications/{application_id}/repayment-schedule', [BNPLController::class, 'getRepaymentSchedule']); // Get repayment schedule for application
     Route::get('/bnpl/guarantor/form', [BNPLController::class, 'downloadGuarantorForm']);

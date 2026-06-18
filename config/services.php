@@ -31,4 +31,12 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'mono' => [
+        'public_key' => env('MONO_PUBLIC_KEY'),
+        'secret_key' => env('MONO_SECRET_KEY'),
+        'webhook_secret' => env('MONO_WEBHOOK_SECRET'),
+        'env' => env('MONO_ENV', 'sandbox'),
+        'run_credit_check' => env('MONO_RUN_CREDIT_CHECK', true),
+    ],
+
 ];

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Helpers\ResponseHelper;
 use App\Mail\AuditStatusEmail;
 use App\Models\AuditRequest;
+use App\Models\CartItem;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -139,8 +140,20 @@ class AuditAdminController extends Controller
                 $allAuditRequests = collect();
             }
 
+            $cartStats = $userIds->isNotEmpty()
+                ? CartItem::whereIn('user_id', $userIds)
+                    ->selectRaw('user_id, COUNT(*) as cart_item_count, COALESCE(SUM(subtotal), 0) as total_cart_amount')
+                    ->groupBy('user_id')
+                    ->get()
+                    ->keyBy('user_id')
+                : collect();
+
+            $usersWithTokens = $userIds->isNotEmpty()
+                ? User::whereIn('id', $userIds)->pluck('cart_access_token', 'id')
+                : collect();
+
             // Format response
-            $formattedData = collect($users->items())->map(function ($user) use ($allAuditRequests) {
+            $formattedData = collect($users->items())->map(function ($user) use ($allAuditRequests, $cartStats, $usersWithTokens) {
                 // Get audit requests for this user
                 $auditRequests = $allAuditRequests->get($user->id, collect());
 
@@ -163,17 +176,25 @@ class AuditAdminController extends Controller
                         'property_floors' => $request->property_floors,
                         'property_rooms' => $request->property_rooms,
                         'is_gated_estate' => $request->is_gated_estate,
-                        'has_property_details' => !empty($request->property_address), // Check if user provided data
+                        'has_property_details' => !empty($request->property_address),
+                        'needs_admin_input' => $request->audit_type === 'commercial'
+                            && empty($request->property_address)
+                            && $request->status === 'pending',
                         'order_id' => $request->order_id,
                         'created_at' => $request->created_at ? $request->created_at->format('Y-m-d H:i:s') : null,
                     ];
                 })->values();
+
+                $cart = $cartStats->get($user->id);
 
                 return [
                     'id' => $user->id,
                     'name' => trim(($user->first_name ?? '') . ' ' . ($user->sur_name ?? '')),
                     'email' => $user->email,
                     'phone' => $user->phone,
+                    'cart_item_count' => (int) ($cart->cart_item_count ?? 0),
+                    'total_cart_amount' => (float) ($cart->total_cart_amount ?? 0),
+                    'has_cart_access_token' => !empty($usersWithTokens[$user->id]),
                     'audit_request_count' => (int) $user->audit_request_count,
                     'pending_count' => (int) $user->pending_count,
                     'approved_count' => (int) $user->approved_count,

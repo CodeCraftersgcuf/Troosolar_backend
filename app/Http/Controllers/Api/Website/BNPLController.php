@@ -25,6 +25,8 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use App\Services\BnplLoanPlanCalculator;
 use App\Services\ReferralRewardService;
+use App\Services\MonoService;
+use App\Models\MonoCreditCheckSession;
 
 class BNPLController extends Controller
 {
@@ -93,6 +95,9 @@ class BNPLController extends Controller
                 && ! empty($priorApp->bank_statement_path)
                 && ! empty($priorApp->live_photo_path);
 
+            $creditCheckMethod = (string) ($allInput['credit_check_method'] ?? 'manual');
+            $isAutoCreditCheck = $creditCheckMethod === 'auto';
+
             $settings = BnplSettings::get();
             $allowedDurations = $settings->loan_durations ?? [3, 6, 9, 12];
             // Validate required fields - handle both JSON and FormData formats
@@ -102,12 +107,19 @@ class BNPLController extends Controller
                 'loan_amount' => 'required|numeric|min:0',
                 'repayment_duration' => 'required|integer|in:' . implode(',', $allowedDurations),
                 'credit_check_method' => 'required|in:auto,manual',
-                'bank_statement' => $canReusePriorDocs
+                'bank_statement' => $isAutoCreditCheck
                     ? 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240'
-                    : 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
-                'live_photo' => $canReusePriorDocs
+                    : ($canReusePriorDocs
+                        ? 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240'
+                        : 'required|file|mimes:pdf,jpg,jpeg,png|max:10240'),
+                'live_photo' => $isAutoCreditCheck
                     ? 'nullable|file|mimes:jpg,jpeg,png|max:5120'
-                    : 'required|file|mimes:jpg,jpeg,png|max:5120',
+                    : ($canReusePriorDocs
+                        ? 'nullable|file|mimes:jpg,jpeg,png|max:5120'
+                        : 'required|file|mimes:jpg,jpeg,png|max:5120'),
+                'mono_credit_session_id' => $isAutoCreditCheck
+                    ? 'required|integer|exists:mono_credit_check_sessions,id'
+                    : 'nullable|integer|exists:mono_credit_check_sessions,id',
             ];
 
             // Handle nested arrays - check if data comes as nested or flat (after normalization)
@@ -281,6 +293,21 @@ class BNPLController extends Controller
                 }
             }
 
+            $monoSession = null;
+            if ($isAutoCreditCheck) {
+                $monoSession = MonoCreditCheckSession::where('id', $data['mono_credit_session_id'])
+                    ->where('user_id', Auth::id())
+                    ->first();
+
+                if (! $monoSession) {
+                    return ResponseHelper::error('Invalid Mono credit check session.', 422);
+                }
+
+                if (! in_array($monoSession->status, ['completed', 'failed'], true)) {
+                    return ResponseHelper::error('Mono credit check is still processing. Please wait and try again.', 422);
+                }
+            }
+
             // Handle file uploads
             $bankStatementPath = null;
             $livePhotoPath = null;
@@ -308,7 +335,7 @@ class BNPLController extends Controller
                 $livePhotoPath = $priorApp->live_photo_path;
             }
 
-            if (empty($bankStatementPath) || empty($livePhotoPath)) {
+            if (! $isAutoCreditCheck && (empty($bankStatementPath) || empty($livePhotoPath))) {
                 return ResponseHelper::error('Bank statement and live photo are required (upload new files or use a valid re-apply link).', 422);
             }
 
@@ -392,7 +419,7 @@ class BNPLController extends Controller
             ];
 
             // Create loan application (with optional order_items_snapshot for multi-item BNPL orders)
-            $loanApplication = LoanApplication::create([
+            $loanApplicationData = [
                 'user_id' => Auth::id(),
                 'prior_application_id' => $priorApp ? $priorApp->id : null,
                 'mono_loan_calculation' => $monoLoanCalculationId, // Can be null if no loan calculation exists
@@ -419,7 +446,25 @@ class BNPLController extends Controller
                 'status' => 'pending',
                 'order_items_snapshot' => !empty($orderItemsSnapshot) ? $orderItemsSnapshot : null,
                 'loan_plan_snapshot' => $planSnapshotForDb,
-            ]);
+            ];
+
+            if ($monoSession) {
+                $loanApplicationData = array_merge($loanApplicationData, [
+                    'mono_account_id' => $monoSession->mono_account_id,
+                    'mono_customer_id' => $monoSession->mono_customer_id,
+                    'mono_credit_status' => $monoSession->status,
+                    'mono_can_afford' => $monoSession->can_afford,
+                    'mono_monthly_payment_kobo' => $monoSession->monthly_payment_kobo,
+                    'mono_credit_report' => $monoSession->credit_worthiness_payload,
+                    'mono_credit_session_id' => $monoSession->id,
+                ]);
+            }
+
+            $loanApplication = LoanApplication::create($loanApplicationData);
+
+            if ($monoSession) {
+                $monoSession->update(['loan_application_id' => $loanApplication->id]);
+            }
 
             // Persist BVN on the user profile (form field was validated but not stored before)
             $user = Auth::user();
@@ -618,6 +663,11 @@ class BNPLController extends Controller
                 'estate_name' => $application->estate_name,
                 'estate_address' => $application->estate_address,
                 'credit_check_method' => $application->credit_check_method,
+                'mono_account_id' => $application->mono_account_id,
+                'mono_credit_status' => $application->mono_credit_status,
+                'mono_can_afford' => $application->mono_can_afford,
+                'mono_monthly_payment_kobo' => $application->mono_monthly_payment_kobo,
+                'mono_credit_report' => $application->mono_credit_report,
                 'social_media_handle' => $application->social_media_handle,
                 'bank_statement_path' => $application->bank_statement_path,
                 'live_photo_path' => $application->live_photo_path,
@@ -1665,5 +1715,106 @@ class BNPLController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * POST /api/bnpl/process-credit-check
+     */
+    public function processCreditCheck(Request $request, MonoService $monoService)
+    {
+        try {
+            $data = $request->validate([
+                'mono_code' => 'required|string',
+                'bvn' => 'required|string',
+                'loan_amount' => 'required|numeric|min:0',
+                'repayment_duration' => 'required|integer|min:1',
+                'loan_plan_snapshot' => 'nullable',
+            ]);
+
+            $bvn = preg_replace('/\s+/', '', trim((string) $data['bvn']));
+            $loanAmount = (float) $data['loan_amount'];
+            $principalKobo = (int) round($loanAmount * 100);
+
+            $planSnapshot = null;
+            if (! empty($data['loan_plan_snapshot'])) {
+                if (is_array($data['loan_plan_snapshot'])) {
+                    $planSnapshot = $data['loan_plan_snapshot'];
+                } else {
+                    $decoded = json_decode((string) $data['loan_plan_snapshot'], true);
+                    $planSnapshot = is_array($decoded) ? $decoded : null;
+                }
+            }
+
+            $interestRate = BnplLoanPlanCalculator::interestMonthlyPercentFromSnapshot($planSnapshot);
+            $accountId = $monoService->exchangeCode($data['mono_code']);
+
+            $session = MonoCreditCheckSession::create([
+                'user_id' => Auth::id(),
+                'mono_account_id' => $accountId,
+                'bvn' => $bvn,
+                'principal_kobo' => $principalKobo,
+                'interest_rate' => $interestRate,
+                'term_months' => (int) $data['repayment_duration'],
+                'run_credit_check' => $monoService->shouldRunCreditCheck(),
+                'status' => 'pending',
+            ]);
+
+            $monoService->initiateCreditWorthiness($accountId, [
+                'bvn' => $bvn,
+                'principal' => $principalKobo,
+                'interest_rate' => $interestRate,
+                'term' => (int) $data['repayment_duration'],
+                'run_credit_check' => $monoService->shouldRunCreditCheck(),
+            ]);
+
+            $session->update(['status' => 'processing']);
+
+            return ResponseHelper::success([
+                'session_id' => $session->id,
+                'status' => 'processing',
+                'mono_account_id' => $accountId,
+            ], 'Credit check initiated. Results will arrive via webhook.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Exception $e) {
+            Log::error('BNPL process credit check error: ' . $e->getMessage());
+
+            return ResponseHelper::error('Failed to process credit check: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * GET /api/bnpl/mono-credit-status/{session_id}
+     */
+    public function monoCreditStatus(int $sessionId)
+    {
+        try {
+            $session = MonoCreditCheckSession::where('id', $sessionId)
+                ->where('user_id', Auth::id())
+                ->firstOrFail();
+
+            return ResponseHelper::success([
+                'session_id' => $session->id,
+                'status' => $session->status,
+                'mono_account_id' => $session->mono_account_id,
+                'can_afford' => $session->can_afford,
+                'monthly_payment_kobo' => $session->monthly_payment_kobo,
+                'monthly_payment' => $session->monthly_payment_kobo !== null
+                    ? number_format($session->monthly_payment_kobo / 100, 2)
+                    : null,
+                'credit_report' => $session->credit_worthiness_payload,
+                'error_message' => $session->error_message,
+            ], 'Mono credit check status retrieved');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return ResponseHelper::error('Credit check session not found', 404);
+        } catch (Exception $e) {
+            Log::error('BNPL mono credit status error: ' . $e->getMessage());
+
+            return ResponseHelper::error('Failed to retrieve credit check status', 500);
+        }
     }
 }

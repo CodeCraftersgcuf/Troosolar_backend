@@ -66,22 +66,21 @@ class CartLinkEmail extends Mailable
 
         $isBnpl = $orderType === 'bnpl';
         $this->headline = $isBnpl
-            ? 'Continue your Buy Now Pay Later application'
+            ? 'Your BNPL custom order is ready'
             : 'Your custom order is ready';
         $this->ctaLabel = $isBnpl
-            ? 'Continue to BNPL'
-            : 'Continue to Buy Now';
+            ? 'Continue BNPL application'
+            : 'View cart & checkout';
     }
 
     public function build()
     {
         $isBnpl = $this->orderType === 'bnpl';
         $subject = $isBnpl
-            ? 'Your BNPL cart is ready — next steps (Troosolar)'
-            : 'Your order is ready — complete Buy Now (Troosolar)';
+            ? 'Your BNPL custom order — next steps (Troosolar)'
+            : 'Your custom order is ready — complete checkout (Troosolar)';
 
-        return $this->subject($subject)
-            ->replyTo([config('mail.from.address')])
+        $mailable = $this->subject($subject)
             ->view('emails.cart_link')
             ->with([
                 'user' => $this->user,
@@ -94,5 +93,12 @@ class CartLinkEmail extends Mailable
                 'headline' => $this->headline,
                 'ctaLabel' => $this->ctaLabel,
             ]);
+
+        $fromAddress = config('mail.from.address');
+        if (!empty($fromAddress)) {
+            $mailable->replyTo($fromAddress, config('mail.from.name'));
+        }
+
+        return $mailable;
     }
 }

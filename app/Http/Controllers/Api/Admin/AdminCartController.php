@@ -21,17 +21,16 @@ use Illuminate\Validation\ValidationException;
 class AdminCartController extends Controller
 {
     /**
-     * Customer dashboard URL for admin-pushed cart / custom order (SPA routes).
-     * BNPL → /bnpl?token=…&type=bnpl ; Buy Now → /buy-now?token=…&type=buy_now (not Laravel /cart).
+     * Customer dashboard URL for admin-pushed cart / custom order.
+     * Universal entry: /cart?token=…&type=buy_now|bnpl (Cart.jsx routes BNPL → /bnpl, Buy Now → checkout).
      */
     private function buildDashboardCustomOrderUrl(string $accessToken, string $orderType): string
     {
         $base = rtrim((string) config('app.frontend_url', 'https://app.troosolar.io'), '/');
         $tokenEnc = rawurlencode($accessToken);
+        $typeEnc = rawurlencode($orderType);
 
-        return $orderType === 'bnpl'
-            ? "{$base}/bnpl?token={$tokenEnc}&type=bnpl"
-            : "{$base}/buy-now?token={$tokenEnc}&type=buy_now";
+        return "{$base}/cart?token={$tokenEnc}&type={$typeEnc}";
     }
 
     /**
@@ -151,27 +150,23 @@ class AdminCartController extends Controller
                 return $carry + ($price * $qty);
             }, 0.0);
             $summaryTotal = round($cartSubtotal + $customSubtotal, 2);
+            $cartLink = $this->buildDashboardCustomOrderUrl($token, $orderType);
 
-            // Send email if requested
-            if ($data['send_email'] ?? true) {
-                try {
-                    $cartLink = $this->buildDashboardCustomOrderUrl($token, $orderType);
-                    Mail::to($user->email)->send(new CartLinkEmail(
-                        $user,
-                        collect($cartItems),
-                        $cartLink,
-                        $orderType,
-                        $emailMessage,
-                        $summaryTotal,
-                        $customItems
-                    ));
-                } catch (Exception $e) {
-                    Log::warning('Failed to send cart link email', [
-                        'user_id' => $userId,
-                        'error' => $e->getMessage()
-                    ]);
-                    // Don't fail the request if email fails
-                }
+            $sendEmail = (bool) ($data['send_email'] ?? true);
+            $emailSent = false;
+            $emailError = null;
+            if ($sendEmail) {
+                $mailResult = $this->sendCartLinkEmailToUser(
+                    $user,
+                    $cartItems,
+                    $cartLink,
+                    $orderType,
+                    $emailMessage,
+                    $summaryTotal,
+                    $customItems
+                );
+                $emailSent = $mailResult['sent'];
+                $emailError = $mailResult['error'];
             }
 
             return ResponseHelper::success([
@@ -189,9 +184,12 @@ class AdminCartController extends Controller
                         'subtotal' => $item->subtotal,
                     ];
                 })->values(),
-                'cart_link' => $this->buildDashboardCustomOrderUrl($token, $orderType),
-                'email_sent' => $data['send_email'] ?? true,
-            ], 'Custom order created and added to user cart successfully');
+                'cart_link' => $cartLink,
+                'email_sent' => $emailSent,
+                'email_error' => $emailError,
+            ], $emailSent || !$sendEmail
+                ? 'Custom order created and added to user cart successfully'
+                : 'Custom order created but the notification email could not be sent');
 
         } catch (ValidationException $e) {
             return response()->json([
@@ -500,19 +498,27 @@ class AdminCartController extends Controller
 
             $cartLink = $this->buildDashboardCustomOrderUrl($token, $data['order_type']);
             $summaryTotal = round((float) $cartItems->sum('subtotal'), 2);
-            Mail::to($user->email)->send(new CartLinkEmail(
+            $mailResult = $this->sendCartLinkEmailToUser(
                 $user,
-                $cartItems,
+                $cartItems->all(),
                 $cartLink,
                 $data['order_type'],
                 $data['email_message'] ?? null,
                 $summaryTotal,
                 []
-            ));
+            );
+
+            if (!$mailResult['sent']) {
+                return ResponseHelper::error(
+                    'Failed to send email: ' . ($mailResult['error'] ?? 'Unknown mail error'),
+                    500
+                );
+            }
 
             return ResponseHelper::success([
                 'email' => $user->email,
                 'cart_link' => $cartLink,
+                'email_sent' => true,
             ], 'Cart link email sent successfully');
 
         } catch (ValidationException $e) {
@@ -524,6 +530,58 @@ class AdminCartController extends Controller
         } catch (Exception $e) {
             Log::error('Error resending cart email: ' . $e->getMessage());
             return ResponseHelper::error('Failed to send email: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * @param  array<int, CartItem>|\Illuminate\Support\Collection<int, CartItem>  $cartItems
+     * @param  array<int, array<string, mixed>>  $customItems
+     * @return array{sent: bool, error: ?string}
+     */
+    private function sendCartLinkEmailToUser(
+        User $user,
+        $cartItems,
+        string $cartLink,
+        string $orderType,
+        ?string $emailMessage,
+        float $summaryTotal,
+        array $customItems = []
+    ): array {
+        if (empty(trim((string) $user->email))) {
+            return ['sent' => false, 'error' => 'User has no email address on file'];
+        }
+
+        try {
+            $ids = collect($cartItems)->pluck('id')->filter()->values();
+            $itemsForMail = $ids->isNotEmpty()
+                ? CartItem::with('itemable')->whereIn('id', $ids)->get()
+                : collect();
+
+            Mail::to($user->email)->send(new CartLinkEmail(
+                $user,
+                $itemsForMail,
+                $cartLink,
+                $orderType,
+                $emailMessage,
+                $summaryTotal,
+                $customItems
+            ));
+
+            Log::info('Cart link email sent', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'order_type' => $orderType,
+            ]);
+
+            return ['sent' => true, 'error' => null];
+        } catch (Exception $e) {
+            Log::error('Failed to send cart link email', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['sent' => false, 'error' => $e->getMessage()];
         }
     }
 }

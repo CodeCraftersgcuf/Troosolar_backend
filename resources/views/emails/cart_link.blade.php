@@ -6,13 +6,19 @@
     <title>{{ $headline }}</title>
     <style>
         body { font-family: Arial, Helvetica, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .container { background-color: #f5f7ff; border-radius: 12px; padding: 32px; margin: 20px 0; border: 1px solid #e2e8f0; }
+        .container { background-color: #f5f7ff; border-radius: 12px; padding: 32px; margin: 20px 0; border: 1px solid #e2e8f0; overflow: hidden; }
+        .brand-header { background-color: #273e8e; color: #ffffff; text-align: center; padding: 24px 20px; margin: -32px -32px 24px -32px; }
+        .brand-title { font-size: 26px; font-weight: 700; margin: 0; }
+        .brand-subtitle { font-size: 16px; margin: 6px 0 0 0; opacity: 0.95; }
         h1 { color: #273e8e; font-size: 22px; margin-top: 0; }
         .message { color: #444; margin: 20px 0; }
         .details { background: #fff; border-radius: 8px; padding: 16px 20px; margin: 16px 0; font-size: 14px; border: 1px solid #e2e8f0; }
         .details p { margin: 8px 0; }
-        .item-list { margin: 12px 0 0 0; padding-left: 0; list-style: none; }
-        .item-list li { margin: 6px 0; padding-left: 0; }
+        .item-block { border-bottom: 1px solid #e2e8f0; padding: 12px 0; }
+        .item-block:last-child { border-bottom: none; }
+        .item-name { font-weight: 600; color: #1e293b; margin: 0 0 6px 0; }
+        .item-meta { margin: 2px 0; color: #64748b; font-size: 13px; }
+        .total-row { margin-top: 16px; padding-top: 14px; border-top: 2px solid #e2e8f0; font-size: 16px; font-weight: 700; color: #273e8e; }
         .btn { display: inline-block; background-color: #273e8e; color: #ffffff !important; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; margin: 16px 0; }
         .footer { margin-top: 28px; padding-top: 20px; border-top: 1px solid #cbd5e1; font-size: 12px; color: #64748b; text-align: center; }
         .muted { color: #64748b; font-size: 13px; }
@@ -22,17 +28,21 @@
 </head>
 <body>
     <div class="container">
+        <div class="brand-header">
+            <p class="brand-title">Troosolar</p>
+            <p class="brand-subtitle">{{ $orderType === 'bnpl' ? 'BNPL Custom Order' : 'Buy Now Cart' }}</p>
+        </div>
+
         <h1>{{ $headline }}</h1>
 
         <p>Hello {{ trim(($user->first_name ?? '') . ' ' . ($user->sur_name ?? '')) }},</p>
 
         <div class="message">
             @if($orderType === 'bnpl')
-                <p>Our team has added items to your Troosolar account for a <strong>Buy Now Pay Later</strong> application. Use the button below to sign in (if needed) and continue where you left off.</p>
+                <p>We have prepared a custom order for your <strong>Buy Now Pay Later</strong> application with the following items:</p>
             @else
-                <p>Our team has prepared a custom <strong>Buy Now</strong> order in your Troosolar account. Use the button below to sign in (if needed) and complete checkout.</p>
+                <p>We have prepared a custom order for you with the following items:</p>
             @endif
-            <p>If you have questions, reply to this email or use the Help section in your account.</p>
         </div>
 
         @if(!empty($customMessage))
@@ -47,53 +57,62 @@
         @endphp
 
         <div class="details">
-            <p><strong>Reference:</strong> Custom order (admin)</p>
-
             @if($itemsCollection->count() > 0)
-                <p style="margin-top: 16px; margin-bottom: 4px;"><strong>{{ $itemsCollection->count() === 1 ? 'Item' : 'Items' }}</strong></p>
-                <ul class="item-list">
-                    @foreach($itemsCollection as $item)
-                        @php
-                            $title = $item->itemable->title ?? $item->itemable->name ?? 'Item';
-                            $qty = max(1, (int) ($item->quantity ?? 1));
-                        @endphp
-                        <li>
-                            <strong>{{ $title }}</strong>
-                            <span class="muted"> — Qty {{ $qty }}</span>
-                            <br><span class="muted">Subtotal: ₦{{ number_format((float) ($item->subtotal ?? 0), 2) }}</span>
-                        </li>
-                    @endforeach
-                </ul>
+                @foreach($itemsCollection as $item)
+                    @php
+                        $itemable = $item->itemable ?? null;
+                        $title = $itemable->title ?? $itemable->name ?? ('Item #' . ($item->itemable_id ?? $item->id ?? ''));
+                        $qty = max(1, (int) ($item->quantity ?? 1));
+                        $subtotal = (float) ($item->subtotal ?? 0);
+                        $unitPrice = $qty > 0 ? ($subtotal / $qty) : (float) ($item->unit_price ?? 0);
+                        $typeLabel = ($item->type ?? '') === 'bundle' ? 'Bundles' : 'Products';
+                    @endphp
+                    <div class="item-block">
+                        <p class="item-name">{{ $title }}</p>
+                        <p class="item-meta"><strong>Type:</strong> {{ $typeLabel }}</p>
+                        <p class="item-meta"><strong>Quantity:</strong> {{ $qty }}</p>
+                        <p class="item-meta"><strong>Unit Price:</strong> ₦{{ number_format($unitPrice, 2) }}</p>
+                        <p class="item-meta"><strong>Subtotal:</strong> ₦{{ number_format($subtotal, 2) }}</p>
+                    </div>
+                @endforeach
             @endif
 
             @if(!empty($customItemsForDisplay))
-                <p style="margin-top: 16px; margin-bottom: 4px;"><strong>Custom products / services</strong></p>
-                <ul class="item-list">
-                    @foreach($customItemsForDisplay as $row)
-                        @php
-                            $nm = trim((string) ($row['name'] ?? ''));
-                            $ds = trim((string) ($row['description'] ?? ''));
-                            $pr = (float) ($row['price'] ?? 0);
-                            $qt = max(1, (int) ($row['quantity'] ?? 1));
-                            $ln = round($pr * $qt, 2);
-                        @endphp
-                        <li>
-                            <strong>{{ $nm }}</strong>
-                            @if($ds !== '')
-                                <br><span class="muted">{{ $ds }}</span>
-                            @endif
-                            <br><span class="muted">₦{{ number_format($pr, 2) }} × {{ $qt }} = ₦{{ number_format($ln, 2) }}</span>
-                        </li>
-                    @endforeach
-                </ul>
+                @foreach($customItemsForDisplay as $row)
+                    @php
+                        $nm = trim((string) ($row['name'] ?? ''));
+                        $ds = trim((string) ($row['description'] ?? ''));
+                        $pr = (float) ($row['price'] ?? 0);
+                        $qt = max(1, (int) ($row['quantity'] ?? 1));
+                        $ln = round($pr * $qt, 2);
+                    @endphp
+                    <div class="item-block">
+                        <p class="item-name">{{ $nm }}</p>
+                        <p class="item-meta"><strong>Type:</strong> Custom</p>
+                        @if($ds !== '')
+                            <p class="item-meta">{{ $ds }}</p>
+                        @endif
+                        <p class="item-meta"><strong>Quantity:</strong> {{ $qt }}</p>
+                        <p class="item-meta"><strong>Unit Price:</strong> ₦{{ number_format($pr, 2) }}</p>
+                        <p class="item-meta"><strong>Subtotal:</strong> ₦{{ number_format($ln, 2) }}</p>
+                    </div>
+                @endforeach
             @endif
 
             @if($itemsCollection->count() === 0 && empty($customItemsForDisplay))
-                <p style="margin-top: 12px;"><strong>Item:</strong> See message above for details.</p>
+                <p>See the message above for order details.</p>
             @endif
 
-            <p style="margin-top: 16px;"><strong>Estimated total:</strong> ₦{{ number_format((float) $summaryTotal, 2) }}</p>
+            <p class="total-row">Total: ₦{{ number_format((float) $summaryTotal, 2) }}</p>
         </div>
+
+        <p class="message">
+            @if($orderType === 'bnpl')
+                Click the button below to continue your BNPL application with these items:
+            @else
+                Click the button below to view your cart and proceed with checkout:
+            @endif
+        </p>
 
         <p>
             <a href="{{ $cartLink }}" class="btn" target="_blank" rel="noopener noreferrer">{{ $ctaLabel }}</a>
@@ -105,12 +124,16 @@
 
         @if($orderType === 'bnpl')
             <p class="info-strip">
-                <strong>Buy Now Pay Later:</strong> You will continue in the BNPL flow (product selection, invoice, loan calculator, and application steps). Minimum order value rules apply as shown in the app.
+                <strong>Buy Now Pay Later:</strong> You will continue in the BNPL flow (invoice, loan calculator, and application steps).
             </p>
         @endif
 
+        <p class="message" style="font-size: 14px;">
+            If you have questions, reply to this email or use the Help section in your account.
+        </p>
+
         <div class="footer">
-            <p>This message was sent because a Troosolar administrator prepared an order or cart for your account.</p>
+            <p>This message was sent because a Troosolar administrator prepared an order for your account.</p>
         </div>
     </div>
 </body>

@@ -214,4 +214,16 @@ class ConfigurationController extends Controller
             return ResponseHelper::error('Failed to retrieve calculator settings', 500);
         }
     }
+
+    /**
+     * Mono Connect public configuration for BNPL credit check.
+     * GET /api/config/mono
+     */
+    public function getMonoConfig()
+    {
+        return ResponseHelper::success([
+            'public_key' => (string) config('services.mono.public_key', ''),
+            'env' => (string) config('services.mono.env', 'sandbox'),
+        ], 'Mono configuration retrieved successfully');
+    }
 }
