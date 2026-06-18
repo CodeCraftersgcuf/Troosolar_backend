@@ -19,6 +19,8 @@ class BrandRequest extends FormRequest
             'title' => 'nullable|string|max:255',
             'icon' => 'nullable|image|mimes:jpg,jpeg,png,svg,webp|max:2048',
             'category_id' => 'nullable|exists:categories,id',
+            'category_ids' => 'nullable|array',
+            'category_ids.*' => 'integer|exists:categories,id',
         ];
     }
      protected function failedValidation(Validator $validator)

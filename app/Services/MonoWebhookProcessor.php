@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\MonoCreditCheckSession;
+use App\Models\UserMonoAccount;
 use App\Models\MonoWebhookEvent;
 use Illuminate\Support\Facades\Log;
 
@@ -75,6 +76,24 @@ class MonoWebhookProcessor
         MonoCreditCheckSession::where('mono_account_id', $accountId)->update([
             'mono_customer_id' => $customerId,
         ]);
+
+        $meta = is_array($data['meta'] ?? null) ? $data['meta'] : [];
+        $institution = is_array($data['institution'] ?? null) ? $data['institution'] : [];
+        $bankName = (string) ($institution['name'] ?? $meta['bank_name'] ?? $data['bank_name'] ?? '');
+        $accountName = (string) ($data['account_name'] ?? $meta['account_name'] ?? '');
+        $accountNumber = (string) ($data['account_number'] ?? $meta['account_number'] ?? '');
+        $lastFour = strlen($accountNumber) >= 4 ? substr($accountNumber, -4) : null;
+
+        $updates = array_filter([
+            'mono_customer_id' => $customerId,
+            'bank_name' => $bankName !== '' ? $bankName : null,
+            'account_name' => $accountName !== '' ? $accountName : null,
+            'account_number_last4' => $lastFour,
+        ], fn ($v) => $v !== null);
+
+        if ($updates !== []) {
+            UserMonoAccount::where('mono_account_id', $accountId)->update($updates);
+        }
     }
 
     /**

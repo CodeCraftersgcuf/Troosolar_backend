@@ -11,13 +11,69 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use App\Models\Product;
 use Exception;
+use Illuminate\Http\Request;
 
 class BrandController extends Controller
 {
+    private function resolveCategoryIds(Request $request): array
+    {
+        $ids = $request->input('category_ids', []);
+        if (is_string($ids)) {
+            $decoded = json_decode($ids, true);
+            $ids = is_array($decoded) ? $decoded : preg_split('/\s*,\s*/', $ids);
+        }
+        if (!is_array($ids)) {
+            $ids = [];
+        }
+
+        $ids = array_values(array_unique(array_filter(array_map(
+            static fn ($id) => (int) $id,
+            $ids
+        ))));
+
+        if ($ids === [] && $request->filled('category_id')) {
+            $ids = [(int) $request->input('category_id')];
+        }
+
+        return $ids;
+    }
+
+    private function formatBrand(Brand $brand): array
+    {
+        $brand->loadMissing('categories');
+        $payload = $brand->toArray();
+        $payload['category_ids'] = $brand->categories->pluck('id')->values()->all();
+        $payload['category_names'] = $brand->categories
+            ->map(fn ($c) => $c->title ?? $c->name ?? '')
+            ->filter()
+            ->values()
+            ->all();
+
+        return $payload;
+    }
+
+    private function syncBrandCategories(Brand $brand, array $categoryIds): void
+    {
+        if ($categoryIds === []) {
+            return;
+        }
+
+        $brand->categories()->sync($categoryIds);
+        if (!$brand->category_id) {
+            $brand->category_id = $categoryIds[0];
+            $brand->save();
+        }
+    }
+
     public function index()
     {
         try {
-            $brands = Brand::all();
+            $brands = Brand::with('categories')
+                ->orderBy('title')
+                ->get()
+                ->map(fn (Brand $brand) => $this->formatBrand($brand))
+                ->values();
+
             return ResponseHelper::success($brands, 'Brands fetched.');
         } catch (Exception $e) {
             Log::error('Error fetching brands: ' . $e->getMessage());
@@ -42,7 +98,9 @@ class BrandController extends Controller
             }
 
             $brand = Brand::create($data);
-            return ResponseHelper::success($brand, 'Brand created.', 201);
+            $this->syncBrandCategories($brand, $this->resolveCategoryIds($request));
+
+            return ResponseHelper::success($this->formatBrand($brand->fresh()), 'Brand created.', 201);
         } catch (Exception $e) {
             Log::error('Error creating brand: ' . $e->getMessage());
             return ResponseHelper::error('Failed to create brand.', 500);
@@ -57,7 +115,7 @@ class BrandController extends Controller
                 return ResponseHelper::error('Brand not found.', 404);
             }
 
-            return ResponseHelper::success($brand, 'Brand found.');
+            return ResponseHelper::success($this->formatBrand($brand->load('categories')), 'Brand found.');
         } catch (Exception $e) {
             Log::error('Error showing brand: ' . $e->getMessage());
             return ResponseHelper::error('Something went wrong.', 500);
@@ -93,7 +151,12 @@ class BrandController extends Controller
             }
 
             $brand->update($data);
-            return ResponseHelper::success($brand, 'Brand updated.');
+            $categoryIds = $this->resolveCategoryIds($request);
+            if ($categoryIds !== []) {
+                $this->syncBrandCategories($brand, $categoryIds);
+            }
+
+            return ResponseHelper::success($this->formatBrand($brand->fresh()), 'Brand updated.');
         } catch (Exception $e) {
             Log::error('Error updating brand: ' . $e->getMessage());
             return ResponseHelper::error('Failed to update brand.', 500);
@@ -139,14 +202,22 @@ class BrandController extends Controller
             // This prevents brand filter from breaking when product.brand_id is null.
             $this->syncMissingBrandTagsForCategory((int) $categoryId);
 
-            // Return brands that belong to this category directly OR have a product in this category
-            $brands = Brand::where(function ($q) use ($categoryId) {
-                $q->where('category_id', $categoryId)
-                  ->orWhereHas('products', function ($pq) use ($categoryId) {
-                      $pq->where('category_id', $categoryId)
-                         ->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0');
-                  });
-            })->get();
+            // Return brands linked to this category (pivot or legacy) or with products in category
+            $brands = Brand::with('categories')
+                ->where(function ($q) use ($categoryId) {
+                    $q->where('category_id', $categoryId)
+                        ->orWhereHas('categories', function ($cq) use ($categoryId) {
+                            $cq->where('categories.id', $categoryId);
+                        })
+                        ->orWhereHas('products', function ($pq) use ($categoryId) {
+                            $pq->where('category_id', $categoryId)
+                                ->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0');
+                        });
+                })
+                ->get()
+                ->unique('id')
+                ->values()
+                ->map(fn (Brand $brand) => $this->formatBrand($brand));
 
             return ResponseHelper::success($brands, $brands->isEmpty()
                 ? 'No brands found for this category.'
@@ -196,7 +267,14 @@ class BrandController extends Controller
             $currentBrand = $product->brand_id ? $brandsById->get((int) $product->brand_id) : null;
             $currentBrandTitle = trim(strtolower((string) ($currentBrand->title ?? '')));
             $isCurrentBrandMissing = !$currentBrand;
-            $isCurrentBrandOutsideCategory = $currentBrand && (int) ($currentBrand->category_id ?? 0) !== $categoryId;
+            $isCurrentBrandOutsideCategory = false;
+            if ($currentBrand) {
+                $currentBrand->loadMissing('categories');
+                $linkedToCategory = $currentBrand->categories
+                    ->contains(fn ($c) => (int) $c->id === $categoryId);
+                $isCurrentBrandOutsideCategory =
+                    !$linkedToCategory && (int) ($currentBrand->category_id ?? 0) !== $categoryId;
+            }
             $isCurrentBrandNotInTitle = $currentBrandTitle === '' || !str_contains($title, $currentBrandTitle);
             $needsRetag = $isCurrentBrandMissing || $isCurrentBrandOutsideCategory || $isCurrentBrandNotInTitle;
 
@@ -212,15 +290,21 @@ class BrandController extends Controller
 public function showBrandByCategory($categoryId, $brandId)
 {
     try {
-        $brand = Brand::where('category_id', $categoryId)
-                      ->where('id', $brandId)
-                      ->first();
+        $brand = Brand::with('categories')
+            ->where('id', $brandId)
+            ->where(function ($q) use ($categoryId) {
+                $q->where('category_id', $categoryId)
+                    ->orWhereHas('categories', function ($cq) use ($categoryId) {
+                        $cq->where('categories.id', $categoryId);
+                    });
+            })
+            ->first();
 
         if (!$brand) {
             return ResponseHelper::error('Brand not found in this category.', 404);
         }
 
-        return ResponseHelper::success($brand, 'Brand fetched successfully.');
+        return ResponseHelper::success($this->formatBrand($brand), 'Brand fetched successfully.');
     } catch (\Exception $e) {
         return ResponseHelper::error('Failed to fetch brand.', 500, $e->getMessage());
     }

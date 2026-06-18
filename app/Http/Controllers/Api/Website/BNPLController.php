@@ -27,6 +27,7 @@ use App\Services\BnplLoanPlanCalculator;
 use App\Services\ReferralRewardService;
 use App\Services\MonoService;
 use App\Models\MonoCreditCheckSession;
+use App\Models\UserMonoAccount;
 
 class BNPLController extends Controller
 {
@@ -1724,12 +1725,15 @@ class BNPLController extends Controller
     {
         try {
             $data = $request->validate([
-                'mono_code' => 'required|string',
+                'mono_code' => 'required_without:use_linked_account|nullable|string',
+                'use_linked_account' => 'sometimes|boolean',
                 'bvn' => 'required|string',
                 'loan_amount' => 'required|numeric|min:0',
                 'repayment_duration' => 'required|integer|min:1',
                 'loan_plan_snapshot' => 'nullable',
             ]);
+
+            $useLinked = filter_var($data['use_linked_account'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
             $bvn = preg_replace('/\s+/', '', trim((string) $data['bvn']));
             $loanAmount = (float) $data['loan_amount'];
@@ -1746,7 +1750,33 @@ class BNPLController extends Controller
             }
 
             $interestRate = BnplLoanPlanCalculator::interestMonthlyPercentFromSnapshot($planSnapshot);
-            $accountId = $monoService->exchangeCode($data['mono_code']);
+
+            if ($useLinked) {
+                $linked = UserMonoAccount::where('user_id', Auth::id())
+                    ->where('status', 'linked')
+                    ->first();
+
+                if (! $linked || ! $linked->mono_account_id) {
+                    return ResponseHelper::error('No linked Mono bank account found. Please connect your bank in Profile settings first.', 422);
+                }
+
+                $accountId = $linked->mono_account_id;
+            } else {
+                if (empty($data['mono_code'])) {
+                    return ResponseHelper::error('Mono authorization code is required.', 422);
+                }
+
+                $accountId = $monoService->exchangeCode($data['mono_code']);
+
+                UserMonoAccount::updateOrCreate(
+                    ['user_id' => Auth::id()],
+                    [
+                        'mono_account_id' => $accountId,
+                        'status' => 'linked',
+                        'linked_at' => now(),
+                    ]
+                );
+            }
 
             $session = MonoCreditCheckSession::create([
                 'user_id' => Auth::id(),

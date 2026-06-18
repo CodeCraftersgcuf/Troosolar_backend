@@ -15,8 +15,14 @@ class Brand extends Model
         'icon',
         'category_id'
     ];
+
     public function category(){
         return $this->belongsTo(Category::class);
+    }
+
+    public function categories()
+    {
+        return $this->belongsToMany(Category::class, 'brand_category')->withTimestamps();
     }
 
 

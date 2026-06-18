@@ -44,7 +44,8 @@ use App\Http\Controllers\Api\Website\{
     BNPLController,
     CalendarController,
     AuditController,
-    ProductSelectionController
+    ProductSelectionController,
+    UserMonoAccountController
 };
 use App\Http\Controllers\InstallmentController;
 use App\Http\Controllers\KycController;
@@ -257,6 +258,11 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     Route::post('/bnpl/apply', [BNPLController::class, 'apply']);
     Route::post('/bnpl/process-credit-check', [BNPLController::class, 'processCreditCheck']);
     Route::get('/bnpl/mono-credit-status/{session_id}', [BNPLController::class, 'monoCreditStatus']);
+
+    // User Mono bank account (profile linking)
+    Route::get('/user/mono-account', [UserMonoAccountController::class, 'show']);
+    Route::post('/user/mono-account/link', [UserMonoAccountController::class, 'link']);
+
     Route::get('/bnpl/status/{application_id}', [BNPLController::class, 'getStatus']); // Get single application details
     Route::get('/bnpl/applications/{application_id}/repayment-schedule', [BNPLController::class, 'getRepaymentSchedule']); // Get repayment schedule for application
     Route::get('/bnpl/guarantor/form', [BNPLController::class, 'downloadGuarantorForm']);
