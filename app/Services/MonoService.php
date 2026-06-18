@@ -354,7 +354,11 @@ class MonoService
         $text = is_string($message) ? $message : 'Unknown Mono API error';
 
         if ($status === 401 || stripos($text, 'unauthorized') !== false) {
-            return 'Mono API unauthorized. On the server .env set MONO_SECRET_KEY to the live_sk_... secret from the same Mono app as MONO_PUBLIC_KEY (currently live_pk), with no quotes. Then run /api/optimize-app. Also confirm Credit Worthiness is enabled on your Mono dashboard.';
+            if (str_contains($path, 'creditworthiness')) {
+                return 'Mono Credit Worthiness unauthorized. Your secret key may work for statements/identity but Credit Worthiness is not enabled on your Mono app. In Mono Dashboard → Apps → your app, confirm Connect scope and ask Mono support to enable Credit Worthiness API. Webhook: https://troosolar.hmstech.org/api/webhooks/mono';
+            }
+
+            return 'Mono API unauthorized. On the server .env set MONO_SECRET_KEY to the live_sk_... secret from the same Mono app as MONO_PUBLIC_KEY (currently live_pk), with no quotes. Then run /api/optimize-app.';
         }
 
         return 'Mono API error: ' . $text;
