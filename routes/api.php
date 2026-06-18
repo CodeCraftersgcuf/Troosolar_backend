@@ -262,6 +262,9 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     // User Mono bank account (profile linking)
     Route::get('/user/mono-account', [UserMonoAccountController::class, 'show']);
     Route::post('/user/mono-account/link', [UserMonoAccountController::class, 'link']);
+    // Aliases under /bnpl (same handlers)
+    Route::get('/bnpl/user-mono-account', [UserMonoAccountController::class, 'show']);
+    Route::post('/bnpl/user-mono-account/link', [UserMonoAccountController::class, 'link']);
 
     Route::get('/bnpl/status/{application_id}', [BNPLController::class, 'getStatus']); // Get single application details
     Route::get('/bnpl/applications/{application_id}/repayment-schedule', [BNPLController::class, 'getRepaymentSchedule']); // Get repayment schedule for application

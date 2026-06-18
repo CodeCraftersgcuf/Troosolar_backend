@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\Website\LoanApplicationController;
 use App\Http\Controllers\Api\Website\LoanCalculationController;
 use App\Http\Controllers\Api\Website\OrderController;
+use App\Http\Controllers\Api\Website\UserMonoAccountController;
 use App\Http\Controllers\InstallmentController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,4 +27,12 @@ Route::get('admin/installments/with-history/{userId}', action: [InstallmentContr
 
 Route::post('admin/order-update-status/{orderId}', [OrderController::class, 'updateStatus']);
 Route::get('/products/top-products', [ProductController::class, 'topProducts']);
+
+// User Mono bank account linking (profile + BNPL skip re-link)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('user/mono-account', [UserMonoAccountController::class, 'show']);
+    Route::post('user/mono-account/link', [UserMonoAccountController::class, 'link']);
+    Route::get('bnpl/user-mono-account', [UserMonoAccountController::class, 'show']);
+    Route::post('bnpl/user-mono-account/link', [UserMonoAccountController::class, 'link']);
+});
 
