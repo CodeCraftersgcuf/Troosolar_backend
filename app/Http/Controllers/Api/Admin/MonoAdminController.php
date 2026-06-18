@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\UserMonoAccount;
 use App\Rules\BvnRule;
 use App\Services\BnplLoanPlanCalculator;
+use App\Services\MonoDocumentNormalizer;
 use App\Services\MonoService;
 use Exception;
 use Illuminate\Http\Request;
@@ -374,7 +375,7 @@ class MonoAdminController extends Controller
     /**
      * GET /api/admin/bnpl/mono/users/{userId}/documents
      */
-    public function fetchUserDocuments(Request $request, MonoService $monoService, int $userId)
+    public function fetchUserDocuments(Request $request, MonoService $monoService, MonoDocumentNormalizer $normalizer, int $userId)
     {
         try {
             User::findOrFail($userId);
@@ -416,6 +417,20 @@ class MonoAdminController extends Controller
                 }
             }
 
+            $documents['linked_account'] = $this->enrichLinkedAccountFromMono($linked, $documents);
+
+            try {
+                $pdfResult = $monoService->fetchStatementPdfUrl($accountId, $period, 6);
+                $documents['statement_pdf'] = [
+                    'period' => $period,
+                    'download_url' => $pdfResult['download_url'],
+                    'status' => $pdfResult['status'],
+                    'job_id' => $pdfResult['job_id'],
+                ];
+            } catch (Exception $ex) {
+                $errors['statement_pdf'] = $ex->getMessage();
+            }
+
             $latestSession = MonoCreditCheckSession::where('user_id', $userId)
                 ->orderByDesc('created_at')
                 ->first();
@@ -429,12 +444,65 @@ class MonoAdminController extends Controller
                 $documents['partial_errors'] = $errors;
             }
 
-            return ResponseHelper::success($documents, 'Mono documents fetched.');
+            $formatted = $normalizer->normalize($documents);
+
+            return ResponseHelper::success($formatted, 'Mono documents fetched.');
         } catch (Exception $e) {
             Log::error('Mono Admin fetchUserDocuments: ' . $e->getMessage());
 
             return ResponseHelper::error('Failed to fetch Mono documents: ' . $e->getMessage(), 500);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $documents
+     * @return array<string, mixed>
+     */
+    private function enrichLinkedAccountFromMono(UserMonoAccount $linked, array $documents): array
+    {
+        $linkedAccount = is_array($documents['linked_account'] ?? null)
+            ? $documents['linked_account']
+            : [];
+
+        if (! isset($documents['account_details']) || ! is_array($documents['account_details'])) {
+            return $linkedAccount;
+        }
+
+        $data = $documents['account_details']['data'] ?? $documents['account_details'];
+        if (! is_array($data)) {
+            return $linkedAccount;
+        }
+
+        $account = is_array($data['account'] ?? null) ? $data['account'] : $data;
+        $institution = is_array($account['institution'] ?? null) ? $account['institution'] : [];
+
+        $bankName = (string) ($institution['name'] ?? $account['bank_name'] ?? '');
+        $accountName = (string) ($account['name'] ?? $account['account_name'] ?? $account['accountName'] ?? '');
+        $accountNumber = (string) ($account['account_number'] ?? $account['accountNumber'] ?? '');
+        $lastFour = strlen($accountNumber) >= 4 ? substr($accountNumber, -4) : null;
+
+        $updates = [];
+        if ($bankName !== '' && empty($linked->bank_name)) {
+            $updates['bank_name'] = $bankName;
+        }
+        if ($accountName !== '' && empty($linked->account_name)) {
+            $updates['account_name'] = $accountName;
+        }
+        if ($lastFour && empty($linked->account_number_last4)) {
+            $updates['account_number_last4'] = $lastFour;
+        }
+
+        if ($updates !== []) {
+            $linked->update($updates);
+            $linked->refresh();
+        }
+
+        return [
+            'bank_name' => $linked->bank_name ?: ($linkedAccount['bank_name'] ?? null),
+            'account_name' => $linked->account_name ?: ($linkedAccount['account_name'] ?? null),
+            'account_number_last4' => $linked->account_number_last4 ?: ($linkedAccount['account_number_last4'] ?? null),
+            'linked_at' => $linked->linked_at ?: ($linkedAccount['linked_at'] ?? null),
+        ];
     }
 
     /**
