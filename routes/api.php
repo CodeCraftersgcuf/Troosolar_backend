@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\Admin\{
     InterestPercentageController,
     AnalyticController,
     BNPLAdminController,
+    MonoAdminController,
     CalculatorSettingsController,
     CheckoutSettingsController,
     ProductReviewAdminController
@@ -460,6 +461,10 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
         Route::post('/applications/{id}/guarantor', [BNPLAdminController::class, 'setApplicationGuarantor']);
         Route::put('/applications/{id}/installation-date/accept', [BNPLAdminController::class, 'acceptInstallationDate']);
         Route::put('/applications/{id}/installation-date/reject', [BNPLAdminController::class, 'rejectInstallationDate']);
+        Route::get('/mono/linked-accounts', [MonoAdminController::class, 'linkedAccounts']);
+        Route::get('/mono/credit-sessions', [MonoAdminController::class, 'creditSessions']);
+        Route::get('/mono/credit-sessions/{id}', [MonoAdminController::class, 'showCreditSession']);
+        Route::get('/mono/webhook-events', [MonoAdminController::class, 'webhookEvents']);
     });
 
     // ================= AUDIT ADMIN ROUTES =================
