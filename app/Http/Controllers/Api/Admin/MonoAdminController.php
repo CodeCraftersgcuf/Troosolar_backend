@@ -38,6 +38,29 @@ class MonoAdminController extends Controller
     }
 
     /**
+     * GET /api/admin/bnpl/mono/status
+     */
+    public function monoStatus(MonoService $monoService)
+    {
+        try {
+            $public = $monoService->normalizeKey($monoService->getPublicKey());
+            $secretInfo = $monoService->describeSecretKey();
+            $auth = $monoService->verifyApiCredentials();
+
+            return ResponseHelper::success([
+                'mono_env' => $monoService->getEnv(),
+                'public_key_prefix' => $public !== '' ? substr($public, 0, 10) . '...' : null,
+                'secret_key' => $secretInfo,
+                'api_auth' => $auth,
+            ], $auth['ok'] ? 'Mono credentials look good.' : 'Mono credentials need attention.');
+        } catch (Exception $e) {
+            Log::error('Mono Admin monoStatus: ' . $e->getMessage());
+
+            return ResponseHelper::error('Failed to check Mono status: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
      * GET /api/admin/bnpl/mono/linked-accounts
      */
     public function linkedAccounts(Request $request)

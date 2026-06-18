@@ -12,7 +12,7 @@ class MonoService
 
     public function getPublicKey(): string
     {
-        return (string) config('services.mono.public_key', '');
+        return $this->normalizeKey((string) config('services.mono.public_key', ''));
     }
 
     public function getEnv(): string
@@ -28,6 +28,134 @@ class MonoService
     public function shouldRunCreditCheck(): bool
     {
         return (bool) config('services.mono.run_credit_check', true);
+    }
+
+    /**
+     * Normalize secret/public keys from .env (strip quotes and whitespace).
+     */
+    public function normalizeKey(string $key): string
+    {
+        $key = trim($key);
+        if (
+            (str_starts_with($key, '"') && str_ends_with($key, '"'))
+            || (str_starts_with($key, "'") && str_ends_with($key, "'"))
+        ) {
+            $key = substr($key, 1, -1);
+        }
+
+        return trim($key);
+    }
+
+    /**
+     * @return array{configured: bool, prefix: string|null, env: string|null, matches_public: bool}
+     */
+    public function describeSecretKey(): array
+    {
+        $secret = $this->getSecretKey();
+        $public = $this->normalizeKey($this->getPublicKey());
+        $prefix = $this->keyPrefix($secret);
+
+        return [
+            'configured' => $secret !== '',
+            'prefix' => $prefix,
+            'env' => $this->secretEnvFromPrefix($prefix),
+            'matches_public' => $this->keysMatchEnvironment($public, $secret),
+        ];
+    }
+
+    /**
+     * Lightweight auth check against Mono (does not use a linked account).
+     *
+     * @return array{ok: bool, status: int|null, message: string}
+     */
+    public function verifyApiCredentials(): array
+    {
+        $secret = $this->getSecretKey();
+        if ($secret === '') {
+            return [
+                'ok' => false,
+                'status' => null,
+                'message' => 'MONO_SECRET_KEY is not set on the server.',
+            ];
+        }
+
+        $public = $this->normalizeKey($this->getPublicKey());
+        if ($public !== '' && ! $this->keysMatchEnvironment($public, $secret)) {
+            return [
+                'ok' => false,
+                'status' => null,
+                'message' => 'MONO_SECRET_KEY does not match MONO_PUBLIC_KEY environment (live vs test mismatch). Use both keys from the same Mono app.',
+            ];
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'accept' => 'application/json',
+                'mono-sec-key' => $secret,
+            ])->timeout(20)->get($this->baseUrl . '/v3/institutions', [
+                'scope' => 'financial_data',
+            ]);
+
+            if ($response->successful()) {
+                return [
+                    'ok' => true,
+                    'status' => $response->status(),
+                    'message' => 'Mono secret key is valid.',
+                ];
+            }
+
+            $message = $response->json('message') ?? $response->body();
+
+            return [
+                'ok' => false,
+                'status' => $response->status(),
+                'message' => is_string($message) ? $message : 'Mono API rejected the secret key.',
+            ];
+        } catch (RequestException $e) {
+            $message = $e->response?->json('message') ?? $e->getMessage();
+
+            return [
+                'ok' => false,
+                'status' => $e->response?->status(),
+                'message' => is_string($message) ? $message : 'Mono API request failed.',
+            ];
+        }
+    }
+
+    public function getSecretKey(): string
+    {
+        return $this->normalizeKey((string) config('services.mono.secret_key', ''));
+    }
+
+    private function keyPrefix(string $key): ?string
+    {
+        if (preg_match('/^(live|test)_(pk|sk)_/', $key, $matches)) {
+            return $matches[1] . '_' . $matches[2];
+        }
+
+        return null;
+    }
+
+    private function secretEnvFromPrefix(?string $prefix): ?string
+    {
+        return match ($prefix) {
+            'live_sk' => 'live',
+            'test_sk' => 'test',
+            default => null,
+        };
+    }
+
+    private function keysMatchEnvironment(string $publicKey, string $secretKey): bool
+    {
+        $publicPrefix = $this->keyPrefix($publicKey);
+        $secretPrefix = $this->keyPrefix($secretKey);
+
+        if ($publicPrefix === null || $secretPrefix === null) {
+            return true;
+        }
+
+        return str_starts_with($publicPrefix, 'live') === str_starts_with($secretPrefix, 'live')
+            && str_starts_with($publicPrefix, 'test') === str_starts_with($secretPrefix, 'test');
     }
 
     /**
@@ -181,9 +309,16 @@ class MonoService
      */
     private function request(string $method, string $path, array $body = [], array $query = []): array
     {
-        $secret = (string) config('services.mono.secret_key', '');
+        $secret = $this->getSecretKey();
         if ($secret === '') {
-            throw new RuntimeException('Mono secret key is not configured.');
+            throw new RuntimeException('Mono secret key is not configured. Set MONO_SECRET_KEY in server .env (live_sk_... for production).');
+        }
+
+        $public = $this->normalizeKey($this->getPublicKey());
+        if ($public !== '' && ! $this->keysMatchEnvironment($public, $secret)) {
+            throw new RuntimeException(
+                'MONO_SECRET_KEY and MONO_PUBLIC_KEY are from different environments. Use both live keys or both test keys from the same Mono app.'
+            );
         }
 
         $url = $this->baseUrl . $path;
@@ -203,14 +338,25 @@ class MonoService
                 : $client->get($url);
         } catch (RequestException $e) {
             $message = $e->response?->json('message') ?? $e->getMessage();
-            throw new RuntimeException('Mono API request failed: ' . $message, 0, $e);
+            throw new RuntimeException($this->formatApiErrorMessage($message, $e->response?->status()), 0, $e);
         }
 
         if (! $response->successful()) {
             $message = $response->json('message') ?? $response->body();
-            throw new RuntimeException('Mono API error: ' . $message);
+            throw new RuntimeException($this->formatApiErrorMessage($message, $response->status()));
         }
 
         return $response->json() ?? [];
+    }
+
+    private function formatApiErrorMessage(mixed $message, ?int $status): string
+    {
+        $text = is_string($message) ? $message : 'Unknown Mono API error';
+
+        if ($status === 401 || stripos($text, 'unauthorized') !== false) {
+            return 'Mono API unauthorized. On the server .env set MONO_SECRET_KEY to the live_sk_... secret from the same Mono app as MONO_PUBLIC_KEY (currently live_pk), with no quotes. Then run /api/optimize-app. Also confirm Credit Worthiness is enabled on your Mono dashboard.';
+        }
+
+        return 'Mono API error: ' . $text;
     }
 }
