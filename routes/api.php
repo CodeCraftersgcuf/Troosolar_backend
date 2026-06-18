@@ -465,6 +465,7 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
         Route::get('/mono/credit-sessions', [MonoAdminController::class, 'creditSessions']);
         Route::get('/mono/credit-sessions/{id}', [MonoAdminController::class, 'showCreditSession']);
         Route::get('/mono/webhook-events', [MonoAdminController::class, 'webhookEvents']);
+        Route::post('/mono/users/{userId}/bvn', [MonoAdminController::class, 'setUserBvn']);
         Route::post('/mono/users/{userId}/credit-check', [MonoAdminController::class, 'runCreditCheck']);
         Route::get('/mono/users/{userId}/documents', [MonoAdminController::class, 'fetchUserDocuments']);
         Route::post('/mono/users/{userId}/statement-pdf', [MonoAdminController::class, 'fetchStatementPdf']);

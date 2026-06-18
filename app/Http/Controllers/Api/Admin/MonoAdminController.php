@@ -10,6 +10,7 @@ use App\Models\MonoCreditCheckSession;
 use App\Models\MonoWebhookEvent;
 use App\Models\User;
 use App\Models\UserMonoAccount;
+use App\Rules\BvnRule;
 use App\Services\BnplLoanPlanCalculator;
 use App\Services\MonoService;
 use Exception;
@@ -31,6 +32,8 @@ class MonoAdminController extends Controller
             'email' => $user->email,
             'phone' => $user->phone ?? $user->phone_number ?? null,
             'full_name' => trim(($user->first_name ?? '') . ' ' . ($user->sur_name ?? '')),
+            'bvn' => $user->bvn && trim((string) $user->bvn) !== '' ? trim((string) $user->bvn) : null,
+            'has_bvn' => $user->bvn && trim((string) $user->bvn) !== '',
         ];
     }
 
@@ -239,7 +242,12 @@ class MonoAdminController extends Controller
             )));
 
             if ($bvn === '') {
-                return ResponseHelper::error('BVN is required. Add it on the user profile or BNPL application first.', 422);
+                return ResponseHelper::error('BVN is required. Set it on the customer profile or use Set BVN in Mono Loans.', 422);
+            }
+
+            if ($user && empty(trim((string) ($user->bvn ?? '')))) {
+                $user->bvn = $bvn;
+                $user->save();
             }
 
             $loanAmount = (float) (
@@ -299,6 +307,44 @@ class MonoAdminController extends Controller
             Log::error('Mono Admin runCreditCheck: ' . $e->getMessage());
 
             return ResponseHelper::error('Failed to run Mono credit check: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * POST /api/admin/bnpl/mono/users/{userId}/bvn
+     */
+    public function setUserBvn(Request $request, int $userId)
+    {
+        try {
+            $user = User::findOrFail($userId);
+
+            if ($user->bvn && trim((string) $user->bvn) !== '') {
+                return ResponseHelper::error('Customer already has a BVN on file. It cannot be changed from here.', 422);
+            }
+
+            $data = $request->validate([
+                'bvn' => ['required', 'string', new BvnRule()],
+            ]);
+
+            $bvn = preg_replace('/\s+/', '', trim((string) $data['bvn']));
+            $user->bvn = $bvn;
+            $user->save();
+
+            return ResponseHelper::success([
+                'user_id' => $userId,
+                'bvn' => $bvn,
+                'user' => $this->formatUserBrief($user->fresh()),
+            ], 'BVN saved for customer.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Exception $e) {
+            Log::error('Mono Admin setUserBvn: ' . $e->getMessage());
+
+            return ResponseHelper::error('Failed to save BVN: ' . $e->getMessage(), 500);
         }
     }
 
