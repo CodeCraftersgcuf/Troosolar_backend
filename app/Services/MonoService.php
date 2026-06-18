@@ -358,28 +358,49 @@ class MonoService
                 ? $client->post($url, $body)
                 : $client->get($url);
         } catch (RequestException $e) {
-            $message = $e->response?->json('message') ?? $e->getMessage();
-            throw new RuntimeException($this->formatApiErrorMessage($message, $e->response?->status()), 0, $e);
+            throw new RuntimeException(
+                $this->formatApiErrorMessage($e->response?->json(), $e->response?->status(), $path),
+                0,
+                $e
+            );
         }
 
         if (! $response->successful()) {
-            $message = $response->json('message') ?? $response->body();
-            throw new RuntimeException($this->formatApiErrorMessage($message, $response->status()));
+            throw new RuntimeException(
+                $this->formatApiErrorMessage($response->json(), $response->status(), $path)
+            );
         }
 
         return $response->json() ?? [];
     }
 
-    private function formatApiErrorMessage(mixed $message, ?int $status): string
+    /**
+     * @param  array<string, mixed>|null  $payload
+     */
+    private function formatApiErrorMessage(?array $payload, ?int $status, string $path = ''): string
     {
+        $message = is_array($payload) ? ($payload['message'] ?? null) : null;
+        $data = is_array($payload) ? ($payload['data'] ?? null) : null;
+        $detail = is_string($data) && $data !== '' ? $data : null;
+
         $text = is_string($message) ? $message : 'Unknown Mono API error';
+
+        if ($detail && stripos($detail, 'wallet balance') !== false) {
+            return 'Mono wallet balance is too low to run this API call. Top up your Mono wallet in the Mono Dashboard (Billing / Wallet), then retry. Credit worthiness costs about ₦500 per check with bureau lookup, or ₦200 without (MONO_RUN_CREDIT_CHECK=false).';
+        }
+
+        if ($detail) {
+            $text = $text . ' — ' . $detail;
+        }
 
         if ($status === 401 || stripos($text, 'unauthorized') !== false) {
             if (str_contains($path, 'creditworthiness')) {
-                return 'Mono Credit Worthiness unauthorized. Your secret key may work for statements/identity but Credit Worthiness is not enabled on your Mono app. In Mono Dashboard → Apps → your app, confirm Connect scope and ask Mono support to enable Credit Worthiness API. Webhook: https://troosolar.hmstech.org/api/webhooks/mono';
+                return 'Mono Credit Worthiness failed: ' . $text
+                    . '. If the detail mentions wallet balance, top up your Mono dashboard wallet. Otherwise confirm Credit Worthiness is enabled and webhook is set to https://troosolar.hmstech.org/api/webhooks/mono';
             }
 
-            return 'Mono API unauthorized. On the server .env set MONO_SECRET_KEY to the live_sk_... secret from the same Mono app as MONO_PUBLIC_KEY (currently live_pk), with no quotes. Then run /api/optimize-app.';
+            return 'Mono API unauthorized: ' . $text
+                . '. Verify MONO_SECRET_KEY matches MONO_PUBLIC_KEY on the server .env (live_sk + live_pk, no quotes), then run /api/optimize-app.';
         }
 
         return 'Mono API error: ' . $text;
