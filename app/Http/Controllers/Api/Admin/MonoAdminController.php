@@ -4,9 +4,14 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Controller;
+use App\Models\BnplSettings;
+use App\Models\LoanApplication;
 use App\Models\MonoCreditCheckSession;
 use App\Models\MonoWebhookEvent;
+use App\Models\User;
 use App\Models\UserMonoAccount;
+use App\Services\BnplLoanPlanCalculator;
+use App\Services\MonoService;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -197,6 +202,221 @@ class MonoAdminController extends Controller
             Log::error('Mono Admin webhookEvents: ' . $e->getMessage());
 
             return ResponseHelper::error('Failed to retrieve Mono webhook events', 500);
+        }
+    }
+
+    /**
+     * POST /api/admin/bnpl/mono/users/{userId}/credit-check
+     */
+    public function runCreditCheck(Request $request, MonoService $monoService, int $userId)
+    {
+        try {
+            User::findOrFail($userId);
+
+            $linked = UserMonoAccount::where('user_id', $userId)
+                ->where('status', 'linked')
+                ->first();
+
+            if (! $linked || ! $linked->mono_account_id) {
+                return ResponseHelper::error('This user has no linked Mono bank account.', 422);
+            }
+
+            $data = $request->validate([
+                'bvn' => 'nullable|string',
+                'loan_amount' => 'nullable|numeric|min:0',
+                'repayment_duration' => 'nullable|integer|min:1',
+            ]);
+
+            $loanApp = LoanApplication::where('user_id', $userId)->latest()->first();
+            $user = User::find($userId);
+            $settings = BnplSettings::get();
+
+            $bvn = preg_replace('/\s+/', '', trim((string) (
+                $data['bvn']
+                ?? $loanApp?->bvn
+                ?? $user?->bvn
+                ?? ''
+            )));
+
+            if ($bvn === '') {
+                return ResponseHelper::error('BVN is required. Add it on the user profile or BNPL application first.', 422);
+            }
+
+            $loanAmount = (float) (
+                $data['loan_amount']
+                ?? $loanApp?->loan_amount
+                ?? $settings->minimum_loan_amount
+                ?? 1500000
+            );
+            $termMonths = (int) (
+                $data['repayment_duration']
+                ?? $loanApp?->repayment_duration
+                ?? 12
+            );
+            $principalKobo = (int) round($loanAmount * 100);
+
+            $planSnapshot = is_array($loanApp?->loan_plan_snapshot)
+                ? $loanApp->loan_plan_snapshot
+                : null;
+            $interestRate = BnplLoanPlanCalculator::interestMonthlyPercentFromSnapshot(
+                $planSnapshot,
+                (float) ($settings->interest_rate_percentage ?? 4)
+            );
+
+            $session = MonoCreditCheckSession::create([
+                'user_id' => $userId,
+                'mono_account_id' => $linked->mono_account_id,
+                'bvn' => $bvn,
+                'principal_kobo' => $principalKobo,
+                'interest_rate' => $interestRate,
+                'term_months' => $termMonths,
+                'run_credit_check' => $monoService->shouldRunCreditCheck(),
+                'status' => 'pending',
+                'loan_application_id' => $loanApp?->id,
+            ]);
+
+            $monoService->initiateCreditWorthiness($linked->mono_account_id, [
+                'bvn' => $bvn,
+                'principal' => $principalKobo,
+                'interest_rate' => $interestRate,
+                'term' => $termMonths,
+                'run_credit_check' => $monoService->shouldRunCreditCheck(),
+            ]);
+
+            $session->update(['status' => 'processing']);
+
+            return ResponseHelper::success([
+                'session' => $this->formatCreditSessionSummary($session->fresh()),
+                'message' => 'Credit check initiated. Results arrive via webhook; refresh Credit Sessions in a few moments.',
+            ], 'Mono credit check started.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Exception $e) {
+            Log::error('Mono Admin runCreditCheck: ' . $e->getMessage());
+
+            return ResponseHelper::error('Failed to run Mono credit check: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * GET /api/admin/bnpl/mono/users/{userId}/documents
+     */
+    public function fetchUserDocuments(Request $request, MonoService $monoService, int $userId)
+    {
+        try {
+            User::findOrFail($userId);
+
+            $linked = UserMonoAccount::where('user_id', $userId)
+                ->where('status', 'linked')
+                ->first();
+
+            if (! $linked || ! $linked->mono_account_id) {
+                return ResponseHelper::error('This user has no linked Mono bank account.', 422);
+            }
+
+            $period = (string) $request->query('period', 'last6months');
+            $accountId = $linked->mono_account_id;
+
+            $documents = [
+                'user_id' => $userId,
+                'mono_account_id' => $accountId,
+                'linked_account' => [
+                    'bank_name' => $linked->bank_name,
+                    'account_name' => $linked->account_name,
+                    'account_number_last4' => $linked->account_number_last4,
+                    'linked_at' => $linked->linked_at,
+                ],
+            ];
+
+            $errors = [];
+
+            foreach ([
+                'account_details' => fn () => $monoService->getAccountDetails($accountId),
+                'identity' => fn () => $monoService->getAccountIdentity($accountId),
+                'balance' => fn () => $monoService->getAccountBalance($accountId),
+                'statement_json' => fn () => $monoService->getAccountStatement($accountId, $period, 'json'),
+            ] as $key => $callback) {
+                try {
+                    $documents[$key] = $callback();
+                } catch (Exception $ex) {
+                    $errors[$key] = $ex->getMessage();
+                }
+            }
+
+            $latestSession = MonoCreditCheckSession::where('user_id', $userId)
+                ->orderByDesc('created_at')
+                ->first();
+
+            if ($latestSession) {
+                $documents['latest_credit_session'] = $this->formatCreditSessionSummary($latestSession);
+                $documents['latest_credit_session']['credit_worthiness_payload'] = $latestSession->credit_worthiness_payload;
+            }
+
+            if ($errors !== []) {
+                $documents['partial_errors'] = $errors;
+            }
+
+            return ResponseHelper::success($documents, 'Mono documents fetched.');
+        } catch (Exception $e) {
+            Log::error('Mono Admin fetchUserDocuments: ' . $e->getMessage());
+
+            return ResponseHelper::error('Failed to fetch Mono documents: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * POST /api/admin/bnpl/mono/users/{userId}/statement-pdf
+     */
+    public function fetchStatementPdf(Request $request, MonoService $monoService, int $userId)
+    {
+        try {
+            User::findOrFail($userId);
+
+            $linked = UserMonoAccount::where('user_id', $userId)
+                ->where('status', 'linked')
+                ->first();
+
+            if (! $linked || ! $linked->mono_account_id) {
+                return ResponseHelper::error('This user has no linked Mono bank account.', 422);
+            }
+
+            $data = $request->validate([
+                'period' => 'nullable|string|max:32',
+            ]);
+
+            $period = $data['period'] ?? 'last6months';
+            $result = $monoService->fetchStatementPdfUrl($linked->mono_account_id, $period);
+
+            if ($result['download_url']) {
+                return ResponseHelper::success([
+                    'download_url' => $result['download_url'],
+                    'job_id' => $result['job_id'],
+                    'status' => $result['status'],
+                    'period' => $period,
+                ], 'Bank statement PDF is ready.');
+            }
+
+            return ResponseHelper::success([
+                'download_url' => null,
+                'job_id' => $result['job_id'],
+                'status' => $result['status'],
+                'period' => $period,
+                'raw' => $result['raw'],
+            ], 'Statement PDF is still processing. Try again in a few seconds.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Exception $e) {
+            Log::error('Mono Admin fetchStatementPdf: ' . $e->getMessage());
+
+            return ResponseHelper::error('Failed to fetch statement PDF: ' . $e->getMessage(), 500);
         }
     }
 
