@@ -419,18 +419,6 @@ class MonoAdminController extends Controller
 
             $documents['linked_account'] = $this->enrichLinkedAccountFromMono($linked, $documents);
 
-            try {
-                $pdfResult = $monoService->fetchStatementPdfUrl($accountId, $period, 6);
-                $documents['statement_pdf'] = [
-                    'period' => $period,
-                    'download_url' => $pdfResult['download_url'],
-                    'status' => $pdfResult['status'],
-                    'job_id' => $pdfResult['job_id'],
-                ];
-            } catch (Exception $ex) {
-                $errors['statement_pdf'] = $ex->getMessage();
-            }
-
             $latestSession = MonoCreditCheckSession::where('user_id', $userId)
                 ->orderByDesc('created_at')
                 ->first();

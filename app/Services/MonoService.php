@@ -224,11 +224,17 @@ class MonoService
      */
     public function getAccountStatement(string $accountId, string $period = 'last6months', string $output = 'json'): array
     {
-        return $this->request('GET', '/v2/accounts/' . $accountId . '/statement', [], [
+        $query = [
             'period' => $period,
             'output' => $output,
-            'format' => 'v2',
-        ]);
+        ];
+
+        // format=v2 is for JSON statements only; Mono rejects it on PDF requests.
+        if (strtolower($output) !== 'pdf') {
+            $query['format'] = 'v2';
+        }
+
+        return $this->request('GET', '/v2/accounts/' . $accountId . '/statement', [], $query);
     }
 
     /**
@@ -247,19 +253,33 @@ class MonoService
     public function fetchStatementPdfUrl(string $accountId, string $period = 'last6months', int $maxAttempts = 12): array
     {
         $init = $this->getAccountStatement($accountId, $period, 'pdf');
-        $jobId = $init['data']['id'] ?? $init['data']['jobId'] ?? $init['jobId'] ?? null;
+        $data = is_array($init['data'] ?? null) ? $init['data'] : [];
+        $pdfMeta = is_array($data['pdf'] ?? null) ? $data['pdf'] : [];
+
+        $jobId = $data['jobId']
+            ?? $data['job_id']
+            ?? $pdfMeta['jobId']
+            ?? $pdfMeta['jobid']
+            ?? $pdfMeta['job_id']
+            ?? $data['id']
+            ?? $init['jobId']
+            ?? null;
+
+        $directPath = $data['path']
+            ?? $pdfMeta['url']
+            ?? $pdfMeta['path']
+            ?? null;
+
+        if (is_string($directPath) && $directPath !== '') {
+            return [
+                'job_id' => is_string($jobId) ? $jobId : null,
+                'status' => 'BUILT',
+                'download_url' => $directPath,
+                'raw' => $init,
+            ];
+        }
 
         if (! is_string($jobId) || $jobId === '') {
-            $directPath = $init['data']['path'] ?? null;
-            if (is_string($directPath) && $directPath !== '') {
-                return [
-                    'job_id' => null,
-                    'status' => 'BUILT',
-                    'download_url' => $directPath,
-                    'raw' => $init,
-                ];
-            }
-
             return [
                 'job_id' => null,
                 'status' => 'unknown',
@@ -274,8 +294,9 @@ class MonoService
             }
 
             $poll = $this->pollStatementPdfJob($accountId, $jobId);
-            $status = strtoupper((string) ($poll['data']['status'] ?? ''));
-            $path = $poll['data']['path'] ?? null;
+            $pollData = is_array($poll['data'] ?? null) ? $poll['data'] : [];
+            $status = strtoupper((string) ($pollData['status'] ?? ''));
+            $path = $pollData['path'] ?? $pollData['url'] ?? null;
 
             if ($status === 'BUILT' && is_string($path) && $path !== '') {
                 return [

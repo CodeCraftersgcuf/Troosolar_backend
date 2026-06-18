@@ -76,7 +76,6 @@ class MonoDocumentNormalizer
             'partial_errors' => is_array($documents['partial_errors'] ?? null)
                 ? $documents['partial_errors']
                 : [],
-            'statement_pdf' => $documents['statement_pdf'] ?? null,
         ];
     }
 
