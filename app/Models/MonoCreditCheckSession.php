@@ -16,7 +16,8 @@ class MonoCreditCheckSession extends Model
         'interest_rate',
         'term_months',
         'run_credit_check',
-        'mono_init_response',
+        'api_request_payload',
+        'api_init_response',
         'status',
         'can_afford',
         'monthly_payment_kobo',
@@ -30,7 +31,8 @@ class MonoCreditCheckSession extends Model
         'interest_rate' => 'decimal:2',
         'term_months' => 'integer',
         'run_credit_check' => 'boolean',
-        'mono_init_response' => 'array',
+        'api_request_payload' => 'array',
+        'api_init_response' => 'array',
         'can_afford' => 'boolean',
         'monthly_payment_kobo' => 'integer',
         'credit_worthiness_payload' => 'array',
@@ -62,5 +64,40 @@ class MonoCreditCheckSession extends Model
             'mono_credit_report' => $this->credit_worthiness_payload,
             'mono_credit_session_id' => $this->id,
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function resolvedApiRequestPayload(): array
+    {
+        if (is_array($this->api_request_payload) && $this->api_request_payload !== []) {
+            return $this->api_request_payload;
+        }
+
+        return [
+            'endpoint' => 'https://api.withmono.com/v2/accounts/' . $this->mono_account_id . '/creditworthiness',
+            'method' => 'POST',
+            'body' => [
+                'bvn' => $this->bvn,
+                'principal' => (int) $this->principal_kobo,
+                'interest_rate' => (float) $this->interest_rate,
+                'term' => (int) $this->term_months,
+                'run_credit_check' => (bool) $this->run_credit_check,
+            ],
+            'note' => 'Reconstructed from session fields — run a new credit check to store the exact POST audit.',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function resolvedApiInitResponse(): ?array
+    {
+        if (is_array($this->api_init_response) && $this->api_init_response !== []) {
+            return $this->api_init_response;
+        }
+
+        return null;
     }
 }

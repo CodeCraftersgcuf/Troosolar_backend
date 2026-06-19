@@ -1778,6 +1778,14 @@ class BNPLController extends Controller
                 );
             }
 
+            $creditParams = [
+                'bvn' => $bvn,
+                'principal' => $principalKobo,
+                'interest_rate' => $interestRate,
+                'term' => (int) $data['repayment_duration'],
+                'run_credit_check' => $monoService->shouldRunCreditCheck(),
+            ];
+
             $session = MonoCreditCheckSession::create([
                 'user_id' => Auth::id(),
                 'mono_account_id' => $accountId,
@@ -1785,21 +1793,16 @@ class BNPLController extends Controller
                 'principal_kobo' => $principalKobo,
                 'interest_rate' => $interestRate,
                 'term_months' => (int) $data['repayment_duration'],
-                'run_credit_check' => $monoService->shouldRunCreditCheck(),
+                'run_credit_check' => $creditParams['run_credit_check'],
+                'api_request_payload' => $monoService->buildCreditWorthinessRequestAudit($accountId, $creditParams),
                 'status' => 'pending',
             ]);
 
-            $initResponse = $monoService->initiateCreditWorthiness($accountId, [
-                'bvn' => $bvn,
-                'principal' => $principalKobo,
-                'interest_rate' => $interestRate,
-                'term' => (int) $data['repayment_duration'],
-                'run_credit_check' => $monoService->shouldRunCreditCheck(),
-            ]);
+            $initResponse = $monoService->initiateCreditWorthiness($accountId, $creditParams);
 
             $session->update([
                 'status' => 'processing',
-                'mono_init_response' => $initResponse,
+                'api_init_response' => $initResponse,
             ]);
 
             return ResponseHelper::success([

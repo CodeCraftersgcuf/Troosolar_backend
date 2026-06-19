@@ -197,6 +197,24 @@ class MonoService
     }
 
     /**
+     * @return array{endpoint: string, body: array<string, mixed>}
+     */
+    public function buildCreditWorthinessRequestAudit(string $accountId, array $params): array
+    {
+        return [
+            'endpoint' => $this->baseUrl . '/v2/accounts/' . $accountId . '/creditworthiness',
+            'method' => 'POST',
+            'body' => [
+                'bvn' => $params['bvn'],
+                'principal' => (int) $params['principal'],
+                'interest_rate' => (float) $params['interest_rate'],
+                'term' => (int) $params['term'],
+                'run_credit_check' => (bool) ($params['run_credit_check'] ?? true),
+            ],
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function getAccountDetails(string $accountId): array

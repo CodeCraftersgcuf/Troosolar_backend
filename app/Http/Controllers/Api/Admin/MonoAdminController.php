@@ -177,8 +177,6 @@ class MonoAdminController extends Controller
             $payload = $this->formatCreditSessionSummary($session);
             $payload['credit_worthiness_payload'] = $session->credit_worthiness_payload;
             $payload['error_message'] = $session->error_message;
-            $payload['mono_init_response'] = $session->mono_init_response;
-            $payload['request_payload'] = $this->buildCreditWorthinessRequestPayload($session);
 
             return ResponseHelper::success($payload, 'Mono credit check session retrieved successfully');
         } catch (Exception $e) {
@@ -297,6 +295,19 @@ class MonoAdminController extends Controller
                 (float) ($settings->interest_rate_percentage ?? 4)
             );
 
+            $creditParams = [
+                'bvn' => $bvn,
+                'principal' => $principalKobo,
+                'interest_rate' => $interestRate,
+                'term' => $termMonths,
+                'run_credit_check' => $monoService->shouldRunCreditCheck(),
+            ];
+
+            $requestAudit = $monoService->buildCreditWorthinessRequestAudit(
+                $linked->mono_account_id,
+                $creditParams
+            );
+
             $session = MonoCreditCheckSession::create([
                 'user_id' => $userId,
                 'mono_account_id' => $linked->mono_account_id,
@@ -304,22 +315,17 @@ class MonoAdminController extends Controller
                 'principal_kobo' => $principalKobo,
                 'interest_rate' => $interestRate,
                 'term_months' => $termMonths,
-                'run_credit_check' => $monoService->shouldRunCreditCheck(),
+                'run_credit_check' => $creditParams['run_credit_check'],
+                'api_request_payload' => $requestAudit,
                 'status' => 'pending',
                 'loan_application_id' => $loanApp?->id,
             ]);
 
-            $initResponse = $monoService->initiateCreditWorthiness($linked->mono_account_id, [
-                'bvn' => $bvn,
-                'principal' => $principalKobo,
-                'interest_rate' => $interestRate,
-                'term' => $termMonths,
-                'run_credit_check' => $monoService->shouldRunCreditCheck(),
-            ]);
+            $initResponse = $monoService->initiateCreditWorthiness($linked->mono_account_id, $creditParams);
 
             $session->update([
                 'status' => 'processing',
-                'mono_init_response' => $initResponse,
+                'api_init_response' => $initResponse,
             ]);
 
             return ResponseHelper::success([
@@ -579,33 +585,14 @@ class MonoAdminController extends Controller
                 : null,
             'has_full_report' => ! empty($report),
             'error_message' => $session->error_message,
+            'api_request_payload' => $session->resolvedApiRequestPayload(),
+            'api_init_response' => $session->resolvedApiInitResponse() ?? [
+                'note' => 'Not stored for sessions before this update — run a new credit check.',
+            ],
+            'webhook_payload' => $report,
+            'mono_result_message' => $report['message'] ?? $session->error_message,
             'created_at' => $session->created_at,
             'updated_at' => $session->updated_at,
-        ];
-    }
-
-    private function buildCreditWorthinessRequestPayload(MonoCreditCheckSession $session): array
-    {
-        $accountId = (string) ($session->mono_account_id ?? '');
-
-        return [
-            'method' => 'POST',
-            'url' => 'https://api.withmono.com/v2/accounts/' . $accountId . '/creditworthiness',
-            'headers' => [
-                'accept' => 'application/json',
-                'content-type' => 'application/json',
-                'mono-sec-key' => '[redacted — from server MONO_SECRET_KEY]',
-            ],
-            'body' => [
-                'bvn' => $session->bvn,
-                'principal' => $session->principal_kobo,
-                'principal_naira' => $session->principal_kobo !== null
-                    ? round($session->principal_kobo / 100, 2)
-                    : null,
-                'interest_rate' => $session->interest_rate !== null ? (float) $session->interest_rate : null,
-                'term' => $session->term_months,
-                'run_credit_check' => $session->run_credit_check,
-            ],
         ];
     }
 }
