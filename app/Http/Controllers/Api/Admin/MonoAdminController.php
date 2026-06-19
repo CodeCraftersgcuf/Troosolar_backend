@@ -177,6 +177,8 @@ class MonoAdminController extends Controller
             $payload = $this->formatCreditSessionSummary($session);
             $payload['credit_worthiness_payload'] = $session->credit_worthiness_payload;
             $payload['error_message'] = $session->error_message;
+            $payload['mono_init_response'] = $session->mono_init_response;
+            $payload['request_payload'] = $this->buildCreditWorthinessRequestPayload($session);
 
             return ResponseHelper::success($payload, 'Mono credit check session retrieved successfully');
         } catch (Exception $e) {
@@ -307,7 +309,7 @@ class MonoAdminController extends Controller
                 'loan_application_id' => $loanApp?->id,
             ]);
 
-            $monoService->initiateCreditWorthiness($linked->mono_account_id, [
+            $initResponse = $monoService->initiateCreditWorthiness($linked->mono_account_id, [
                 'bvn' => $bvn,
                 'principal' => $principalKobo,
                 'interest_rate' => $interestRate,
@@ -315,7 +317,10 @@ class MonoAdminController extends Controller
                 'run_credit_check' => $monoService->shouldRunCreditCheck(),
             ]);
 
-            $session->update(['status' => 'processing']);
+            $session->update([
+                'status' => 'processing',
+                'mono_init_response' => $initResponse,
+            ]);
 
             return ResponseHelper::success([
                 'session' => $this->formatCreditSessionSummary($session->fresh()),
@@ -576,6 +581,31 @@ class MonoAdminController extends Controller
             'error_message' => $session->error_message,
             'created_at' => $session->created_at,
             'updated_at' => $session->updated_at,
+        ];
+    }
+
+    private function buildCreditWorthinessRequestPayload(MonoCreditCheckSession $session): array
+    {
+        $accountId = (string) ($session->mono_account_id ?? '');
+
+        return [
+            'method' => 'POST',
+            'url' => 'https://api.withmono.com/v2/accounts/' . $accountId . '/creditworthiness',
+            'headers' => [
+                'accept' => 'application/json',
+                'content-type' => 'application/json',
+                'mono-sec-key' => '[redacted — from server MONO_SECRET_KEY]',
+            ],
+            'body' => [
+                'bvn' => $session->bvn,
+                'principal' => $session->principal_kobo,
+                'principal_naira' => $session->principal_kobo !== null
+                    ? round($session->principal_kobo / 100, 2)
+                    : null,
+                'interest_rate' => $session->interest_rate !== null ? (float) $session->interest_rate : null,
+                'term' => $session->term_months,
+                'run_credit_check' => $session->run_credit_check,
+            ],
         ];
     }
 }

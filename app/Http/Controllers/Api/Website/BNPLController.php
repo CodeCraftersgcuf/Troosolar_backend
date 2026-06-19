@@ -1789,7 +1789,7 @@ class BNPLController extends Controller
                 'status' => 'pending',
             ]);
 
-            $monoService->initiateCreditWorthiness($accountId, [
+            $initResponse = $monoService->initiateCreditWorthiness($accountId, [
                 'bvn' => $bvn,
                 'principal' => $principalKobo,
                 'interest_rate' => $interestRate,
@@ -1797,7 +1797,10 @@ class BNPLController extends Controller
                 'run_credit_check' => $monoService->shouldRunCreditCheck(),
             ]);
 
-            $session->update(['status' => 'processing']);
+            $session->update([
+                'status' => 'processing',
+                'mono_init_response' => $initResponse,
+            ]);
 
             return ResponseHelper::success([
                 'session_id' => $session->id,

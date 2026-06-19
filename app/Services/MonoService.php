@@ -179,10 +179,11 @@ class MonoService
      * Initiate async creditworthiness analysis.
      *
      * @param  array{bvn: string, principal: int, interest_rate: float|int, term: int, run_credit_check: bool}  $params
+     * @return array<string, mixed>
      *
      * @throws RuntimeException
      */
-    public function initiateCreditWorthiness(string $accountId, array $params): void
+    public function initiateCreditWorthiness(string $accountId, array $params): array
     {
         $body = [
             'bvn' => $params['bvn'],
@@ -192,7 +193,7 @@ class MonoService
             'run_credit_check' => (bool) ($params['run_credit_check'] ?? true),
         ];
 
-        $this->request('POST', '/v2/accounts/' . $accountId . '/creditworthiness', $body);
+        return $this->request('POST', '/v2/accounts/' . $accountId . '/creditworthiness', $body);
     }
 
     /**

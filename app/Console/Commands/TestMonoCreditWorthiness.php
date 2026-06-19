@@ -58,9 +58,10 @@ class TestMonoCreditWorthiness extends Command
         $this->table(['Field', 'Value'], collect($params)->map(fn ($v, $k) => [$k, $v])->values()->all());
 
         try {
-            $monoService->initiateCreditWorthiness($accountId, $params);
+            $initResponse = $monoService->initiateCreditWorthiness($accountId, $params);
             $this->newLine();
             $this->info('✓ Credit worthiness request accepted by Mono.');
+            $this->line(json_encode($initResponse, JSON_PRETTY_PRINT));
             $this->line('Results will arrive via webhook: mono.events.account_credit_worthiness');
             $this->line('Check admin → Mono Loans → Credit Sessions in a few moments.');
 
