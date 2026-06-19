@@ -90,6 +90,8 @@ class MonoAdminController extends Controller
             $accounts = $query->paginate($request->integer('per_page', 20));
 
             $accounts->getCollection()->transform(function (UserMonoAccount $row) {
+                $loanApp = LoanApplication::where('user_id', $row->user_id)->latest()->first();
+
                 return [
                     'id' => $row->id,
                     'user_id' => $row->user_id,
@@ -105,6 +107,12 @@ class MonoAdminController extends Controller
                     'updated_at' => $row->updated_at,
                     'display_label' => $row->displayLabel(),
                     'is_linked' => $row->isLinked(),
+                    'suggested_loan_amount' => $loanApp?->loan_amount !== null
+                        ? (float) $loanApp->loan_amount
+                        : null,
+                    'suggested_repayment_duration' => $loanApp?->repayment_duration !== null
+                        ? (int) $loanApp->repayment_duration
+                        : null,
                 ];
             });
 
@@ -250,8 +258,8 @@ class MonoAdminController extends Controller
 
             $data = $request->validate([
                 'bvn' => 'nullable|string',
-                'loan_amount' => 'nullable|numeric|min:0',
-                'repayment_duration' => 'nullable|integer|min:1',
+                'loan_amount' => 'required|numeric|min:1|max:999999999',
+                'repayment_duration' => 'nullable|integer|min:1|max:120',
             ]);
 
             $loanApp = LoanApplication::where('user_id', $userId)->latest()->first();
@@ -274,17 +282,8 @@ class MonoAdminController extends Controller
                 $user->save();
             }
 
-            $loanAmount = (float) (
-                $data['loan_amount']
-                ?? $loanApp?->loan_amount
-                ?? $settings->minimum_loan_amount
-                ?? 1500000
-            );
-            $termMonths = (int) (
-                $data['repayment_duration']
-                ?? $loanApp?->repayment_duration
-                ?? 12
-            );
+            $loanAmount = (float) $data['loan_amount'];
+            $termMonths = (int) ($data['repayment_duration'] ?? 12);
             $principalKobo = (int) round($loanAmount * 100);
 
             $planSnapshot = is_array($loanApp?->loan_plan_snapshot)

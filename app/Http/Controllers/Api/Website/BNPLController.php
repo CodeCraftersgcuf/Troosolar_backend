@@ -304,8 +304,8 @@ class BNPLController extends Controller
                     return ResponseHelper::error('Invalid Mono credit check session.', 422);
                 }
 
-                if (! in_array($monoSession->status, ['completed', 'failed'], true)) {
-                    return ResponseHelper::error('Mono credit check is still processing. Please wait and try again.', 422);
+                if (! in_array($monoSession->status, ['pending', 'processing', 'completed', 'failed'], true)) {
+                    return ResponseHelper::error('Invalid Mono credit check session status.', 422);
                 }
             }
 
