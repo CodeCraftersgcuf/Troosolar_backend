@@ -206,23 +206,24 @@ class SendUserLoanInfoToPartner extends Mailable
     {
         $snap = $this->loanApplication->loan_plan_snapshot ?? null;
         if (is_array($snap) && count($snap) > 0) {
-            return 'BNPL Loan Application – Customer Info for Credit Evaluation.';
+            return 'BNPL loan application – customer info for credit evaluation – Troosolar';
         }
 
-        return 'Loan Application – Customer Info for Credit Evaluation.';
+        return 'Loan application – customer info for credit evaluation – Troosolar';
     }
 
     public function envelope(): Envelope
     {
         return new Envelope(
             subject: $this->emailSubject,
+            replyTo: [config('mail.from.address')],
         );
     }
 
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.user_loan_info',
+            view: 'emails.user_loan_info',
         );
     }
 

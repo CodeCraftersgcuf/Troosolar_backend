@@ -47,6 +47,10 @@ class BNPLAdminController extends Controller
                 $query->where('customer_type', $request->customer_type);
             }
 
+            if ($request->filled('user_id')) {
+                $query->where('user_id', (int) $request->user_id);
+            }
+
             // Search by user name or email
             if ($request->has('search')) {
                 $search = $request->search;

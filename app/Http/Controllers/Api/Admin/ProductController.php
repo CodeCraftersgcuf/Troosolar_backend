@@ -201,24 +201,46 @@ class ProductController extends Controller
 public function getProductsByBrand($ids)
 {
     try {
-        // Convert comma-separated IDs into array
-        $brandIds = explode(',', $ids);
+        $brandIds = array_values(array_filter(array_map(
+            static fn ($id) => (int) $id,
+            explode(',', (string) $ids)
+        )));
 
-        $brands = Brand::with(['products' => function ($query) {
-            if (Schema::hasColumn('products', 'is_available')) {
-                $query->where('is_available', true);
-            }
-            $query->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0');
-            $query->orderByDisplayProminence();
-            $query->with('reviews.user');
-        }])->whereIn('id', $brandIds)->get();
+        $brands = Brand::with([
+            'categories',
+            'products' => function ($query) {
+                if (Schema::hasColumn('products', 'is_available')) {
+                    $query->where('is_available', true);
+                }
+                $query->whereRaw('CAST(stock AS DECIMAL(10,2)) > 0');
+                $query->orderByDisplayProminence();
+                $query->with('reviews.user');
+            },
+        ])->whereIn('id', $brandIds)->get();
 
         if ($brands->isEmpty()) {
             return ResponseHelper::error('No brands found.', 404);
         }
 
-        // Merge all products into one collection
-        $products = $brands->pluck('products')->flatten();
+        $products = $brands->pluck('products')->flatten()->unique('id');
+
+        $products = $products->filter(function ($product) use ($brands) {
+            $brand = $brands->firstWhere('id', (int) $product->brand_id);
+            if (!$brand) {
+                return false;
+            }
+
+            $brand->loadMissing('categories');
+            $allowedCategoryIds = $brand->categories->pluck('id');
+            if ($allowedCategoryIds->isEmpty() && $brand->category_id) {
+                $allowedCategoryIds = collect([(int) $brand->category_id]);
+            }
+            if ($allowedCategoryIds->isEmpty()) {
+                return true;
+            }
+
+            return $allowedCategoryIds->contains((int) $product->category_id);
+        })->values();
 
         return ResponseHelper::success($products, 'Products fetched by brand(s).');
     } catch (\Exception $e) {

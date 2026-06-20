@@ -1438,6 +1438,10 @@ class OrderController extends Controller
                 $query->where('order_status', $request->status);
             }
 
+            if ($request->filled('user_id')) {
+                $query->where('user_id', (int) $request->user_id);
+            }
+
             // Search by user name or email
             if ($request->has('search')) {
                 $search = $request->search;
