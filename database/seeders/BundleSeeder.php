@@ -8,7 +8,7 @@ use App\Models\Bundles;
 
 class BundleSeeder extends Seeder
 {
-    private const FEATURED_IMAGE_URL = 'https://troosolar.hmstech.org/storage/products/d5c7f116-57ed-46ef-a659-337c94c308a9.png';
+    private const FEATURED_IMAGE_URL = 'https://api.troosolar.com/storage/products/d5c7f116-57ed-46ef-a659-337c94c308a9.png';
 
     /**
      * Run the database seeds.

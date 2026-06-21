@@ -231,7 +231,7 @@ class ProductSelectionController extends Controller
                     'top_deal' => false,
                     'installation_compulsory' => false,
                     'is_available' => true,
-                    'featured_image' => 'https://troosolar.hmstech.org/storage/products/e212b55b-057a-4a39-8d80-d241169cdac0.png',
+                    'featured_image' => 'https://api.troosolar.com/storage/products/e212b55b-057a-4a39-8d80-d241169cdac0.png',
                 ]
             );
         }
@@ -322,7 +322,7 @@ class ProductSelectionController extends Controller
                     'top_deal' => false,
                     'installation_compulsory' => false,
                     'is_available' => true,
-                    'featured_image' => 'https://troosolar.hmstech.org/storage/products/e212b55b-057a-4a39-8d80-d241169cdac0.png',
+                    'featured_image' => 'https://api.troosolar.com/storage/products/e212b55b-057a-4a39-8d80-d241169cdac0.png',
                 ]
             );
         }

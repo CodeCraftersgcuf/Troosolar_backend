@@ -24,7 +24,7 @@ This guide provides complete documentation for all API endpoints used in the **B
 
 **Base URL:**
 - Development: `http://127.0.0.1:8000/api`
-- Production: `https://troosolar.hmstech.org/api`
+- Production: `https://api.troosolar.com/api`
 
 ---
 

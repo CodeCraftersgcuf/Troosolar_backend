@@ -52,7 +52,7 @@ class BundleMaterialSeeder extends Seeder
                     'price'          => (float) ($material->selling_rate ?? $material->rate ?? 0),
                     'discount_price' => (float) ($material->selling_rate ?? $material->rate ?? 0),
                     'stock'          => 'In Stock',
-                    'featured_image' => 'https://troosolar.hmstech.org/storage/products/d5c7f116-57ed-46ef-a659-337c94c308a9.png',
+                    'featured_image' => 'https://api.troosolar.com/storage/products/d5c7f116-57ed-46ef-a659-337c94c308a9.png',
                 ]);
                 return $product;
             }

@@ -415,7 +415,7 @@ class MonoService
         if ($status === 401 || stripos($text, 'unauthorized') !== false) {
             if (str_contains($path, 'creditworthiness')) {
                 return 'Mono Credit Worthiness failed: ' . $text
-                    . '. If the detail mentions wallet balance, top up your Mono dashboard wallet. Otherwise confirm Credit Worthiness is enabled and webhook is set to https://troosolar.hmstech.org/api/webhooks/mono';
+                    . '. If the detail mentions wallet balance, top up your Mono dashboard wallet. Otherwise confirm Credit Worthiness is enabled and webhook is set to https://api.troosolar.com/api/webhooks/mono';
             }
 
             return 'Mono API unauthorized: ' . $text

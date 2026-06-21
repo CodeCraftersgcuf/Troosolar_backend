@@ -2,7 +2,7 @@
 
 **Version:** 2.0  
 **Last Updated:** November 26, 2025  
-**Base URL:** `http://127.0.0.1:8000/api` (Development) / `https://troosolar.hmstech.org/api` (Production)
+**Base URL:** `http://127.0.0.1:8000/api` (Development) / `https://api.troosolar.com/api` (Production)
 
 ---
 
