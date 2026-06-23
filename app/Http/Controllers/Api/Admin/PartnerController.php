@@ -5,18 +5,18 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\PartnerRequest;
-use App\Jobs\SendUserLoanInfoToPartnerJob;
 use App\Mail\SendUserLoanInfoToPartner;
 use App\Models\LinkAccount;
 use App\Models\LoanApplication;
 use App\Models\LoanStatus;
 use App\Models\Partner;
 use App\Models\User;
-use Exception;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Exception;
+use Throwable;
 
 class PartnerController extends Controller
 {
@@ -109,61 +109,83 @@ class PartnerController extends Controller
     }
 
     // send to partner user details (works for both loan and BNPL applications)
-  public function sendToPartner(Request $request, string $userId)
-{
-    try {
-        $request->validate([
-            'partner_id' => 'required|exists:partners,id',
-            'loan_application_id' => 'nullable|integer|exists:loan_applications,id',
-        ]);
-        $user = User::findOrFail($userId);
-
-        $baseQuery = LoanApplication::where('user_id', $userId);
-        if ($request->filled('loan_application_id')) {
-            $loanApplication = (clone $baseQuery)
-                ->where('id', (int) $request->loan_application_id)
-                ->with(['guarantor', 'mono'])
-                ->first();
-            if (! $loanApplication) {
-                return ResponseHelper::error('Loan application not found for this user.', 404);
-            }
-        } else {
-            $loanApplication = $baseQuery->with(['guarantor', 'mono'])->latest()->first();
-        }
-
-        if (!$loanApplication) {
-            return ResponseHelper::error('No loan application found for this user.', 404);
-        }
-
-        $linkAccount = LinkAccount::where('user_id', $userId)->latest()->first();
-        $partner = Partner::findOrFail($request->partner_id);
-
-        // Send mail instantly
-        Mail::to($partner->email)->send(
-            new SendUserLoanInfoToPartner($user, $loanApplication, $partner, $linkAccount)
-        );
-
-        // Only update LoanStatus if it exists (BNPL may not have a LoanStatus record)
-        $loanStatus = LoanStatus::where('loan_application_id', $loanApplication->id)->first();
-        if ($loanStatus) {
-            $loanStatus->update([
-                'send_status' => 'active',
-                'send_date'   => now(),
-                'partner_id'  => $partner->id
+    public function sendToPartner(Request $request, string $userId)
+    {
+        try {
+            $request->validate([
+                'partner_id' => 'required|exists:partners,id',
+                'loan_application_id' => 'nullable|integer|exists:loan_applications,id',
             ]);
-        }
 
-        return ResponseHelper::success('The email has been sent to the partner.');
-    } catch (\Illuminate\Validation\ValidationException $e) {
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Validation failed',
-            'errors' => $e->errors()
-        ], 422);
-    } catch (Exception $ex) {
-        Log::error('Error sending email to partner: ' . $ex->getMessage());
-        return ResponseHelper::error('The email could not be sent to the partner.'.$ex->getMessage());
+            $user = User::findOrFail($userId);
+
+            $baseQuery = LoanApplication::where('user_id', $userId);
+            if ($request->filled('loan_application_id')) {
+                $loanApplication = (clone $baseQuery)
+                    ->where('id', (int) $request->loan_application_id)
+                    ->with(['guarantor', 'mono'])
+                    ->first();
+                if (! $loanApplication) {
+                    return ResponseHelper::error('Loan application not found for this user.', 404);
+                }
+            } else {
+                $loanApplication = $baseQuery->with(['guarantor', 'mono'])->latest()->first();
+            }
+
+            if (! $loanApplication) {
+                return ResponseHelper::error('No loan application found for this user.', 404);
+            }
+
+            $partner = Partner::findOrFail($request->partner_id);
+            $partnerEmail = trim((string) ($partner->email ?? ''));
+            if ($partnerEmail === '' || ! filter_var($partnerEmail, FILTER_VALIDATE_EMAIL)) {
+                return ResponseHelper::error('This financing partner has no valid email address configured.', 422);
+            }
+
+            $linkAccount = LinkAccount::where('user_id', $userId)->latest()->first();
+
+            Mail::to($partnerEmail)->send(
+                new SendUserLoanInfoToPartner($user, $loanApplication, $partner, $linkAccount)
+            );
+
+            $loanStatus = LoanStatus::where('loan_application_id', $loanApplication->id)->first();
+            if ($loanStatus) {
+                $loanStatus->update([
+                    'send_status' => 'active',
+                    'send_date' => now(),
+                    'partner_id' => $partner->id,
+                ]);
+            }
+
+            return ResponseHelper::success([
+                'user_id' => (int) $userId,
+                'loan_application_id' => (int) $loanApplication->id,
+                'partner_id' => (int) $partner->id,
+            ], 'The email has been sent to the partner.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (ModelNotFoundException $e) {
+            return ResponseHelper::error('User, partner, or application not found.', 404);
+        } catch (Throwable $ex) {
+            Log::error('Error sending email to partner', [
+                'user_id' => $userId,
+                'loan_application_id' => $request->input('loan_application_id'),
+                'partner_id' => $request->input('partner_id'),
+                'message' => $ex->getMessage(),
+                'exception' => $ex::class,
+                'file' => $ex->getFile(),
+                'line' => $ex->getLine(),
+            ]);
+
+            return ResponseHelper::error(
+                'The email could not be sent to the partner. '.$ex->getMessage(),
+                500
+            );
+        }
     }
-}
 
 }

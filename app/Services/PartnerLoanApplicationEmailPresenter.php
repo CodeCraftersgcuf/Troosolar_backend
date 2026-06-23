@@ -34,7 +34,7 @@ class PartnerLoanApplicationEmailPresenter
             'application' => [
                 'id' => $this->application->id,
                 'status' => $this->application->status,
-                'created_at' => $this->application->created_at?->format('d/m/Y'),
+                'created_at' => $this->formatApplicationDate($this->application->created_at),
                 'loan_amount' => $this->application->loan_amount,
                 'loan_amount_formatted' => $this->application->loan_amount
                     ? $this->formatNaira((float) $this->application->loan_amount)
@@ -572,5 +572,22 @@ class PartnerLoanApplicationEmailPresenter
         }
 
         return ucwords(str_replace(['-', '_'], ' ', trim($value)));
+    }
+
+    private function formatApplicationDate(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('d/m/Y');
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse((string) $value)->format('d/m/Y');
+        } catch (\Throwable) {
+            return (string) $value;
+        }
     }
 }
