@@ -519,17 +519,21 @@ class CartController extends Controller
             $authUser = $this->resolveBearerUser($request);
             $isOwner = $authUser !== null && (int) $authUser->id === (int) $user->id;
 
+            // Email cart links are secret; issue a session when the visitor is not the cart owner.
+            $issuedToken = null;
+            if (! $isOwner) {
+                $issuedToken = $user->createToken('cart-email-link')->plainTextToken;
+            }
+
             return ResponseHelper::success([
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->first_name . ' ' . $user->sur_name,
-                    'email' => $user->email,
-                ],
+                'user' => $user,
                 'cart_items' => $cartItems,
-                'requires_login' => ! $isOwner,
-                'message' => $isOwner
-                    ? 'Cart accessed successfully'
-                    : 'Please login to proceed with checkout',
+                'requires_login' => false,
+                'auto_authenticated' => $issuedToken !== null,
+                'access_token' => $issuedToken,
+                'message' => $issuedToken !== null
+                    ? 'Signed in via cart link'
+                    : 'Cart accessed successfully',
             ], 'Cart accessed successfully');
 
         } catch (Exception $e) {

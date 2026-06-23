@@ -13,6 +13,7 @@ class ProductReveiews extends Model
         'product_id',
         'bundle_id',
         'user_id',
+        'order_id',
         'review',
         'rating',
         'admin_reply',
@@ -37,5 +38,10 @@ class ProductReveiews extends Model
     public function bundle()
     {
         return $this->belongsTo(Bundles::class, 'bundle_id');
+    }
+
+    public function order()
+    {
+        return $this->belongsTo(Order::class);
     }
 }

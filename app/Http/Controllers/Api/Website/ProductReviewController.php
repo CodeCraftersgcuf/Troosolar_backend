@@ -16,7 +16,7 @@ class ProductReviewController extends Controller
     {
         try {
             $query = ProductReveiews::query()
-                ->with(['user:id,first_name,sur_name', 'product:id,title', 'bundle:id,title'])
+                ->with(['user:id,first_name,sur_name', 'product:id,title', 'bundle:id,title', 'order:id,order_number'])
                 ->orderByDesc('created_at');
 
             if ($request->filled('product_id')) {
@@ -25,6 +25,10 @@ class ProductReviewController extends Controller
 
             if ($request->filled('bundle_id')) {
                 $query->where('bundle_id', (int) $request->input('bundle_id'));
+            }
+
+            if ($request->filled('order_id')) {
+                $query->where('order_id', (int) $request->input('order_id'));
             }
 
             $mine = filter_var($request->input('mine'), FILTER_VALIDATE_BOOLEAN);
@@ -93,28 +97,43 @@ class ProductReviewController extends Controller
 
     private function isDeliveredStatus(string $normalized): bool
     {
-        return in_array($normalized, ['delivered', 'completed'], true);
+        return in_array($normalized, ['delivered', 'completed', 'complete'], true);
     }
 
-    private function orderLineBasename(OrderItem $item): string
+    private function normalizeLineItemKind(?string $itemableType, ?string $fallbackType = null): ?string
     {
-        return class_basename((string) $item->itemable_type);
+        $raw = strtolower(trim((string) ($itemableType ?? $fallbackType ?? '')));
+        if ($raw === '') {
+            return null;
+        }
+        if ($raw === 'product' || str_ends_with($raw, '\\product') || $raw === 'products') {
+            return 'product';
+        }
+        if ($raw === 'bundle' || $raw === 'bundles' || str_contains($raw, 'bundle')) {
+            return 'bundle';
+        }
+
+        return null;
+    }
+
+    private function orderLineKind(OrderItem $item): ?string
+    {
+        return $this->normalizeLineItemKind($item->itemable_type);
     }
 
     private function orderLineContainsProduct(OrderItem $item, int $productId): bool
     {
-        $basename = $this->orderLineBasename($item);
         $itemableId = (int) $item->itemable_id;
-
         if ($itemableId <= 0) {
             return false;
         }
 
-        if (strcasecmp($basename, 'Product') === 0) {
+        $kind = $this->orderLineKind($item);
+        if ($kind === 'product') {
             return $itemableId === $productId;
         }
 
-        if (strcasecmp($basename, 'Bundles') === 0) {
+        if ($kind === 'bundle') {
             return BundleItems::query()
                 ->where('bundle_id', $itemableId)
                 ->where('product_id', $productId)
@@ -126,10 +145,9 @@ class ProductReviewController extends Controller
 
     private function orderLineContainsBundle(OrderItem $item, int $bundleId): bool
     {
-        $basename = $this->orderLineBasename($item);
         $itemableId = (int) $item->itemable_id;
 
-        return strcasecmp($basename, 'Bundles') === 0 && $itemableId === $bundleId;
+        return $this->orderLineKind($item) === 'bundle' && $itemableId === $bundleId;
     }
 
     private function orderContainsPurchasedProduct(Order $order, int $productId): bool
@@ -280,10 +298,11 @@ class ProductReviewController extends Controller
                     ['user_id' => $userId, 'bundle_id' => $bundleId],
                     [
                         'product_id' => null,
+                        'order_id' => $orderId,
                         'review' => $data['review'],
                         'rating' => $data['rating'],
                     ]
-                )->load(['user:id,first_name,sur_name', 'bundle:id,title']);
+                )->load(['user:id,first_name,sur_name', 'bundle:id,title', 'order:id,order_number']);
             } else {
                 if (! $this->userCanReviewProduct($userId, (int) $productId, $orderId)) {
                     return response()->json([
@@ -296,10 +315,11 @@ class ProductReviewController extends Controller
                     ['user_id' => $userId, 'product_id' => $productId],
                     [
                         'bundle_id' => null,
+                        'order_id' => $orderId,
                         'review' => $data['review'],
                         'rating' => $data['rating'],
                     ]
-                )->load(['user:id,first_name,sur_name', 'product:id,title']);
+                )->load(['user:id,first_name,sur_name', 'product:id,title', 'order:id,order_number']);
             }
 
             return response()->json([
@@ -354,12 +374,13 @@ class ProductReviewController extends Controller
             $review->update([
                 'review' => $data['review'],
                 'rating' => $data['rating'],
+                ...( $orderId !== null ? ['order_id' => $orderId] : [] ),
             ]);
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Review updated successfully',
-                'data' => $review->load(['user:id,first_name,sur_name', 'product:id,title', 'bundle:id,title']),
+                'data' => $review->load(['user:id,first_name,sur_name', 'product:id,title', 'bundle:id,title', 'order:id,order_number']),
             ]);
         } catch (\Exception $e) {
             return response()->json([
