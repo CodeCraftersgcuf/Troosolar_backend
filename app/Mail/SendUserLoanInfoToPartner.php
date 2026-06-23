@@ -43,13 +43,13 @@ class SendUserLoanInfoToPartner extends Mailable
         $this->partner = $partner;
         $this->linkAccount = $linkAccount;
         $this->emailSubject = $this->resolveSubject();
-        $this->partnerEmailData = $this->buildViewData($user, $loanApplication);
+        $this->partnerEmailData = $this->buildPartnerEmailData($user, $loanApplication);
     }
 
     /**
      * @return array<string, mixed>
      */
-    protected function buildViewData($user, LoanApplication $loanApplication): array
+    protected function buildPartnerEmailData($user, LoanApplication $loanApplication): array
     {
         try {
             return (new PartnerLoanApplicationEmailPresenter($user, $loanApplication))->build();
