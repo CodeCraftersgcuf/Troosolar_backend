@@ -8,8 +8,10 @@ use Illuminate\Database\Eloquent\Model;
 class ProductReveiews extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'product_id',
+        'bundle_id',
         'user_id',
         'review',
         'rating',
@@ -30,5 +32,10 @@ class ProductReveiews extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function bundle()
+    {
+        return $this->belongsTo(Bundles::class, 'bundle_id');
     }
 }

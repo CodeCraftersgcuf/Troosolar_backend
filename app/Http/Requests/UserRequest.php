@@ -47,7 +47,7 @@ class UserRequest extends FormRequest
         'referral_code'    => 'nullable|string|max:255',
         'refferal_code'    => 'nullable|string|max:255',
         'user_code'        => 'nullable|string|max:255',
-        'role'             => 'nullable|string|max:255',
+        'role'             => 'nullable|string|in:user,admin,super_admin',
         'is_verified'      => 'nullable|boolean',
         'is_active'        => 'nullable|boolean',
         'otp'              => 'nullable|string|max:10',

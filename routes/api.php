@@ -120,6 +120,8 @@ Route::post('/webhooks/mono', [\App\Http\Controllers\Api\MonoWebhookController::
 
 // Site banner (public - dashboard home promo)
 Route::get('/site/banner', [\App\Http\Controllers\Api\Website\SiteBannerController::class, 'show']);
+Route::get('/site/faqs', [\App\Http\Controllers\Api\Website\SiteFaqController::class, 'index']);
+Route::get('/site/ticket-subjects', [\App\Http\Controllers\Api\Website\TicketSubjectController::class, 'index']);
 
 // Public bundles endpoint (for Buy Now flow)
 Route::get('/bundles', [\App\Http\Controllers\Api\Website\BundleController::class, 'index']);
@@ -418,6 +420,8 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     });
     Route::get('admin/analytics', [AnalyticController::class, 'index']);
     Route::get('/all-users', [UserController::class, 'allUsers']);
+    Route::get('/admin/admins', [UserController::class, 'listAdmins']);
+    Route::post('/add-user', [UserController::class, 'addUser']);
 
     // ================= REFERRAL ADMIN ROUTES =================
     Route::prefix('admin/referral')->group(function () {
@@ -494,6 +498,16 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
         Route::get('/banner', [\App\Http\Controllers\Api\Admin\SiteBannerAdminController::class, 'show']);
         Route::post('/banner', [\App\Http\Controllers\Api\Admin\SiteBannerAdminController::class, 'store']);
         Route::delete('/banner', [\App\Http\Controllers\Api\Admin\SiteBannerAdminController::class, 'destroy']);
+
+        Route::get('/faqs', [\App\Http\Controllers\Api\Admin\SiteFaqAdminController::class, 'index']);
+        Route::post('/faqs', [\App\Http\Controllers\Api\Admin\SiteFaqAdminController::class, 'store']);
+        Route::put('/faqs/{id}', [\App\Http\Controllers\Api\Admin\SiteFaqAdminController::class, 'update']);
+        Route::delete('/faqs/{id}', [\App\Http\Controllers\Api\Admin\SiteFaqAdminController::class, 'destroy']);
+
+        Route::get('/ticket-subjects', [\App\Http\Controllers\Api\Admin\TicketSubjectAdminController::class, 'index']);
+        Route::post('/ticket-subjects', [\App\Http\Controllers\Api\Admin\TicketSubjectAdminController::class, 'store']);
+        Route::put('/ticket-subjects/{id}', [\App\Http\Controllers\Api\Admin\TicketSubjectAdminController::class, 'update']);
+        Route::delete('/ticket-subjects/{id}', [\App\Http\Controllers\Api\Admin\TicketSubjectAdminController::class, 'destroy']);
     });
 
     // ================= CALCULATOR SETTINGS ADMIN ROUTES =================

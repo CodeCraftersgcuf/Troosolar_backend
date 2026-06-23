@@ -7,9 +7,8 @@
     <style>
         body { font-family: Arial, Helvetica, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
         .container { background-color: #f5f7ff; border-radius: 12px; padding: 32px; margin: 20px 0; border: 1px solid #e2e8f0; overflow: hidden; }
-        .brand-header { background-color: #273e8e; color: #ffffff; text-align: center; padding: 24px 20px; margin: -32px -32px 24px -32px; }
-        .brand-title { font-size: 26px; font-weight: 700; margin: 0; }
-        .brand-subtitle { font-size: 16px; margin: 6px 0 0 0; opacity: 0.95; }
+        @include('emails.partials.brand_styles')
+        .brand-header { margin: -32px -32px 24px -32px; }
         h1 { color: #273e8e; font-size: 22px; margin-top: 0; }
         .message { color: #444; margin: 20px 0; }
         .details { background: #fff; border-radius: 8px; padding: 16px 20px; margin: 16px 0; font-size: 14px; border: 1px solid #e2e8f0; }
@@ -28,10 +27,7 @@
 </head>
 <body>
     <div class="container">
-        <div class="brand-header">
-            <p class="brand-title">Troosolar</p>
-            <p class="brand-subtitle">{{ $orderType === 'bnpl' ? 'BNPL Custom Order' : 'Buy Now Cart' }}</p>
-        </div>
+        @include('emails.partials.brand_header', ['brandSubtitle' => $orderType === 'bnpl' ? 'BNPL Custom Order' : 'Buy Now Cart'])
 
         <h1>{{ $headline }}</h1>
 

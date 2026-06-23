@@ -19,6 +19,7 @@ use App\Models\ReferralSettings;
 use App\Models\User;
 use App\Support\CheckoutPricing;
 use Illuminate\Support\Arr;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class CartController extends Controller
 {
@@ -479,13 +480,33 @@ class CartController extends Controller
     }
 
     /**
+     * Resolve user from Bearer token on public routes (no auth:sanctum middleware).
+     */
+    private function resolveBearerUser(Request $request): ?User
+    {
+        $bearer = $request->bearerToken();
+        if ($bearer === null || $bearer === '') {
+            return null;
+        }
+
+        $accessToken = PersonalAccessToken::findToken($bearer);
+        if ($accessToken === null) {
+            return null;
+        }
+
+        $user = $accessToken->tokenable;
+
+        return $user instanceof User ? $user : null;
+    }
+
+    /**
      * Access cart via token (from email link)
      * GET /api/cart/access/{token}
      */
-    public function accessCartViaToken($token)
+    public function accessCartViaToken(Request $request, $token)
     {
         try {
-            $user = \App\Models\User::where('cart_access_token', $token)->first();
+            $user = User::where('cart_access_token', $token)->first();
 
             if (!$user) {
                 return ResponseHelper::error('Invalid or expired cart link', 404);
@@ -495,6 +516,9 @@ class CartController extends Controller
                 ->where('user_id', $user->id)
                 ->get();
 
+            $authUser = $this->resolveBearerUser($request);
+            $isOwner = $authUser !== null && (int) $authUser->id === (int) $user->id;
+
             return ResponseHelper::success([
                 'user' => [
                     'id' => $user->id,
@@ -502,9 +526,9 @@ class CartController extends Controller
                     'email' => $user->email,
                 ],
                 'cart_items' => $cartItems,
-                'requires_login' => !Auth::check() || Auth::id() !== $user->id,
-                'message' => Auth::check() && Auth::id() === $user->id 
-                    ? 'Cart accessed successfully' 
+                'requires_login' => ! $isOwner,
+                'message' => $isOwner
+                    ? 'Cart accessed successfully'
                     : 'Please login to proceed with checkout',
             ], 'Cart accessed successfully');
 

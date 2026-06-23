@@ -6,6 +6,7 @@ use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Controller;
 use App\Mail\CartLinkEmail;
 use App\Models\CartItem;
+use App\Support\FrontendUrl;
 use App\Models\Product;
 use App\Models\Bundles;
 use App\Models\User;
@@ -26,11 +27,7 @@ class AdminCartController extends Controller
      */
     private function buildDashboardCustomOrderUrl(string $accessToken, string $orderType): string
     {
-        $base = rtrim((string) config('app.frontend_url', 'https://app.troosolar.io'), '/');
-        $tokenEnc = rawurlencode($accessToken);
-        $typeEnc = rawurlencode($orderType);
-
-        return "{$base}/cart?token={$tokenEnc}&type={$typeEnc}";
+        return FrontendUrl::cartAccess($accessToken, $orderType);
     }
 
     /**

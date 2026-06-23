@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\LoanApplication;
 use App\Models\User;
+use App\Support\FrontendUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -22,8 +23,7 @@ class BNPLApplicationSubmittedEmail extends Mailable
     {
         $this->user = $user;
         $this->application = $application;
-        $frontendUrl = rtrim(config('app.frontend_url', 'https://app.troosolar.io'), '/');
-        $this->applicationUrl = $frontendUrl . '/bnpl-loans/app-' . $application->id;
+        $this->applicationUrl = FrontendUrl::bnplApplicationTrack($application->id);
     }
 
     public function envelope(): Envelope

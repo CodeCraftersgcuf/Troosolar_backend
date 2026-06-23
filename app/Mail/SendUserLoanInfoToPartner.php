@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\LoanApplication;
+use App\Services\PartnerLoanApplicationEmailPresenter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Attachment;
@@ -25,19 +26,8 @@ class SendUserLoanInfoToPartner extends Mailable
 
     public string $emailSubject;
 
-    /** @var array<int, string> */
-    public array $loanPlanLines = [];
-
-    public string $orderItemsSummary = '';
-
-    /** @var array<int, string> */
-    public array $monoSummaryLines = [];
-
-    /** @var array<int, string> */
-    public array $guarantorSummaryLines = [];
-
-    /** @var array<int, string> */
-    public array $finalApplicationPersonalLines = [];
+    /** @var array<string, mixed> */
+    public array $viewData = [];
 
     /**
      * @param  \App\Models\User  $user
@@ -50,156 +40,7 @@ class SendUserLoanInfoToPartner extends Mailable
         $this->partner = $partner;
         $this->linkAccount = $linkAccount;
         $this->emailSubject = $this->resolveSubject();
-        $this->loanPlanLines = $this->buildLoanPlanLines($loanApplication);
-        $this->orderItemsSummary = $this->buildOrderItemsSummary($loanApplication);
-        $this->monoSummaryLines = $this->buildMonoSummaryLines($loanApplication);
-        $this->guarantorSummaryLines = $this->buildGuarantorSummaryLines($loanApplication);
-        $this->finalApplicationPersonalLines = $this->buildFinalApplicationPersonalLines($loanApplication);
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    protected function buildFinalApplicationPersonalLines(LoanApplication $app): array
-    {
-        $snap = $app->loan_plan_snapshot;
-        if (! is_array($snap) || empty($snap['final_application_personal']) || ! is_array($snap['final_application_personal'])) {
-            return [];
-        }
-
-        $lines = [];
-        foreach ($snap['final_application_personal'] as $key => $value) {
-            if ($value !== null && $value !== '') {
-                $lines[] = str_replace('_', ' ', (string) $key) . ': ' . $value;
-            }
-        }
-
-        return $lines;
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    protected function buildLoanPlanLines(LoanApplication $app): array
-    {
-        $snap = $app->loan_plan_snapshot;
-        if (! is_array($snap) || $snap === []) {
-            return [];
-        }
-
-        $lines = [];
-        $pairs = [
-            'totalAmount' => 'Total amount (bundle + fees where stored)',
-            'depositAmount' => 'Upfront due (deposit + admin fees)',
-            'baseDepositAmount' => 'Equity deposit (before admin fees)',
-            'totalLoanAmount' => 'Loan principal',
-            'principal' => 'Principal',
-            'totalInterestAmount' => 'Total interest',
-            'totalInterest' => 'Total interest',
-            'totalRepaymentAmount' => 'Total repayment',
-            'totalRepayment' => 'Total repayment',
-            'monthlyRepaymentAmount' => 'Monthly repayment',
-            'monthlyRepayment' => 'Monthly repayment',
-            'tenor' => 'Tenor (months)',
-            'depositPercent' => 'Deposit %',
-            'interestRate' => 'Interest rate % (monthly)',
-            'insuranceFee' => 'Insurance fee',
-            'managementFee' => 'Management fee',
-            'legalFee' => 'Legal fee',
-            'adminFeesTotal' => 'Total admin fees',
-        ];
-
-        foreach ($pairs as $key => $label) {
-            if (array_key_exists($key, $snap) && $snap[$key] !== null && $snap[$key] !== '') {
-                $lines[] = $label . ': ' . $snap[$key];
-            }
-        }
-
-        return $lines;
-    }
-
-    protected function buildOrderItemsSummary(LoanApplication $app): string
-    {
-        $items = $app->order_items_snapshot;
-        if (! is_array($items) || $items === []) {
-            return '';
-        }
-
-        $lines = [];
-        foreach ($items as $idx => $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-            $type = $row['itemable_type'] ?? '';
-            $id = $row['itemable_id'] ?? '';
-            $qty = $row['quantity'] ?? 1;
-            $unit = $row['unit_price'] ?? $row['subtotal'] ?? '';
-            $lines[] = sprintf(
-                'Item %d: type=%s id=%s qty=%s unit/subtotal=%s',
-                $idx + 1,
-                is_string($type) ? class_basename($type) : (string) $type,
-                (string) $id,
-                (string) $qty,
-                (string) $unit
-            );
-        }
-
-        return implode("\n", $lines);
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    protected function buildMonoSummaryLines(LoanApplication $app): array
-    {
-        $mono = $app->mono;
-        if ($mono === null) {
-            return [];
-        }
-
-        $lines = [];
-        foreach ([
-            'loan_amount' => 'Financed amount',
-            'down_payment' => 'Down payment',
-            'total_amount' => 'Total amount',
-            'repayment_duration' => 'Repayment duration (mo)',
-            'interest_rate' => 'Interest rate %',
-            'credit_score' => 'Credit score',
-            'status' => 'Status',
-        ] as $attr => $label) {
-            if (isset($mono->{$attr}) && $mono->{$attr} !== null && $mono->{$attr} !== '') {
-                $lines[] = $label . ': ' . $mono->{$attr};
-            }
-        }
-
-        return $lines;
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    protected function buildGuarantorSummaryLines(LoanApplication $app): array
-    {
-        $g = $app->guarantor;
-        if ($g === null) {
-            return [];
-        }
-
-        $lines = [];
-        foreach ([
-            'full_name' => 'Full name',
-            'email' => 'Email',
-            'phone' => 'Phone',
-            'bvn' => 'BVN',
-            'relationship' => 'Relationship',
-            'status' => 'Status',
-        ] as $attr => $label) {
-            if (! empty($g->{$attr})) {
-                $lines[] = $label . ': ' . $g->{$attr};
-            }
-        }
-
-        return $lines;
+        $this->viewData = (new PartnerLoanApplicationEmailPresenter($user, $loanApplication))->build();
     }
 
     protected function resolveSubject(): string

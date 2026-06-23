@@ -61,6 +61,8 @@ return [
 
     'frontend_url' => env('FRONTEND_URL', 'https://app.troosolar.io'),
 
+    'mail_logo_url' => env('MAIL_LOGO_URL'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

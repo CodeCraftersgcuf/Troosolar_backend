@@ -28,11 +28,15 @@ class ProductReviewAdminController extends Controller
         }
 
         $query = ProductReveiews::query()
-            ->with(['user:id,first_name,sur_name', 'product:id,title'])
+            ->with(['user:id,first_name,sur_name', 'product:id,title', 'bundle:id,title'])
             ->orderByDesc('created_at');
 
         if ($request->filled('product_id')) {
             $query->where('product_id', (int) $request->input('product_id'));
+        }
+
+        if ($request->filled('bundle_id')) {
+            $query->where('bundle_id', (int) $request->input('bundle_id'));
         }
 
         return response()->json([
@@ -60,7 +64,7 @@ class ProductReviewAdminController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Review updated successfully',
-            'data' => $review->load(['user:id,first_name,sur_name', 'product:id,title']),
+            'data' => $review->load(['user:id,first_name,sur_name', 'product:id,title', 'bundle:id,title']),
         ]);
     }
 
@@ -102,7 +106,7 @@ class ProductReviewAdminController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => $review->admin_reply ? 'Reply saved successfully' : 'Reply removed',
-            'data' => $review->load(['user:id,first_name,sur_name', 'product:id,title']),
+            'data' => $review->load(['user:id,first_name,sur_name', 'product:id,title', 'bundle:id,title']),
         ]);
     }
 }

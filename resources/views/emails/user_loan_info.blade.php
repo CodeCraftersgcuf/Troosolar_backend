@@ -5,187 +5,450 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $emailSubject ?? 'Loan application – Troosolar' }}</title>
     <style>
-        body { font-family: Arial, Helvetica, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #eef2ff; }
-        .container { background-color: #f5f7ff; border-radius: 12px; padding: 32px; margin: 20px 0; border: 1px solid #e2e8f0; }
-        h1 { color: #273e8e; font-size: 22px; margin-top: 0; margin-bottom: 8px; }
-        h2 { color: #273e8e; font-size: 16px; margin: 0 0 12px 0; }
-        h3 { color: #1e3270; font-size: 14px; margin: 16px 0 8px 0; }
-        .intro { color: #444; margin: 16px 0 24px 0; }
-        .details { background: #fff; border-radius: 8px; padding: 16px 20px; margin: 16px 0; font-size: 14px; border: 1px solid #e2e8f0; }
-        .details p { margin: 8px 0; }
-        .details ul { margin: 8px 0; padding-left: 20px; }
-        .details li { margin: 6px 0; }
-        .muted { color: #64748b; font-style: italic; }
-        .footer { margin-top: 28px; padding-top: 20px; border-top: 1px solid #cbd5e1; font-size: 12px; color: #64748b; text-align: center; }
+        body { font-family: Arial, Helvetica, sans-serif; line-height: 1.5; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 16px; background-color: #f3f4f6; }
+        .wrap { background: #fff; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb; }
+        @include('emails.partials.brand_styles')
+        .wrap .brand-header { margin: 0; padding: 20px 28px 16px; }
+        .header { background: linear-gradient(135deg, #273e8e 0%, #1e3270 100%); color: #fff; padding: 24px 28px; }
+        .header h1 { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; }
+        .header p { margin: 0; font-size: 14px; opacity: 0.92; }
+        .body { padding: 24px 28px 28px; }
+        .intro { font-size: 14px; color: #374151; margin-bottom: 24px; }
+        .section { margin-bottom: 20px; border-radius: 10px; padding: 18px 20px; }
+        .section-blue { background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%); border: 1px solid #bfdbfe; }
+        .section-white { background: #fff; border: 1px solid #e5e7eb; }
+        .section-green { background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border: 1px solid #a7f3d0; }
+        h2 { color: #273e8e; font-size: 16px; margin: 0 0 14px 0; font-weight: 700; }
+        h3 { color: #1e3270; font-size: 13px; margin: 14px 0 8px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+        .grid { display: table; width: 100%; border-collapse: collapse; }
+        .grid-row { display: table-row; }
+        .grid-label, .grid-value { display: table-cell; padding: 6px 0; font-size: 13px; vertical-align: top; }
+        .grid-label { color: #6b7280; width: 42%; padding-right: 12px; }
+        .grid-value { color: #111827; font-weight: 600; }
+        .status-pill { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #dbeafe; color: #1e40af; text-transform: capitalize; }
+        .summary-card { background: #fff; border: 1px solid #d1fae5; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
+        .summary-card table { width: 100%; border-collapse: collapse; }
+        .summary-card td { font-size: 13px; vertical-align: middle; }
+        .summary-label { color: #374151; padding-right: 12px; }
+        .summary-label.bold { font-weight: 700; }
+        .summary-value { text-align: right; font-size: 16px; color: #111827; white-space: nowrap; }
+        .summary-value.bold { font-weight: 700; }
+        .summary-value.highlight { color: #273e8e; font-weight: 700; }
+        .items-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+        .items-table th { text-align: left; padding: 8px 10px; background: #f9fafb; color: #6b7280; font-weight: 600; border-bottom: 1px solid #e5e7eb; }
+        .items-table td { padding: 10px; border-bottom: 1px solid #f3f4f6; color: #111827; }
+        .items-table td.num { text-align: right; white-space: nowrap; }
+        .muted { color: #9ca3af; font-style: italic; font-size: 13px; }
+        .attachments { list-style: none; padding: 0; margin: 8px 0 0 0; }
+        .attachments li { font-size: 13px; padding: 6px 0; color: #065f46; }
+        .attachments li::before { content: "✓ "; font-weight: 700; }
+        .footer { padding: 16px 28px 24px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; text-align: center; background: #f9fafb; }
     </style>
 </head>
 <body>
-    <div class="container">
+@php
+    $d = $viewData ?? [];
+    $app = $d['application'] ?? [];
+    $customer = $d['customer'] ?? [];
+    $property = $d['property'] ?? [];
+    $ordered = $d['ordered_items'] ?? ['lines' => [], 'display' => null];
+    $loanSummary = $d['loan_summary'] ?? null;
+    $credit = $d['credit_check'] ?? [];
+    $beneficiary = $d['beneficiary'] ?? [];
+    $guarantor = $d['guarantor'] ?? null;
+    $kycAttachments = $d['kyc_attachments'] ?? [];
+    $admin = $d['admin'] ?? [];
+    $showMono = !empty($d['show_mono_section']);
+    $monoSummary = $d['mono_summary'] ?? [];
+@endphp
+
+<div class="wrap">
+    @include('emails.partials.brand_header', ['brandSubtitle' => 'Partner loan application'])
+    <div class="header">
         <h1>Loan application for credit evaluation</h1>
-
-        <p>Hello {{ $partner->name }},</p>
-
-        <div class="intro">
-            <p>Please find below the <strong>customer and application details</strong> for credit evaluation.</p>
-            <p><strong>Supporting files</strong> (bank statement, live selfie, KYC documents, guarantor form when available) are attached to this email.</p>
-        </div>
-
-        <div class="details">
-            <h2>Application reference</h2>
-            <ul>
-                <li><strong>Loan application ID:</strong> {{ $loanApplication->id }}</li>
-                <li><strong>Status:</strong> {{ $loanApplication->status }}</li>
-                <li><strong>Submitted at:</strong> {{ $loanApplication->created_at }}</li>
-            </ul>
-        </div>
-
-        <div class="details">
-            <h2>Customer (profile)</h2>
-            <ul>
-                <li><strong>First name:</strong> {{ $user->first_name }}</li>
-                <li><strong>Surname:</strong> {{ $user->sur_name }}</li>
-                <li><strong>Email:</strong> {{ $user->email }}</li>
-                <li><strong>Phone:</strong> {{ $user->phone }}</li>
-            </ul>
-
-            @if(!empty($finalApplicationPersonalLines))
-                <h3>As submitted on final BNPL application (may differ from profile)</h3>
-                <ul>
-                    @foreach($finalApplicationPersonalLines as $line)
-                        <li>{{ $line }}</li>
-                    @endforeach
-                </ul>
-            @endif
-        </div>
-
-        <div class="details">
-            <h2>BNPL / product</h2>
-            <ul>
-                <li><strong>Customer type:</strong> {{ $loanApplication->customer_type ?? '—' }}</li>
-                <li><strong>Product category:</strong> {{ $loanApplication->product_category ?? '—' }}</li>
-                @if(!empty($loanApplication->audit_type))
-                    <li><strong>Audit type:</strong> {{ $loanApplication->audit_type }}</li>
-                @endif
-            </ul>
-
-            <h3>Product / bundle ordered</h3>
-            @if(!empty($orderItemsSummary))
-                <p style="white-space: pre-line; margin: 8px 0;">{{ $orderItemsSummary }}</p>
-            @else
-                <p class="muted">Order line snapshot not available on this application.</p>
-            @endif
-        </div>
-
-        <div class="details">
-            <h2>Property</h2>
-            <ul>
-                <li><strong>State:</strong> {{ $loanApplication->property_state ?? '—' }}</li>
-                <li><strong>Address:</strong> {{ $loanApplication->property_address ?? '—' }}</li>
-                <li><strong>Landmark:</strong> {{ $loanApplication->property_landmark ?? '—' }}</li>
-                <li><strong>Floors:</strong> {{ $loanApplication->property_floors ?? '—' }}</li>
-                <li><strong>Rooms:</strong> {{ $loanApplication->property_rooms ?? '—' }}</li>
-                <li><strong>Gated estate:</strong> {{ $loanApplication->is_gated_estate ? 'Yes' : 'No' }}</li>
-                @if($loanApplication->is_gated_estate)
-                    <li><strong>Estate name:</strong> {{ $loanApplication->estate_name ?? '—' }}</li>
-                    <li><strong>Estate address:</strong> {{ $loanApplication->estate_address ?? '—' }}</li>
-                @endif
-            </ul>
-        </div>
-
-        <div class="details">
-            <h2>Loan plan snapshot (BNPL)</h2>
-            @if(!empty($loanPlanLines))
-                <ul>
-                    @foreach($loanPlanLines as $line)
-                        <li>{{ $line }}</li>
-                    @endforeach
-                </ul>
-            @else
-                <p class="muted">No structured loan plan snapshot on file.</p>
-            @endif
-            <p><strong>Loan amount (stored):</strong> {{ $loanApplication->loan_amount }}</p>
-            <p><strong>Repayment duration (months):</strong> {{ $loanApplication->repayment_duration }}</p>
-
-            @if(!empty($monoSummaryLines))
-                <h3>Mono / calculation (if linked)</h3>
-                <ul>
-                    @foreach($monoSummaryLines as $line)
-                        <li>{{ $line }}</li>
-                    @endforeach
-                </ul>
-            @endif
-        </div>
-
-        <div class="details">
-            <h2>Credit check &amp; identity</h2>
-            <ul>
-                <li><strong>Credit check method:</strong> {{ $loanApplication->credit_check_method ?? '—' }}</li>
-                <li><strong>BVN (application):</strong> {{ $loanApplication->bvn ?? '—' }}</li>
-                <li><strong>Social media (application):</strong> {{ $loanApplication->social_media_handle ?? '—' }}</li>
-            </ul>
-
-            <h3>Linked bank account (if any)</h3>
-            @if($linkAccount)
-                <ul>
-                    <li><strong>Account number:</strong> {{ $linkAccount->account_number }}</li>
-                    <li><strong>Account name:</strong> {{ $linkAccount->account_name }}</li>
-                    <li><strong>Bank:</strong> {{ $linkAccount->bank_name }}</li>
-                </ul>
-            @else
-                <p class="muted">No linked account on file.</p>
-            @endif
-        </div>
-
-        <div class="details">
-            <h2>Beneficiary (offer / contact)</h2>
-            <ul>
-                <li><strong>Name:</strong> {{ $loanApplication->beneficiary_name ?? '—' }}</li>
-                <li><strong>Email:</strong> {{ $loanApplication->beneficiary_email ?? '—' }}</li>
-                <li><strong>Phone:</strong> {{ $loanApplication->beneficiary_phone ?? '—' }}</li>
-                <li><strong>Relationship:</strong> {{ $loanApplication->beneficiary_relationship ?? '—' }}</li>
-            </ul>
-        </div>
-
-        <div class="details">
-            <h2>KYC documents (paths on file)</h2>
-            <ul>
-                <li><strong>Title document:</strong> {{ $loanApplication->title_document ?? '—' }}</li>
-                <li><strong>Upload document:</strong> {{ $loanApplication->upload_document ?? '—' }}</li>
-                <li><strong>Bank statement path:</strong> {{ $loanApplication->bank_statement_path ?? '—' }}</li>
-                <li><strong>Live photo path:</strong> {{ $loanApplication->live_photo_path ?? '—' }}</li>
-            </ul>
-        </div>
-
-        <div class="details">
-            <h2>Guarantor</h2>
-            @if(!empty($guarantorSummaryLines))
-                <ul>
-                    @foreach($guarantorSummaryLines as $line)
-                        <li>{{ $line }}</li>
-                    @endforeach
-                    @if($loanApplication->guarantor && !empty($loanApplication->guarantor->signed_form_path))
-                        <li><strong>Signed form file:</strong> attached as <code>guarantor_signed_form_*</code> when the file exists on the server.</li>
-                    @endif
-                </ul>
-            @else
-                <p class="muted">No guarantor record linked to this application.</p>
-            @endif
-        </div>
-
-        <div class="details">
-            <h2>Admin / counter-offer (if any)</h2>
-            <ul>
-                <li><strong>Admin notes:</strong> {{ $loanApplication->admin_notes ?? '—' }}</li>
-                <li><strong>Counter-offer min deposit (stored):</strong> {{ $loanApplication->counter_offer_min_deposit ?? '—' }}</li>
-                <li><strong>Counter-offer min tenor:</strong> {{ $loanApplication->counter_offer_min_tenor ?? '—' }}</li>
-            </ul>
-        </div>
-
-        <p style="margin-top: 24px;">Thank you,<br><strong>Troosolar Team</strong></p>
-
-        <div class="footer">
-            <p>This is an automated message from Troosolar for financing partner review. Please do not reply to this email unless instructed by Troosolar operations.</p>
-        </div>
+        <p>Application #{{ $app['id'] ?? $loanApplication->id }} · Troosolar</p>
     </div>
+
+    <div class="body">
+        <p class="intro">
+            Hello {{ $partner->name }},<br><br>
+            Please find the customer and application details below for your credit evaluation.
+            @if(count($kycAttachments) > 0)
+                Supporting documents are attached to this email.
+            @endif
+        </p>
+
+        {{-- Application overview --}}
+        <div class="section section-blue">
+            <h2>Application overview</h2>
+            <div class="grid">
+                <div class="grid-row">
+                    <div class="grid-label">Application ID</div>
+                    <div class="grid-value">#{{ $app['id'] ?? '—' }}</div>
+                </div>
+                <div class="grid-row">
+                    <div class="grid-label">Status</div>
+                    <div class="grid-value"><span class="status-pill">{{ $app['status'] ?? '—' }}</span></div>
+                </div>
+                @if(!empty($app['created_at']))
+                <div class="grid-row">
+                    <div class="grid-label">Application date</div>
+                    <div class="grid-value">{{ $app['created_at'] }}</div>
+                </div>
+                @endif
+                @if(!empty($app['loan_amount_formatted']) && empty($loanSummary))
+                <div class="grid-row">
+                    <div class="grid-label">Loan amount</div>
+                    <div class="grid-value" style="color:#273e8e;">{{ $app['loan_amount_formatted'] }}</div>
+                </div>
+                @endif
+                @if(!empty($app['repayment_duration']) && empty($loanSummary))
+                <div class="grid-row">
+                    <div class="grid-label">Repayment duration</div>
+                    <div class="grid-value">{{ $app['repayment_duration'] }} months</div>
+                </div>
+                @endif
+                @if(!empty($app['customer_type']))
+                <div class="grid-row">
+                    <div class="grid-label">Customer type</div>
+                    <div class="grid-value">{{ $app['customer_type'] }}</div>
+                </div>
+                @endif
+                @if(!empty($app['product_category']))
+                <div class="grid-row">
+                    <div class="grid-label">Product category</div>
+                    <div class="grid-value">{{ $app['product_category'] }}</div>
+                </div>
+                @endif
+                @if(!empty($app['prior_application_id']))
+                <div class="grid-row">
+                    <div class="grid-label">Re-application</div>
+                    <div class="grid-value">From application #{{ $app['prior_application_id'] }}</div>
+                </div>
+                @endif
+            </div>
+
+            @if(!empty($ordered['display']))
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid #bfdbfe;">
+                <div class="grid-label" style="display:block;margin-bottom:4px;">Bundle / product ordered</div>
+                <div class="grid-value" style="display:block;">{{ $ordered['display'] }}</div>
+            </div>
+            @endif
+        </div>
+
+        {{-- Customer --}}
+        <div class="section section-white">
+            <h2>Customer details</h2>
+            <div class="grid">
+                @if(!empty($customer['full_name']))
+                <div class="grid-row">
+                    <div class="grid-label">Full name</div>
+                    <div class="grid-value">{{ $customer['full_name'] }}</div>
+                </div>
+                @else
+                <div class="grid-row">
+                    <div class="grid-label">Name</div>
+                    <div class="grid-value">{{ trim(($customer['first_name'] ?? '') . ' ' . ($customer['surname'] ?? '')) ?: '—' }}</div>
+                </div>
+                @endif
+                <div class="grid-row">
+                    <div class="grid-label">Email</div>
+                    <div class="grid-value">{{ $customer['email'] ?? '—' }}</div>
+                </div>
+                <div class="grid-row">
+                    <div class="grid-label">Phone</div>
+                    <div class="grid-value">{{ $customer['phone'] ?? '—' }}</div>
+                </div>
+                @if(!empty($customer['bvn']))
+                <div class="grid-row">
+                    <div class="grid-label">BVN</div>
+                    <div class="grid-value">{{ $customer['bvn'] }}</div>
+                </div>
+                @endif
+                @if(!empty($customer['social_media']))
+                <div class="grid-row">
+                    <div class="grid-label">Social media</div>
+                    <div class="grid-value">{{ $customer['social_media'] }}</div>
+                </div>
+                @endif
+            </div>
+        </div>
+
+        {{-- Ordered items table --}}
+        @if(count($ordered['lines'] ?? []) > 0)
+        <div class="section section-white">
+            <h2>Product / bundle ordered</h2>
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Type</th>
+                        <th style="text-align:center;">Qty</th>
+                        <th style="text-align:right;">Unit price</th>
+                        <th style="text-align:right;">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($ordered['lines'] as $line)
+                    <tr>
+                        <td><strong>{{ $line['title'] }}</strong></td>
+                        <td>{{ $line['kind_label'] }}</td>
+                        <td style="text-align:center;">{{ $line['quantity'] }}</td>
+                        <td class="num">{{ $line['unit_price_formatted'] ?? '—' }}</td>
+                        <td class="num">{{ $line['subtotal_formatted'] ?? '—' }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        @endif
+
+        {{-- Property --}}
+        <div class="section section-white">
+            <h2>Property</h2>
+            <div class="grid">
+                <div class="grid-row">
+                    <div class="grid-label">State</div>
+                    <div class="grid-value">{{ $property['state'] ?? '—' }}</div>
+                </div>
+                <div class="grid-row">
+                    <div class="grid-label">Address</div>
+                    <div class="grid-value">{{ $property['address'] ?? '—' }}</div>
+                </div>
+                @if(!empty($property['landmark']))
+                <div class="grid-row">
+                    <div class="grid-label">Landmark</div>
+                    <div class="grid-value">{{ $property['landmark'] }}</div>
+                </div>
+                @endif
+                @if(!empty($property['floors']))
+                <div class="grid-row">
+                    <div class="grid-label">Floors</div>
+                    <div class="grid-value">{{ $property['floors'] }}</div>
+                </div>
+                @endif
+                @if(!empty($property['rooms']))
+                <div class="grid-row">
+                    <div class="grid-label">Rooms</div>
+                    <div class="grid-value">{{ $property['rooms'] }}</div>
+                </div>
+                @endif
+                <div class="grid-row">
+                    <div class="grid-label">Gated estate</div>
+                    <div class="grid-value">{{ !empty($property['is_gated_estate']) ? 'Yes' : 'No' }}</div>
+                </div>
+                @if(!empty($property['is_gated_estate']))
+                <div class="grid-row">
+                    <div class="grid-label">Estate name</div>
+                    <div class="grid-value">{{ $property['estate_name'] ?? '—' }}</div>
+                </div>
+                <div class="grid-row">
+                    <div class="grid-label">Estate address</div>
+                    <div class="grid-value">{{ $property['estate_address'] ?? '—' }}</div>
+                </div>
+                @endif
+            </div>
+        </div>
+
+        {{-- Loan summary (matches admin BNPL view) --}}
+        @if(!empty($loanSummary))
+        <div class="section section-green">
+            <h2 style="margin-bottom:16px;">Loan summary</h2>
+            @foreach($loanSummary['rows'] as $row)
+            <div class="summary-card">
+                <table>
+                    <tr>
+                        <td class="summary-label {{ !empty($row['bold']) ? 'bold' : '' }}">
+                            {{ $row['num'] }}. {{ $row['label'] }}
+                        </td>
+                        <td class="summary-value {{ !empty($row['bold']) ? 'bold' : '' }} {{ $row['num'] === 5 ? 'highlight' : '' }}">
+                            {{ $row['value_formatted'] }}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            @endforeach
+            <div class="summary-card" style="margin-bottom:0;">
+                <table>
+                    <tr>
+                        <td class="summary-label">6. Loan Tenor</td>
+                        <td class="summary-value highlight">{{ $loanSummary['tenor_label'] }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        @endif
+
+        {{-- Credit check --}}
+        <div class="section section-white">
+            <h2>Credit check &amp; identity</h2>
+            <div class="grid">
+                <div class="grid-row">
+                    <div class="grid-label">Credit check method</div>
+                    <div class="grid-value">{{ $credit['method'] ?? '—' }}</div>
+                </div>
+                @if(!empty($credit['mono_credit_status']))
+                <div class="grid-row">
+                    <div class="grid-label">Mono credit status</div>
+                    <div class="grid-value">{{ $credit['mono_credit_status'] }}</div>
+                </div>
+                @endif
+            </div>
+
+            @if($showMono && count($monoSummary) > 0)
+            <h3>Mono calculation</h3>
+            <div class="grid">
+                @foreach($monoSummary as $line)
+                <div class="grid-row">
+                    <div class="grid-label">{{ $line['label'] }}</div>
+                    <div class="grid-value">{{ $line['value'] }}</div>
+                </div>
+                @endforeach
+            </div>
+            @endif
+
+            <h3>Linked bank account</h3>
+            @if($linkAccount)
+            <div class="grid">
+                <div class="grid-row">
+                    <div class="grid-label">Account number</div>
+                    <div class="grid-value">{{ $linkAccount->account_number }}</div>
+                </div>
+                <div class="grid-row">
+                    <div class="grid-label">Account name</div>
+                    <div class="grid-value">{{ $linkAccount->account_name }}</div>
+                </div>
+                <div class="grid-row">
+                    <div class="grid-label">Bank</div>
+                    <div class="grid-value">{{ $linkAccount->bank_name }}</div>
+                </div>
+            </div>
+            @else
+            <p class="muted">No linked account on file.</p>
+            @endif
+        </div>
+
+        {{-- Beneficiary --}}
+        @if(!empty($beneficiary['name']) || !empty($beneficiary['email']) || !empty($beneficiary['phone']))
+        <div class="section section-white">
+            <h2>Beneficiary</h2>
+            <div class="grid">
+                <div class="grid-row">
+                    <div class="grid-label">Name</div>
+                    <div class="grid-value">{{ $beneficiary['name'] ?? '—' }}</div>
+                </div>
+                <div class="grid-row">
+                    <div class="grid-label">Email</div>
+                    <div class="grid-value">{{ $beneficiary['email'] ?? '—' }}</div>
+                </div>
+                <div class="grid-row">
+                    <div class="grid-label">Phone</div>
+                    <div class="grid-value">{{ $beneficiary['phone'] ?? '—' }}</div>
+                </div>
+                <div class="grid-row">
+                    <div class="grid-label">Relationship</div>
+                    <div class="grid-value">{{ $beneficiary['relationship'] ?? '—' }}</div>
+                </div>
+            </div>
+        </div>
+        @endif
+
+        {{-- Guarantor --}}
+        @if(!empty($guarantor))
+        <div class="section section-white">
+            <h2>Guarantor</h2>
+            <div class="grid">
+                @if(!empty($guarantor['full_name']))
+                <div class="grid-row">
+                    <div class="grid-label">Full name</div>
+                    <div class="grid-value">{{ $guarantor['full_name'] }}</div>
+                </div>
+                @endif
+                @if(!empty($guarantor['email']))
+                <div class="grid-row">
+                    <div class="grid-label">Email</div>
+                    <div class="grid-value">{{ $guarantor['email'] }}</div>
+                </div>
+                @endif
+                @if(!empty($guarantor['phone']))
+                <div class="grid-row">
+                    <div class="grid-label">Phone</div>
+                    <div class="grid-value">{{ $guarantor['phone'] }}</div>
+                </div>
+                @endif
+                @if(!empty($guarantor['bvn']))
+                <div class="grid-row">
+                    <div class="grid-label">BVN</div>
+                    <div class="grid-value">{{ $guarantor['bvn'] }}</div>
+                </div>
+                @endif
+                @if(!empty($guarantor['relationship']))
+                <div class="grid-row">
+                    <div class="grid-label">Relationship</div>
+                    <div class="grid-value">{{ $guarantor['relationship'] }}</div>
+                </div>
+                @endif
+                @if(!empty($guarantor['status']))
+                <div class="grid-row">
+                    <div class="grid-label">Status</div>
+                    <div class="grid-value">{{ $guarantor['status'] }}</div>
+                </div>
+                @endif
+                @if(!empty($guarantor['has_signed_form']))
+                <div class="grid-row">
+                    <div class="grid-label">Signed form</div>
+                    <div class="grid-value" style="color:#065f46;">Attached to this email</div>
+                </div>
+                @endif
+            </div>
+        </div>
+        @endif
+
+        {{-- Attachments (no file paths) --}}
+        @if(count($kycAttachments) > 0)
+        <div class="section section-white">
+            <h2>Documents attached</h2>
+            <ul class="attachments">
+                @foreach($kycAttachments as $doc)
+                <li>{{ $doc['label'] }}</li>
+                @endforeach
+            </ul>
+        </div>
+        @endif
+
+        {{-- Admin notes --}}
+        @if(!empty($admin['notes']) || !empty($admin['counter_offer_min_deposit']) || !empty($admin['counter_offer_min_tenor']))
+        <div class="section section-white">
+            <h2>Admin notes</h2>
+            <div class="grid">
+                @if(!empty($admin['notes']))
+                <div class="grid-row">
+                    <div class="grid-label">Notes</div>
+                    <div class="grid-value">{{ $admin['notes'] }}</div>
+                </div>
+                @endif
+                @if(!empty($admin['counter_offer_min_deposit']))
+                <div class="grid-row">
+                    <div class="grid-label">Counter-offer min deposit</div>
+                    <div class="grid-value">{{ $admin['counter_offer_min_deposit'] }}</div>
+                </div>
+                @endif
+                @if(!empty($admin['counter_offer_min_tenor']))
+                <div class="grid-row">
+                    <div class="grid-label">Counter-offer min tenor</div>
+                    <div class="grid-value">{{ $admin['counter_offer_min_tenor'] }} months</div>
+                </div>
+                @endif
+            </div>
+        </div>
+        @endif
+
+        <p style="margin-top:8px;font-size:14px;">Thank you,<br><strong>Troosolar Team</strong></p>
+    </div>
+
+    <div class="footer">
+        Automated message from Troosolar for financing partner review. Please do not reply unless instructed by Troosolar operations.
+    </div>
+</div>
 </body>
 </html>

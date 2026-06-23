@@ -6,7 +6,9 @@
     <title>Your order has been delivered</title>
     <style>
         body { font-family: Arial, Helvetica, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .container { background-color: #f5f7ff; border-radius: 12px; padding: 32px; margin: 20px 0; border: 1px solid #e2e8f0; }
+        .container { background-color: #f5f7ff; border-radius: 12px; padding: 32px; margin: 20px 0; border: 1px solid #e2e8f0; overflow: hidden; }
+        @include('emails.partials.brand_styles')
+        .brand-header { margin: -32px -32px 24px -32px; }
         h1 { color: #273e8e; font-size: 22px; margin-top: 0; }
         .message { color: #444; margin: 20px 0; }
         .details { background: #fff; border-radius: 8px; padding: 16px 20px; margin: 16px 0; font-size: 14px; border: 1px solid #e2e8f0; }
@@ -18,6 +20,8 @@
 </head>
 <body>
     <div class="container">
+        @include('emails.partials.brand_header', ['brandSubtitle' => 'Order Delivered'])
+
         <h1>Thank you — your order is delivered</h1>
 
         <p>Hello {{ trim($user->first_name . ' ' . $user->sur_name) }},</p>

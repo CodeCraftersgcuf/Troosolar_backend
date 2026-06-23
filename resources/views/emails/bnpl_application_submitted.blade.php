@@ -4,26 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BNPL Application Submitted</title>
+    <style>
+        body { font-family: Arial, Helvetica, sans-serif; color: #1f2937; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px; background: #f3f4f6; }
+        .container { background: #f5f7ff; border-radius: 12px; padding: 32px; border: 1px solid #e2e8f0; overflow: hidden; }
+        @include('emails.partials.brand_styles')
+        .brand-header { margin: -32px -32px 24px -32px; }
+        h2 { color: #273e8e; margin-top: 0; }
+        .btn { display: inline-block; background: #273e8e; color: #fff !important; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; margin-top: 8px; }
+    </style>
 </head>
-<body style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5;">
-    <h2 style="color: #273e8e;">BNPL Application Submitted</h2>
-    <p>Hello {{ trim(($user->first_name ?? '') . ' ' . ($user->sur_name ?? '')) ?: 'Customer' }},</p>
+<body>
+    <div class="container">
+        @include('emails.partials.brand_header', ['brandSubtitle' => 'BNPL Application'])
 
-    <p>Your Buy Now Pay Later application has been submitted successfully.</p>
+        <h2>Application submitted</h2>
+        <p>Hello {{ trim(($user->first_name ?? '') . ' ' . ($user->sur_name ?? '')) ?: 'Customer' }},</p>
 
-    <p>
-        <strong>Application ID:</strong> #{{ $application->id }}<br>
-        <strong>Status:</strong> {{ strtoupper($application->status ?? 'pending') }}
-    </p>
+        <p>Your Buy Now Pay Later application has been submitted successfully.</p>
 
-    <p>Our team will review your application and share feedback within 24-48 hours.</p>
+        <p>
+            <strong>Application ID:</strong> #{{ $application->id }}<br>
+            <strong>Status:</strong> {{ strtoupper($application->status ?? 'pending') }}
+        </p>
 
-    <p>
-        You can track your application here:<br>
-        <a href="{{ $applicationUrl }}">{{ $applicationUrl }}</a>
-    </p>
+        <p>Our team will review your application and share feedback within 24–48 hours.</p>
 
-    <p>Thank you,<br>Troosolar Team</p>
+        <p>
+            <a href="{{ $applicationUrl }}" class="btn">Track your application</a>
+        </p>
+        <p style="font-size: 13px; color: #64748b; word-break: break-all;">{{ $applicationUrl }}</p>
+
+        <p>Thank you,<br><strong>Troosolar Team</strong></p>
+    </div>
 </body>
 </html>
-

@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\LoanApplication;
 use App\Models\User;
+use App\Support\FrontendUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -35,8 +36,7 @@ class BNPLStatusEmail extends Mailable
         $this->application = $application;
         $this->status = $status;
 
-        $frontendUrl = rtrim(config('app.frontend_url', 'https://app.troosolar.io'), '/');
-        $this->continueUrl = $frontendUrl . '/bnpl-loans/app-' . $application->id;
+        $this->continueUrl = FrontendUrl::bnplApplicationTrack($application->id);
 
         $this->downPayment = $application->mono ? (float) $application->mono->down_payment : null;
         $this->repaymentDuration = (int) $application->repayment_duration;

@@ -5,49 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OTP Code</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .container {
-            background-color: #f9f9f9;
-            border-radius: 8px;
-            padding: 30px;
-            margin: 20px 0;
-        }
-        .otp-code {
-            background-color: #fff;
-            border: 2px solid #007bff;
-            border-radius: 8px;
-            padding: 20px;
-            text-align: center;
-            font-size: 32px;
-            font-weight: bold;
-            color: #007bff;
-            letter-spacing: 8px;
-            margin: 20px 0;
-        }
-        .message {
-            color: #666;
-            margin: 20px 0;
-        }
-        .footer {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #ddd;
-            font-size: 12px;
-            color: #999;
-            text-align: center;
-        }
+        body { font-family: Arial, Helvetica, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .container { background-color: #f5f7ff; border-radius: 12px; padding: 32px; margin: 20px 0; border: 1px solid #e2e8f0; overflow: hidden; }
+        @include('emails.partials.brand_styles')
+        .brand-header { margin: -32px -32px 24px -32px; }
+        .otp-code { background-color: #fff; border: 2px solid #273e8e; border-radius: 8px; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; color: #273e8e; letter-spacing: 8px; margin: 20px 0; }
+        .message { color: #666; margin: 20px 0; }
+        .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #999; text-align: center; }
+        h2 { color: #273e8e; margin-top: 0; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Your OTP Code</h2>
+        @include('emails.partials.brand_header', ['brandSubtitle' => 'Verification'])
+
+        <h2>Your OTP code</h2>
 
         @if(isset($first_name) && !empty($first_name))
             <p>Hi {{ $first_name }},</p>
@@ -70,7 +42,7 @@
         </p>
         
         <div class="footer">
-            <p>This is an automated message from {{ config('app.name') }}. Please do not reply to this email.</p>
+            <p>This is an automated message from Troosolar. Please do not reply to this email.</p>
         </div>
     </div>
 </body>

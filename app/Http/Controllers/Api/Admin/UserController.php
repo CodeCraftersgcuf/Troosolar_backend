@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Helpers\ActivityHelper;
 use App\Http\Requests\ForgetPasswordRequest;
+use App\Support\UserRole;
 use Exception;
 use App\Models\User;
 use App\Models\Wallet;
@@ -105,8 +106,9 @@ public function index()
         $data['user_code'] = Str::lower($data['first_name']) . rand(100, 999);
         $data['otp'] = rand(10000, 99999);
         
-        // Set default values
-        $data['role'] = $data['role'] ?? 'user'; // Default to 'user' if role not provided
+        // Website sign-ups are always customers — never accept role from the client.
+        unset($data['role']);
+        $data['role'] = UserRole::ROLE_USER;
         $data['is_active'] = $data['is_active'] ?? true;
         $data['is_verified'] = $data['is_verified'] ?? false;
 
@@ -157,24 +159,41 @@ public function index()
 
 public function addUser(UserRequest $request){
     try{
-        $data=$request->validated();
+        $caller = Auth::user();
+        if (! $caller || ! UserRole::isAdmin($caller->role)) {
+            return ResponseHelper::error('Unauthorized. Only admins can create accounts this way.', 403);
+        }
+
+        $data = $request->validated();
 
         if (User::where('email', $data['email'])->exists()) {
             return ResponseHelper::error('Email is already registered', 409);
         }
-            if (isset($data['profile_picture']) && $data['profile_picture']->isValid()) {
+
+        if (isset($data['profile_picture']) && $data['profile_picture']->isValid()) {
             $img = $data['profile_picture'];
             $ext = $img->getClientOriginalExtension();
             $imageName = time() . '.' . $ext;
             $img->move(public_path('/users'), $imageName);
             $data['profile_picture'] = 'users/' . $imageName;
+        }
 
+        $requestedRole = UserRole::normalize($data['role'] ?? UserRole::ROLE_USER);
+        unset($data['role']);
+
+        if (UserRole::isAdmin($requestedRole)) {
+            if ($requestedRole === UserRole::ROLE_SUPER_ADMIN && ! UserRole::isSuperAdmin($caller->role)) {
+                return ResponseHelper::error('Only super admins can create super admin accounts.', 403);
+            }
+            $data['role'] = $requestedRole;
+        } else {
+            $data['role'] = UserRole::ROLE_USER;
         }
 
         $data['user_code'] = Str::lower($data['first_name']) . rand(100, 999);
-        //no need of otp
         $user = User::create($data);
         $this->createWallet($user);
+
         return ResponseHelper::success($user, 'User registered successfully', 201);
 
     }catch(Exception $ex){
@@ -248,7 +267,7 @@ public function adminLogin(LoginRequest $request)
 
         if (Auth::attempt($user)) {
             $authUser = Auth::user();
-            if($authUser->role != 'admin' && $authUser->role != 'super_admin'){
+            if (! UserRole::isAdmin($authUser->role)) {
                 return ResponseHelper::error('Unauthorized access', 403);
             }
             $token = $authUser->createToken("API Token")->plainTextToken;
@@ -348,6 +367,11 @@ public function resetPassword(ResetPassword $request){
 public function allUsers()
 {
     try {
+        $caller = Auth::user();
+        if (! $caller || ! UserRole::isAdmin($caller->role)) {
+            return ResponseHelper::error('Unauthorized', 403);
+        }
+
         $users = User::all();
          $total = User::count();
         $nweUser = User::whereMonth('created_at', Carbon::now()->month)->count();
@@ -363,6 +387,34 @@ public function allUsers()
         return ResponseHelper::success($data, 'Users retrieved successfully');
     } catch (Exception $ex) {
         return ResponseHelper::error('Users not found', 404);
+    }
+}
+
+/**
+ * Admin accounts only (Settings → All Admins).
+ * GET /api/admin/admins
+ */
+public function listAdmins()
+{
+    try {
+        $caller = Auth::user();
+        if (! $caller || ! UserRole::isAdmin($caller->role)) {
+            return ResponseHelper::error('Unauthorized', 403);
+        }
+
+        $admins = User::query()
+            ->whereIn('role', ['admin', 'Admin', 'super_admin', 'superadmin', 'Super_Admin'])
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function (User $user) {
+                $user->role = UserRole::normalize($user->role);
+
+                return $user;
+            });
+
+        return ResponseHelper::success($admins, 'Admins retrieved successfully');
+    } catch (Exception $ex) {
+        return ResponseHelper::error('Failed to retrieve admins', 500);
     }
 }
 
@@ -404,11 +456,26 @@ public function updateUser(UpdateRequest $request)
 public function updateUserByAdmin(UpdateRequest $request,$userId)
 {
     try {
+        $caller = Auth::user();
+        if (! $caller || ! UserRole::isAdmin($caller->role)) {
+            return ResponseHelper::error('Unauthorized', 403);
+        }
+
         $data = $request->validated();
-        // dd($data);
         $user = User::find($userId);
         if (!$user) {
             throw new Exception("User not found");
+        }
+
+        if (array_key_exists('role', $data)) {
+            $newRole = UserRole::normalize($data['role']);
+            if ($newRole === UserRole::ROLE_SUPER_ADMIN && ! UserRole::isSuperAdmin($caller->role)) {
+                return ResponseHelper::error('Only super admins can grant super admin access.', 403);
+            }
+            if (UserRole::isAdmin($user->role) && ! UserRole::isAdmin($newRole) && (int) $user->id === (int) $caller->id) {
+                return ResponseHelper::error('You cannot remove your own admin access.', 403);
+            }
+            $data['role'] = $newRole;
         }
 
         if (isset($data['profile_picture']) && is_object($data['profile_picture']) && is_file($data['profile_picture']->getPathname())) {
