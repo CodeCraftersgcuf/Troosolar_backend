@@ -421,6 +421,7 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     Route::get('admin/analytics', [AnalyticController::class, 'index']);
     Route::get('/all-users', [UserController::class, 'allUsers']);
     Route::get('/admin/admins', [UserController::class, 'listAdmins']);
+    Route::get('/admin/me', [UserController::class, 'currentAdmin']);
     Route::post('/add-user', [UserController::class, 'addUser']);
 
     // ================= REFERRAL ADMIN ROUTES =================

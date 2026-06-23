@@ -555,6 +555,22 @@ public function createWallet($user)
     return $wallet;
 }
 
+// get currently authenticated admin profile
+public function currentAdmin(Request $request)
+{
+    try {
+        $user = $request->user();
+        if (!$user || ! UserRole::isAdmin($user->role)) {
+            return ResponseHelper::error('Unauthorized access', 403);
+        }
+        $user->load('wallet', 'activitys');
+        return ResponseHelper::success($user, 'Admin profile retrieved successfully');
+    } catch (Exception $e) {
+        Log::error('Error retrieving current admin', ['message' => $e->getMessage()]);
+        return ResponseHelper::error('Error retrieving admin profile', 500);
+    }
+}
+
 // get single user
 public function singleUser($userId)
 {
