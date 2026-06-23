@@ -30,7 +30,7 @@ class SendUserLoanInfoToPartner extends Mailable
     public string $emailSubject;
 
     /** @var array<string, mixed> */
-    public array $viewData = [];
+    protected array $partnerEmailData = [];
 
     /**
      * @param  \App\Models\User  $user
@@ -43,7 +43,7 @@ class SendUserLoanInfoToPartner extends Mailable
         $this->partner = $partner;
         $this->linkAccount = $linkAccount;
         $this->emailSubject = $this->resolveSubject();
-        $this->viewData = $this->buildViewData($user, $loanApplication);
+        $this->partnerEmailData = $this->buildViewData($user, $loanApplication);
     }
 
     /**
@@ -119,7 +119,7 @@ class SendUserLoanInfoToPartner extends Mailable
         return new Content(
             view: 'emails.user_loan_info',
             with: [
-                'viewData' => $this->viewData,
+                'viewData' => $this->partnerEmailData,
             ],
         );
     }
