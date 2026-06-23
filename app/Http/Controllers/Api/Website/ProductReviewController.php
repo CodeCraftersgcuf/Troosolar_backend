@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Api\Website;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductReviewRequest;
 use App\Models\BundleItems;
+use App\Models\Bundles;
 use App\Models\LoanApplication;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Product;
 use App\Models\ProductReveiews;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class ProductReviewController extends Controller
 {
@@ -160,10 +163,15 @@ class ProductReviewController extends Controller
             $ids[] = (int) $order->product_id;
         }
 
-        $order->loadMissing('items');
+        $order->loadMissing(['items.itemable']);
         foreach ($order->items as $item) {
             $itemableId = (int) $item->itemable_id;
             if ($itemableId <= 0) {
+                continue;
+            }
+
+            if ($item->itemable instanceof Product) {
+                $ids[] = (int) $item->itemable->id;
                 continue;
             }
 
@@ -210,15 +218,26 @@ class ProductReviewController extends Controller
             $ids[] = (int) $order->bundle_id;
         }
 
-        $order->loadMissing('items');
+        $order->loadMissing(['items.itemable']);
         foreach ($order->items as $item) {
             $itemableId = (int) $item->itemable_id;
             if ($itemableId <= 0) {
                 continue;
             }
 
+            if ($item->itemable instanceof Bundles) {
+                $ids[] = (int) $item->itemable->id;
+                continue;
+            }
+
             $kind = $this->orderLineKind($item);
             if ($kind === 'bundle' || str_contains(strtolower((string) $item->itemable_type), 'bundle')) {
+                $ids[] = $itemableId;
+                continue;
+            }
+
+            // Any morph row whose id matches a bundle record (legacy / odd itemable_type values)
+            if (Bundles::query()->whereKey($itemableId)->exists()) {
                 $ids[] = $itemableId;
             }
         }
@@ -235,6 +254,63 @@ class ProductReviewController extends Controller
         }
 
         return array_values(array_unique(array_filter($ids)));
+    }
+
+    private function bundleBelongsToOrder(Order $order, int $bundleId): bool
+    {
+        if ($bundleId <= 0) {
+            return false;
+        }
+
+        if (in_array($bundleId, $this->collectPurchasedBundleIds($order), true)) {
+            return true;
+        }
+
+        if ((int) ($order->bundle_id ?? 0) === $bundleId) {
+            return true;
+        }
+
+        return OrderItem::query()
+            ->where('order_id', $order->id)
+            ->where('itemable_id', $bundleId)
+            ->where(function ($query) {
+                $query->where('itemable_type', Bundles::class)
+                    ->orWhere('itemable_type', 'like', '%Bundle%');
+            })
+            ->exists();
+    }
+
+    private function productBelongsToOrder(Order $order, int $productId): bool
+    {
+        if ($productId <= 0) {
+            return false;
+        }
+
+        if (in_array($productId, $this->collectPurchasedProductIds($order), true)) {
+            return true;
+        }
+
+        if ((int) ($order->product_id ?? 0) === $productId) {
+            return true;
+        }
+
+        return OrderItem::query()
+            ->where('order_id', $order->id)
+            ->where('itemable_id', $productId)
+            ->where(function ($query) {
+                $query->where('itemable_type', Product::class)
+                    ->orWhere('itemable_type', 'like', '%Product%');
+            })
+            ->exists();
+    }
+
+    private function loadOwnedOrder(int $orderId, int $userId): ?Order
+    {
+        return Order::query()
+            ->with(['items.itemable'])
+            ->whereKey($orderId)
+            ->where('user_id', $userId)
+            ->first();
     }
 
     /** @return list<array<string, mixed>> */
@@ -284,30 +360,22 @@ class ProductReviewController extends Controller
 
     private function orderAllowsProductReview(int $orderId, int $userId, int $productId): bool
     {
-        $order = Order::query()->whereKey($orderId)->where('user_id', $userId)->first();
-        if (! $order) {
+        $order = $this->loadOwnedOrder($orderId, $userId);
+        if (! $order || ! $this->isReviewAllowedOrder($order)) {
             return false;
         }
 
-        if (! $this->isReviewAllowedOrder($order)) {
-            return false;
-        }
-
-        return $this->orderContainsPurchasedProduct($order, $productId);
+        return $this->productBelongsToOrder($order, $productId);
     }
 
     private function orderAllowsBundleReview(int $orderId, int $userId, int $bundleId): bool
     {
-        $order = Order::query()->whereKey($orderId)->where('user_id', $userId)->first();
-        if (! $order) {
+        $order = $this->loadOwnedOrder($orderId, $userId);
+        if (! $order || ! $this->isReviewAllowedOrder($order)) {
             return false;
         }
 
-        if (! $this->isReviewAllowedOrder($order)) {
-            return false;
-        }
-
-        return $this->orderContainsPurchasedBundle($order, $bundleId);
+        return $this->bundleBelongsToOrder($order, $bundleId);
     }
 
     private function hasDeliveredOrderForProduct(int $userId, int $productId): bool
@@ -348,8 +416,8 @@ class ProductReviewController extends Controller
 
     private function userCanReviewProduct(int $userId, int $productId, ?int $orderId = null): bool
     {
-        if ($orderId !== null && $this->orderAllowsProductReview($orderId, $userId, $productId)) {
-            return true;
+        if ($orderId !== null) {
+            return $this->orderAllowsProductReview($orderId, $userId, $productId);
         }
 
         return $this->hasDeliveredOrderForProduct($userId, $productId);
@@ -361,7 +429,23 @@ class ProductReviewController extends Controller
             return true;
         }
 
+        if ($orderId !== null) {
+            return false;
+        }
+
         return $this->hasDeliveredOrderForBundle($userId, $bundleId);
+    }
+
+    private function assertBundleReviewsSupported(): ?\Illuminate\Http\JsonResponse
+    {
+        if (! Schema::hasColumn('product_reveiews', 'bundle_id')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bundle reviews are not enabled on the server yet. Please run: php artisan migrate',
+            ], 503);
+        }
+
+        return null;
     }
 
     public function store(StoreProductReviewRequest $request)
@@ -381,10 +465,18 @@ class ProductReviewController extends Controller
             $orderId = ! empty($data['order_id']) ? (int) $data['order_id'] : null;
 
             if ($bundleId !== null) {
+                if ($blocked = $this->assertBundleReviewsSupported()) {
+                    return $blocked;
+                }
+
                 if (! $this->userCanReviewBundle($userId, $bundleId, $orderId)) {
+                    $hint = $orderId !== null
+                        ? 'This bundle was not found on the selected order, or the order is not eligible for reviews yet.'
+                        : 'You can only review bundles from paid or delivered orders.';
+
                     return response()->json([
                         'status' => 'error',
-                        'message' => 'You can only review bundles from paid or delivered orders.',
+                        'message' => $hint,
                     ], 422);
                 }
 
