@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Website;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductReviewRequest;
 use App\Models\BundleItems;
+use App\Models\LoanApplication;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\ProductReveiews;
@@ -100,6 +101,25 @@ class ProductReviewController extends Controller
         return in_array($normalized, ['delivered', 'completed', 'complete'], true);
     }
 
+    private function isPaidPaymentStatus(string $normalized): bool
+    {
+        return in_array($normalized, ['paid', 'confirmed', 'completed', 'success', 'successful'], true);
+    }
+
+    /** Customer may review after delivery or once payment is confirmed (shop / buy-now checkout). */
+    private function isReviewAllowedOrder(Order $order): bool
+    {
+        $status = $this->normalizeOrderStatus($order->order_status);
+        if (in_array($status, ['cancelled', 'refunded'], true)) {
+            return false;
+        }
+        if ($this->isDeliveredStatus($status)) {
+            return true;
+        }
+
+        return $this->isPaidPaymentStatus($this->normalizeOrderStatus($order->payment_status));
+    }
+
     private function normalizeLineItemKind(?string $itemableType, ?string $fallbackType = null): ?string
     {
         $raw = strtolower(trim((string) ($itemableType ?? $fallbackType ?? '')));
@@ -121,71 +141,145 @@ class ProductReviewController extends Controller
         return $this->normalizeLineItemKind($item->itemable_type);
     }
 
-    private function orderLineContainsProduct(OrderItem $item, int $productId): bool
-    {
-        $itemableId = (int) $item->itemable_id;
-        if ($itemableId <= 0) {
-            return false;
-        }
-
-        $kind = $this->orderLineKind($item);
-        if ($kind === 'product') {
-            return $itemableId === $productId;
-        }
-
-        if ($kind === 'bundle') {
-            return BundleItems::query()
-                ->where('bundle_id', $itemableId)
-                ->where('product_id', $productId)
-                ->exists();
-        }
-
-        return false;
-    }
-
-    private function orderLineContainsBundle(OrderItem $item, int $bundleId): bool
-    {
-        $itemableId = (int) $item->itemable_id;
-
-        return $this->orderLineKind($item) === 'bundle' && $itemableId === $bundleId;
-    }
-
     private function orderContainsPurchasedProduct(Order $order, int $productId): bool
     {
-        if ((int) ($order->product_id ?? 0) === $productId) {
-            return true;
-        }
-
-        $items = OrderItem::query()
-            ->where('order_id', $order->id)
-            ->get(['itemable_type', 'itemable_id']);
-
-        foreach ($items as $item) {
-            if ($this->orderLineContainsProduct($item, $productId)) {
-                return true;
-            }
-        }
-
-        return false;
+        return in_array($productId, $this->collectPurchasedProductIds($order), true);
     }
 
     private function orderContainsPurchasedBundle(Order $order, int $bundleId): bool
     {
-        if ((int) ($order->bundle_id ?? 0) === $bundleId) {
-            return true;
+        return in_array($bundleId, $this->collectPurchasedBundleIds($order), true);
+    }
+
+    /** @return list<int> */
+    private function collectPurchasedProductIds(Order $order): array
+    {
+        $ids = [];
+
+        if ((int) ($order->product_id ?? 0) > 0) {
+            $ids[] = (int) $order->product_id;
         }
 
-        $items = OrderItem::query()
-            ->where('order_id', $order->id)
-            ->get(['itemable_type', 'itemable_id']);
+        $order->loadMissing('items');
+        foreach ($order->items as $item) {
+            $itemableId = (int) $item->itemable_id;
+            if ($itemableId <= 0) {
+                continue;
+            }
 
-        foreach ($items as $item) {
-            if ($this->orderLineContainsBundle($item, $bundleId)) {
-                return true;
+            $kind = $this->orderLineKind($item);
+            if ($kind === 'product') {
+                $ids[] = $itemableId;
+                continue;
+            }
+
+            if ($kind === 'bundle') {
+                $bundleProductIds = BundleItems::query()
+                    ->where('bundle_id', $itemableId)
+                    ->pluck('product_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+                foreach ($bundleProductIds as $pid) {
+                    if ($pid > 0) {
+                        $ids[] = $pid;
+                    }
+                }
             }
         }
 
-        return false;
+        foreach ($this->snapshotLineRows($order) as $row) {
+            $kind = $this->snapshotRowKind($row);
+            if ($kind !== 'product') {
+                continue;
+            }
+            $id = $this->snapshotRowId($row, 'product');
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        return array_values(array_unique(array_filter($ids)));
+    }
+
+    /** @return list<int> */
+    private function collectPurchasedBundleIds(Order $order): array
+    {
+        $ids = [];
+
+        if ((int) ($order->bundle_id ?? 0) > 0) {
+            $ids[] = (int) $order->bundle_id;
+        }
+
+        $order->loadMissing('items');
+        foreach ($order->items as $item) {
+            $itemableId = (int) $item->itemable_id;
+            if ($itemableId <= 0) {
+                continue;
+            }
+
+            $kind = $this->orderLineKind($item);
+            if ($kind === 'bundle' || str_contains(strtolower((string) $item->itemable_type), 'bundle')) {
+                $ids[] = $itemableId;
+            }
+        }
+
+        foreach ($this->snapshotLineRows($order) as $row) {
+            $kind = $this->snapshotRowKind($row);
+            if ($kind !== 'bundle') {
+                continue;
+            }
+            $id = $this->snapshotRowId($row, 'bundle');
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        return array_values(array_unique(array_filter($ids)));
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function snapshotLineRows(Order $order): array
+    {
+        if (! $order->mono_calculation_id) {
+            return [];
+        }
+
+        $application = LoanApplication::query()
+            ->where('mono_loan_calculation', $order->mono_calculation_id)
+            ->where('user_id', $order->user_id)
+            ->first();
+
+        if (! $application || ! is_array($application->order_items_snapshot)) {
+            return [];
+        }
+
+        return $application->order_items_snapshot;
+    }
+
+    private function snapshotRowKind(array $row): ?string
+    {
+        return $this->normalizeLineItemKind(
+            $row['itemable_type'] ?? null,
+            $row['type'] ?? null
+        );
+    }
+
+    private function snapshotRowId(array $row, ?string $kind = null): int
+    {
+        $keys = $kind === 'bundle'
+            ? ['itemable_id', 'bundle_id']
+            : ($kind === 'product'
+                ? ['itemable_id', 'product_id']
+                : ['itemable_id', 'bundle_id', 'product_id', 'id']);
+
+        foreach ($keys as $key) {
+            $id = (int) ($row[$key] ?? 0);
+            if ($id > 0) {
+                return $id;
+            }
+        }
+
+        return 0;
     }
 
     private function orderAllowsProductReview(int $orderId, int $userId, int $productId): bool
@@ -195,7 +289,7 @@ class ProductReviewController extends Controller
             return false;
         }
 
-        if (! $this->isDeliveredStatus($this->normalizeOrderStatus($order->order_status))) {
+        if (! $this->isReviewAllowedOrder($order)) {
             return false;
         }
 
@@ -209,7 +303,7 @@ class ProductReviewController extends Controller
             return false;
         }
 
-        if (! $this->isDeliveredStatus($this->normalizeOrderStatus($order->order_status))) {
+        if (! $this->isReviewAllowedOrder($order)) {
             return false;
         }
 
@@ -220,10 +314,10 @@ class ProductReviewController extends Controller
     {
         $orders = Order::query()
             ->where('user_id', $userId)
-            ->get(['id', 'order_status', 'product_id']);
+            ->get(['id', 'order_status', 'payment_status', 'product_id', 'bundle_id', 'mono_calculation_id']);
 
         foreach ($orders as $order) {
-            if (! $this->isDeliveredStatus($this->normalizeOrderStatus($order->order_status))) {
+            if (! $this->isReviewAllowedOrder($order)) {
                 continue;
             }
             if ($this->orderContainsPurchasedProduct($order, $productId)) {
@@ -238,10 +332,10 @@ class ProductReviewController extends Controller
     {
         $orders = Order::query()
             ->where('user_id', $userId)
-            ->get(['id', 'order_status', 'bundle_id']);
+            ->get(['id', 'order_status', 'payment_status', 'product_id', 'bundle_id', 'mono_calculation_id']);
 
         foreach ($orders as $order) {
-            if (! $this->isDeliveredStatus($this->normalizeOrderStatus($order->order_status))) {
+            if (! $this->isReviewAllowedOrder($order)) {
                 continue;
             }
             if ($this->orderContainsPurchasedBundle($order, $bundleId)) {
@@ -290,7 +384,7 @@ class ProductReviewController extends Controller
                 if (! $this->userCanReviewBundle($userId, $bundleId, $orderId)) {
                     return response()->json([
                         'status' => 'error',
-                        'message' => 'You can only review bundles from delivered/completed orders.',
+                        'message' => 'You can only review bundles from paid or delivered orders.',
                     ], 422);
                 }
 
@@ -307,7 +401,7 @@ class ProductReviewController extends Controller
                 if (! $this->userCanReviewProduct($userId, (int) $productId, $orderId)) {
                     return response()->json([
                         'status' => 'error',
-                        'message' => 'You can only review products from delivered/completed orders.',
+                        'message' => 'You can only review products from paid or delivered orders.',
                     ], 422);
                 }
 
@@ -361,7 +455,7 @@ class ProductReviewController extends Controller
                 if (! $this->userCanReviewBundle((int) auth()->id(), (int) $review->bundle_id, $orderId)) {
                     return response()->json([
                         'status' => 'error',
-                        'message' => 'You can only review bundles from delivered/completed orders.',
+                        'message' => 'You can only review bundles from paid or delivered orders.',
                     ], 422);
                 }
             } elseif (! $this->userCanReviewProduct((int) auth()->id(), (int) $review->product_id, $orderId)) {
