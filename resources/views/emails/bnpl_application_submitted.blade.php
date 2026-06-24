@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BNPL Application Submitted</title>
+    <title>{{ \App\Support\MailBrand::BNPL_LABEL }} Application Submitted</title>
     <style>
         body { font-family: Arial, Helvetica, sans-serif; color: #1f2937; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px; background: #f3f4f6; }
         .container { background: #f5f7ff; border-radius: 12px; padding: 32px; border: 1px solid #e2e8f0; overflow: hidden; }
@@ -15,19 +15,19 @@
 </head>
 <body>
     <div class="container">
-        @include('emails.partials.brand_header', ['brandSubtitle' => 'BNPL Application'])
+        @include('emails.partials.brand_header', ['brandSubtitle' => \App\Support\MailBrand::BNPL_LABEL . ' Application'])
 
         <h2>Application submitted</h2>
         <p>Hello {{ trim(($user->first_name ?? '') . ' ' . ($user->sur_name ?? '')) ?: 'Customer' }},</p>
 
-        <p>Your Buy Now Pay Later application has been submitted successfully.</p>
+        <p>Your {{ \App\Support\MailBrand::BNPL_LABEL }} application has been submitted successfully.</p>
 
         <p>
             <strong>Application ID:</strong> #{{ $application->id }}<br>
             <strong>Status:</strong> {{ strtoupper($application->status ?? 'pending') }}
         </p>
 
-        <p>Our team will review your application and share feedback within 24–48 hours.</p>
+        <p>Our team will review your application and share feedback within 24–72 hours.</p>
 
         <p>
             <a href="{{ $applicationUrl }}" class="btn">Track your application</a>

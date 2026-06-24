@@ -12,8 +12,7 @@
             <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
                 <tr>
                     <td style="background:#ffffff;padding:20px 24px 0;text-align:center;border-bottom:3px solid #273e8e;">
-                        <img src="{{ \App\Support\MailBrand::logoUrl() }}" alt="Troosolar" width="260" style="max-width:260px;width:100%;height:auto;display:block;margin:0 auto 8px;" />
-                        <p style="margin:0 0 12px;font-size:13px;color:#273e8e;font-style:italic;">{{ \App\Support\MailBrand::SLOGAN }}</p>
+                        <img src="{{ \App\Support\MailBrand::logoUrl() }}" alt="Troosolar" width="260" style="max-width:260px;width:100%;height:auto;display:block;margin:0 auto 12px;" />
                     </td>
                 </tr>
                 <tr>

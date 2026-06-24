@@ -220,7 +220,6 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
         Route::get('review-eligibility', [ProductReviewController::class, 'reviewEligibility']);
         Route::get('/', [ProductReviewController::class, 'index']);
         Route::post('/', [ProductReviewController::class, 'store']);
-        Route::put('/{id}', [ProductReviewController::class, 'update']);
     });
     Route::prefix('admin/product-reviews')->group(function () {
         Route::get('/', [ProductReviewAdminController::class, 'index']);
@@ -347,7 +346,8 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     // Terms
 
     // Website Tickets
-    Route::apiResource('website/tickets', TicketController::class)->names('website.tickets');
+    Route::post('website/tickets/{ticket}/reply', [TicketController::class, 'reply'])->name('website.tickets.reply');
+    Route::apiResource('website/tickets', TicketController::class)->only(['index', 'store', 'show'])->names('website.tickets');
 
     // Admin Tickets
 

@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use App\Mail\OrderDeliveredThankYouMail;
 use App\Mail\OrderPlacedConfirmationMail;
 use App\Mail\OrderStatusUpdatedMail;
 use Illuminate\Support\Facades\Schema;
@@ -137,6 +138,14 @@ class OrderController extends Controller
 
         try {
             $order->loadMissing(['user', 'items.itemable', 'deliveryAddress']);
+
+            if (in_array($new, ['delivered', 'completed', 'complete'], true)) {
+                $summaryLine = $this->orderDeliveredSummaryLine($order);
+                Mail::to($user->email)->send(new OrderDeliveredThankYouMail($order, $user, $summaryLine));
+
+                return;
+            }
+
             $orderView = $this->formatOrder($order->fresh(['user', 'items.itemable', 'deliveryAddress']), []);
             $prevHuman = $this->humanizeOrderStatus($previousStatus);
             $newHuman = $this->humanizeOrderStatus($order->order_status);

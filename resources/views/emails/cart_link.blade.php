@@ -27,7 +27,7 @@
 </head>
 <body>
     <div class="container">
-        @include('emails.partials.brand_header', ['brandSubtitle' => $orderType === 'bnpl' ? 'BNPL Custom Order' : 'Buy Now Cart'])
+        @include('emails.partials.brand_header', ['brandSubtitle' => $orderType === 'bnpl' ? \App\Support\MailBrand::BNPL_LABEL . ' Custom Order' : \App\Support\MailBrand::BUY_NOW_CUSTOM_ORDER_LABEL])
 
         <h1>{{ $headline }}</h1>
 
@@ -35,7 +35,7 @@
 
         <div class="message">
             @if($orderType === 'bnpl')
-                <p>We have prepared a custom order for your <strong>Buy Now Pay Later</strong> application with the following items:</p>
+                <p>We have prepared a custom order for your <strong>{{ \App\Support\MailBrand::BNPL_LABEL }}</strong> application with the following items:</p>
             @else
                 <p>We have prepared a custom order for you with the following items:</p>
             @endif
@@ -104,9 +104,9 @@
 
         <p class="message">
             @if($orderType === 'bnpl')
-                Click the button below to continue your BNPL application with these items:
+                Click the button below to continue your {{ \App\Support\MailBrand::BNPL_LABEL }} application with these items:
             @else
-                Click the button below to view your cart and proceed with checkout:
+                Click the button below to open your {{ \App\Support\MailBrand::BUY_NOW_CUSTOM_ORDER_LABEL }} and proceed with checkout:
             @endif
         </p>
 
@@ -120,7 +120,7 @@
 
         @if($orderType === 'bnpl')
             <p class="info-strip">
-                <strong>Buy Now Pay Later:</strong> You will continue in the BNPL flow (invoice, loan calculator, and application steps).
+                <strong>{{ \App\Support\MailBrand::BNPL_LABEL }}:</strong> You will continue in the application flow (invoice, loan calculator, and application steps).
             </p>
         @endif
 

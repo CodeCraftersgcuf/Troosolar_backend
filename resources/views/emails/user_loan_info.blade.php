@@ -20,11 +20,11 @@
         .section-green { background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border: 1px solid #a7f3d0; }
         h2 { color: #273e8e; font-size: 16px; margin: 0 0 14px 0; font-weight: 700; }
         h3 { color: #1e3270; font-size: 13px; margin: 14px 0 8px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
-        .grid { display: table; width: 100%; border-collapse: collapse; }
-        .grid-row { display: table-row; }
-        .grid-label, .grid-value { display: table-cell; padding: 6px 0; font-size: 13px; vertical-align: top; }
-        .grid-label { color: #6b7280; width: 42%; padding-right: 12px; }
-        .grid-value { color: #111827; font-weight: 600; }
+        .detail-table { display: table; width: 100%; border-collapse: collapse; }
+        .detail-row { display: table-row; }
+        .detail-label, .detail-value { display: table-cell; padding: 6px 0; font-size: 13px; vertical-align: top; }
+        .detail-label { color: #6b7280; width: 42%; padding-right: 12px; }
+        .detail-value { color: #111827; font-weight: 600; }
         .status-pill { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #dbeafe; color: #1e40af; text-transform: capitalize; }
         .summary-card { background: #fff; border: 1px solid #d1fae5; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
         .summary-card table { width: 100%; border-collapse: collapse; }
@@ -60,10 +60,11 @@
     $admin = $d['admin'] ?? [];
     $showMono = !empty($d['show_mono_section']);
     $monoSummary = $d['mono_summary'] ?? [];
+    $currentPowerSources = $property['current_power_sources'] ?? $property['landmark'] ?? null;
 @endphp
 
 <div class="wrap">
-    @include('emails.partials.brand_header', ['brandSubtitle' => 'Partner loan application'])
+    @include('emails.partials.brand_header')
     <div class="header">
         <h1>Loan application for credit evaluation</h1>
         <p>Application #{{ $app['id'] ?? $loanApplication->id }} · Troosolar</p>
@@ -81,57 +82,57 @@
         {{-- Application overview --}}
         <div class="section section-blue">
             <h2>Application overview</h2>
-            <div class="grid">
-                <div class="grid-row">
-                    <div class="grid-label">Application ID</div>
-                    <div class="grid-value">#{{ $app['id'] ?? '—' }}</div>
+            <div class="detail-table">
+                <div class="detail-row">
+                    <div class="detail-label">Application ID</div>
+                    <div class="detail-value">#{{ $app['id'] ?? '—' }}</div>
                 </div>
-                <div class="grid-row">
-                    <div class="grid-label">Status</div>
-                    <div class="grid-value"><span class="status-pill">{{ $app['status'] ?? '—' }}</span></div>
+                <div class="detail-row">
+                    <div class="detail-label">Status</div>
+                    <div class="detail-value"><span class="status-pill">{{ $app['status'] ?? '—' }}</span></div>
                 </div>
                 @if(!empty($app['created_at']))
-                <div class="grid-row">
-                    <div class="grid-label">Application date</div>
-                    <div class="grid-value">{{ $app['created_at'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Application date</div>
+                    <div class="detail-value">{{ $app['created_at'] }}</div>
                 </div>
                 @endif
                 @if(!empty($app['loan_amount_formatted']) && empty($loanSummary))
-                <div class="grid-row">
-                    <div class="grid-label">Loan amount</div>
-                    <div class="grid-value" style="color:#273e8e;">{{ $app['loan_amount_formatted'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Loan amount</div>
+                    <div class="detail-value" style="color:#273e8e;">{{ $app['loan_amount_formatted'] }}</div>
                 </div>
                 @endif
                 @if(!empty($app['repayment_duration']) && empty($loanSummary))
-                <div class="grid-row">
-                    <div class="grid-label">Repayment duration</div>
-                    <div class="grid-value">{{ $app['repayment_duration'] }} months</div>
+                <div class="detail-row">
+                    <div class="detail-label">Repayment duration</div>
+                    <div class="detail-value">{{ $app['repayment_duration'] }} months</div>
                 </div>
                 @endif
                 @if(!empty($app['customer_type']))
-                <div class="grid-row">
-                    <div class="grid-label">Customer type</div>
-                    <div class="grid-value">{{ $app['customer_type'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Customer type</div>
+                    <div class="detail-value">{{ $app['customer_type'] }}</div>
                 </div>
                 @endif
                 @if(!empty($app['product_category']))
-                <div class="grid-row">
-                    <div class="grid-label">Product category</div>
-                    <div class="grid-value">{{ $app['product_category'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Product category</div>
+                    <div class="detail-value">{{ $app['product_category'] }}</div>
                 </div>
                 @endif
                 @if(!empty($app['prior_application_id']))
-                <div class="grid-row">
-                    <div class="grid-label">Re-application</div>
-                    <div class="grid-value">From application #{{ $app['prior_application_id'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Re-application</div>
+                    <div class="detail-value">From application #{{ $app['prior_application_id'] }}</div>
                 </div>
                 @endif
             </div>
 
             @if(!empty($ordered['display']))
             <div style="margin-top:14px;padding-top:14px;border-top:1px solid #bfdbfe;">
-                <div class="grid-label" style="display:block;margin-bottom:4px;">Bundle / product ordered</div>
-                <div class="grid-value" style="display:block;">{{ $ordered['display'] }}</div>
+                <div class="detail-label" style="display:block;margin-bottom:4px;">Bundle / product ordered</div>
+                <div class="detail-value" style="display:block;">{{ $ordered['display'] }}</div>
             </div>
             @endif
         </div>
@@ -139,36 +140,36 @@
         {{-- Customer --}}
         <div class="section section-white">
             <h2>Customer details</h2>
-            <div class="grid">
+            <div class="detail-table">
                 @if(!empty($customer['full_name']))
-                <div class="grid-row">
-                    <div class="grid-label">Full name</div>
-                    <div class="grid-value">{{ $customer['full_name'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Full name</div>
+                    <div class="detail-value">{{ $customer['full_name'] }}</div>
                 </div>
                 @else
-                <div class="grid-row">
-                    <div class="grid-label">Name</div>
-                    <div class="grid-value">{{ trim(($customer['first_name'] ?? '') . ' ' . ($customer['surname'] ?? '')) ?: '—' }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Name</div>
+                    <div class="detail-value">{{ trim(($customer['first_name'] ?? '') . ' ' . ($customer['surname'] ?? '')) ?: '—' }}</div>
                 </div>
                 @endif
-                <div class="grid-row">
-                    <div class="grid-label">Email</div>
-                    <div class="grid-value">{{ $customer['email'] ?? '—' }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Email</div>
+                    <div class="detail-value">{{ $customer['email'] ?? '—' }}</div>
                 </div>
-                <div class="grid-row">
-                    <div class="grid-label">Phone</div>
-                    <div class="grid-value">{{ $customer['phone'] ?? '—' }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Phone</div>
+                    <div class="detail-value">{{ $customer['phone'] ?? '—' }}</div>
                 </div>
                 @if(!empty($customer['bvn']))
-                <div class="grid-row">
-                    <div class="grid-label">BVN</div>
-                    <div class="grid-value">{{ $customer['bvn'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">BVN</div>
+                    <div class="detail-value">{{ $customer['bvn'] }}</div>
                 </div>
                 @endif
                 @if(!empty($customer['social_media']))
-                <div class="grid-row">
-                    <div class="grid-label">Social media</div>
-                    <div class="grid-value">{{ $customer['social_media'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Social media</div>
+                    <div class="detail-value">{{ $customer['social_media'] }}</div>
                 </div>
                 @endif
             </div>
@@ -206,45 +207,45 @@
         {{-- Property --}}
         <div class="section section-white">
             <h2>Property</h2>
-            <div class="grid">
-                <div class="grid-row">
-                    <div class="grid-label">State</div>
-                    <div class="grid-value">{{ $property['state'] ?? '—' }}</div>
+            <div class="detail-table">
+                <div class="detail-row">
+                    <div class="detail-label">State</div>
+                    <div class="detail-value">{{ $property['state'] ?? '—' }}</div>
                 </div>
-                <div class="grid-row">
-                    <div class="grid-label">Address</div>
-                    <div class="grid-value">{{ $property['address'] ?? '—' }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Address</div>
+                    <div class="detail-value">{{ $property['address'] ?? '—' }}</div>
                 </div>
-                @if(!empty($property['landmark']))
-                <div class="grid-row">
-                    <div class="grid-label">Landmark</div>
-                    <div class="grid-value">{{ $property['landmark'] }}</div>
+                @if(!empty($currentPowerSources))
+                <div class="detail-row">
+                    <div class="detail-label">Current power sources</div>
+                    <div class="detail-value">{{ $currentPowerSources }}</div>
                 </div>
                 @endif
                 @if(!empty($property['floors']))
-                <div class="grid-row">
-                    <div class="grid-label">Floors</div>
-                    <div class="grid-value">{{ $property['floors'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Floors</div>
+                    <div class="detail-value">{{ $property['floors'] }}</div>
                 </div>
                 @endif
                 @if(!empty($property['rooms']))
-                <div class="grid-row">
-                    <div class="grid-label">Rooms</div>
-                    <div class="grid-value">{{ $property['rooms'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Rooms</div>
+                    <div class="detail-value">{{ $property['rooms'] }}</div>
                 </div>
                 @endif
-                <div class="grid-row">
-                    <div class="grid-label">Gated estate</div>
-                    <div class="grid-value">{{ !empty($property['is_gated_estate']) ? 'Yes' : 'No' }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Gated estate</div>
+                    <div class="detail-value">{{ !empty($property['is_gated_estate']) ? 'Yes' : 'No' }}</div>
                 </div>
                 @if(!empty($property['is_gated_estate']))
-                <div class="grid-row">
-                    <div class="grid-label">Estate name</div>
-                    <div class="grid-value">{{ $property['estate_name'] ?? '—' }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Estate name</div>
+                    <div class="detail-value">{{ $property['estate_name'] ?? '—' }}</div>
                 </div>
-                <div class="grid-row">
-                    <div class="grid-label">Estate address</div>
-                    <div class="grid-value">{{ $property['estate_address'] ?? '—' }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Estate address</div>
+                    <div class="detail-value">{{ $property['estate_address'] ?? '—' }}</div>
                 </div>
                 @endif
             </div>
@@ -282,26 +283,26 @@
         {{-- Credit check --}}
         <div class="section section-white">
             <h2>Credit check &amp; identity</h2>
-            <div class="grid">
-                <div class="grid-row">
-                    <div class="grid-label">Credit check method</div>
-                    <div class="grid-value">{{ $credit['method'] ?? '—' }}</div>
+            <div class="detail-table">
+                <div class="detail-row">
+                    <div class="detail-label">Credit check method</div>
+                    <div class="detail-value">{{ $credit['method'] ?? '—' }}</div>
                 </div>
                 @if(!empty($credit['mono_credit_status']))
-                <div class="grid-row">
-                    <div class="grid-label">Mono credit status</div>
-                    <div class="grid-value">{{ $credit['mono_credit_status'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Mono credit status</div>
+                    <div class="detail-value">{{ $credit['mono_credit_status'] }}</div>
                 </div>
                 @endif
             </div>
 
             @if($showMono && count($monoSummary) > 0)
             <h3>Mono calculation</h3>
-            <div class="grid">
+            <div class="detail-table">
                 @foreach($monoSummary as $line)
-                <div class="grid-row">
-                    <div class="grid-label">{{ $line['label'] }}</div>
-                    <div class="grid-value">{{ $line['value'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">{{ $line['label'] }}</div>
+                    <div class="detail-value">{{ $line['value'] }}</div>
                 </div>
                 @endforeach
             </div>
@@ -309,18 +310,18 @@
 
             <h3>Linked bank account</h3>
             @if($linkAccount)
-            <div class="grid">
-                <div class="grid-row">
-                    <div class="grid-label">Account number</div>
-                    <div class="grid-value">{{ $linkAccount->account_number }}</div>
+            <div class="detail-table">
+                <div class="detail-row">
+                    <div class="detail-label">Account number</div>
+                    <div class="detail-value">{{ $linkAccount->account_number }}</div>
                 </div>
-                <div class="grid-row">
-                    <div class="grid-label">Account name</div>
-                    <div class="grid-value">{{ $linkAccount->account_name }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Account name</div>
+                    <div class="detail-value">{{ $linkAccount->account_name }}</div>
                 </div>
-                <div class="grid-row">
-                    <div class="grid-label">Bank</div>
-                    <div class="grid-value">{{ $linkAccount->bank_name }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Bank</div>
+                    <div class="detail-value">{{ $linkAccount->bank_name }}</div>
                 </div>
             </div>
             @else
@@ -332,22 +333,22 @@
         @if(!empty($beneficiary['name']) || !empty($beneficiary['email']) || !empty($beneficiary['phone']))
         <div class="section section-white">
             <h2>Beneficiary</h2>
-            <div class="grid">
-                <div class="grid-row">
-                    <div class="grid-label">Name</div>
-                    <div class="grid-value">{{ $beneficiary['name'] ?? '—' }}</div>
+            <div class="detail-table">
+                <div class="detail-row">
+                    <div class="detail-label">Name</div>
+                    <div class="detail-value">{{ $beneficiary['name'] ?? '—' }}</div>
                 </div>
-                <div class="grid-row">
-                    <div class="grid-label">Email</div>
-                    <div class="grid-value">{{ $beneficiary['email'] ?? '—' }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Email</div>
+                    <div class="detail-value">{{ $beneficiary['email'] ?? '—' }}</div>
                 </div>
-                <div class="grid-row">
-                    <div class="grid-label">Phone</div>
-                    <div class="grid-value">{{ $beneficiary['phone'] ?? '—' }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Phone</div>
+                    <div class="detail-value">{{ $beneficiary['phone'] ?? '—' }}</div>
                 </div>
-                <div class="grid-row">
-                    <div class="grid-label">Relationship</div>
-                    <div class="grid-value">{{ $beneficiary['relationship'] ?? '—' }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Relationship</div>
+                    <div class="detail-value">{{ $beneficiary['relationship'] ?? '—' }}</div>
                 </div>
             </div>
         </div>
@@ -357,47 +358,47 @@
         @if(!empty($guarantor))
         <div class="section section-white">
             <h2>Guarantor</h2>
-            <div class="grid">
+            <div class="detail-table">
                 @if(!empty($guarantor['full_name']))
-                <div class="grid-row">
-                    <div class="grid-label">Full name</div>
-                    <div class="grid-value">{{ $guarantor['full_name'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Full name</div>
+                    <div class="detail-value">{{ $guarantor['full_name'] }}</div>
                 </div>
                 @endif
                 @if(!empty($guarantor['email']))
-                <div class="grid-row">
-                    <div class="grid-label">Email</div>
-                    <div class="grid-value">{{ $guarantor['email'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Email</div>
+                    <div class="detail-value">{{ $guarantor['email'] }}</div>
                 </div>
                 @endif
                 @if(!empty($guarantor['phone']))
-                <div class="grid-row">
-                    <div class="grid-label">Phone</div>
-                    <div class="grid-value">{{ $guarantor['phone'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Phone</div>
+                    <div class="detail-value">{{ $guarantor['phone'] }}</div>
                 </div>
                 @endif
                 @if(!empty($guarantor['bvn']))
-                <div class="grid-row">
-                    <div class="grid-label">BVN</div>
-                    <div class="grid-value">{{ $guarantor['bvn'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">BVN</div>
+                    <div class="detail-value">{{ $guarantor['bvn'] }}</div>
                 </div>
                 @endif
                 @if(!empty($guarantor['relationship']))
-                <div class="grid-row">
-                    <div class="grid-label">Relationship</div>
-                    <div class="grid-value">{{ $guarantor['relationship'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Relationship</div>
+                    <div class="detail-value">{{ $guarantor['relationship'] }}</div>
                 </div>
                 @endif
                 @if(!empty($guarantor['status']))
-                <div class="grid-row">
-                    <div class="grid-label">Status</div>
-                    <div class="grid-value">{{ $guarantor['status'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Status</div>
+                    <div class="detail-value">{{ $guarantor['status'] }}</div>
                 </div>
                 @endif
                 @if(!empty($guarantor['has_signed_form']))
-                <div class="grid-row">
-                    <div class="grid-label">Signed form</div>
-                    <div class="grid-value" style="color:#065f46;">Attached to this email</div>
+                <div class="detail-row">
+                    <div class="detail-label">Signed form</div>
+                    <div class="detail-value" style="color:#065f46;">Attached to this email</div>
                 </div>
                 @endif
             </div>
@@ -420,23 +421,23 @@
         @if(!empty($admin['notes']) || !empty($admin['counter_offer_min_deposit']) || !empty($admin['counter_offer_min_tenor']))
         <div class="section section-white">
             <h2>Admin notes</h2>
-            <div class="grid">
+            <div class="detail-table">
                 @if(!empty($admin['notes']))
-                <div class="grid-row">
-                    <div class="grid-label">Notes</div>
-                    <div class="grid-value">{{ $admin['notes'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Notes</div>
+                    <div class="detail-value">{{ $admin['notes'] }}</div>
                 </div>
                 @endif
                 @if(!empty($admin['counter_offer_min_deposit']))
-                <div class="grid-row">
-                    <div class="grid-label">Counter-offer min deposit</div>
-                    <div class="grid-value">{{ $admin['counter_offer_min_deposit'] }}</div>
+                <div class="detail-row">
+                    <div class="detail-label">Counter-offer min deposit</div>
+                    <div class="detail-value">{{ $admin['counter_offer_min_deposit'] }}</div>
                 </div>
                 @endif
                 @if(!empty($admin['counter_offer_min_tenor']))
-                <div class="grid-row">
-                    <div class="grid-label">Counter-offer min tenor</div>
-                    <div class="grid-value">{{ $admin['counter_offer_min_tenor'] }} months</div>
+                <div class="detail-row">
+                    <div class="detail-label">Counter-offer min tenor</div>
+                    <div class="detail-value">{{ $admin['counter_offer_min_tenor'] }} months</div>
                 </div>
                 @endif
             </div>

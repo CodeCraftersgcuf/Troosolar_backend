@@ -488,8 +488,8 @@ class BNPLController extends Controller
 
             return ResponseHelper::success([
                 'loan_application' => $loanApplication,
-                'message' => 'BNPL application submitted successfully. You will receive feedback within 24-48 hours.'
-            ], 'BNPL application submitted successfully');
+                'message' => \App\Support\MailBrand::BNPL_LABEL.' application submitted successfully. You will receive feedback within 24-72 hours.'
+            ], \App\Support\MailBrand::BNPL_LABEL.' application submitted successfully');
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             // Return 422 for validation errors

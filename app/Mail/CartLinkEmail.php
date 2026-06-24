@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\User;
+use App\Support\MailBrand;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
@@ -65,20 +66,24 @@ class CartLinkEmail extends Mailable
             : round($fromCart + $fromCustom, 2);
 
         $isBnpl = $orderType === 'bnpl';
+        $bnpl = MailBrand::BNPL_LABEL;
+        $buyNow = MailBrand::BUY_NOW_CUSTOM_ORDER_LABEL;
         $this->headline = $isBnpl
-            ? 'Your BNPL custom order is ready'
-            : 'Your custom order is ready';
+            ? "Your {$bnpl} custom order is ready"
+            : "Your {$buyNow} is ready";
         $this->ctaLabel = $isBnpl
-            ? 'Continue BNPL application'
-            : 'View cart & checkout';
+            ? "Continue {$bnpl} application"
+            : "Open {$buyNow}";
     }
 
     public function build()
     {
         $isBnpl = $this->orderType === 'bnpl';
+        $bnpl = MailBrand::BNPL_LABEL;
+        $buyNow = MailBrand::BUY_NOW_CUSTOM_ORDER_LABEL;
         $subject = $isBnpl
-            ? 'Your BNPL custom order — next steps (Troosolar)'
-            : 'Your custom order is ready — complete checkout (Troosolar)';
+            ? "Your {$bnpl} custom order — next steps (Troosolar)"
+            : "Your {$buyNow} — complete checkout (Troosolar)";
 
         $mailable = $this->subject($subject)
             ->view('emails.cart_link')

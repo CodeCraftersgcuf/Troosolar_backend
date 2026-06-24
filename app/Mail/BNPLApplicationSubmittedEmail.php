@@ -5,6 +5,7 @@ namespace App\Mail;
 use App\Models\LoanApplication;
 use App\Models\User;
 use App\Support\FrontendUrl;
+use App\Support\MailBrand;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -29,7 +30,7 @@ class BNPLApplicationSubmittedEmail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'BNPL Application Submitted - Troosolar',
+            subject: MailBrand::BNPL_LABEL.' Application Submitted - Troosolar',
             replyTo: [config('mail.from.address')],
         );
     }

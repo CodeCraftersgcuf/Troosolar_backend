@@ -393,16 +393,29 @@ class PartnerLoanApplicationEmailPresenter
      */
     private function buildPropertyBlock(): array
     {
+        $currentPowerSources = $this->formatCurrentPowerSources($this->application->property_landmark);
+
         return [
             'state' => $this->application->property_state,
             'address' => $this->application->property_address,
-            'landmark' => $this->application->property_landmark,
+            'current_power_sources' => $currentPowerSources,
+            'landmark' => $currentPowerSources,
             'floors' => $this->application->property_floors,
             'rooms' => $this->application->property_rooms,
             'is_gated_estate' => (bool) $this->application->is_gated_estate,
             'estate_name' => $this->application->estate_name,
             'estate_address' => $this->application->estate_address,
         ];
+    }
+
+    private function formatCurrentPowerSources(?string $value): ?string
+    {
+        $normalized = trim((string) ($value ?? ''));
+        if ($normalized === '') {
+            return null;
+        }
+
+        return ucwords(strtolower($normalized));
     }
 
     /**

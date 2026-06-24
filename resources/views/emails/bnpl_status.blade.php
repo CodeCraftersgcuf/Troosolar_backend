@@ -20,7 +20,7 @@
 </head>
 <body>
     <div class="container">
-        @include('emails.partials.brand_header', ['brandSubtitle' => 'Buy Now Pay Later'])
+        @include('emails.partials.brand_header', ['brandSubtitle' => \App\Support\MailBrand::BNPL_LABEL])
 
         <h2>{{ $headingText }}</h2>
 
@@ -58,7 +58,7 @@
         @endif
 
         <div class="footer">
-            <p>This is an automated message from Troosolar about your BuyNowPayLater application. Please do not reply to this email.</p>
+            <p>This is an automated message from Troosolar about your {{ \App\Support\MailBrand::BNPL_LABEL }} application. Please do not reply to this email.</p>
         </div>
     </div>
 </body>

@@ -100,22 +100,14 @@ class ProductReviewController extends Controller
         return in_array($normalized, ['delivered', 'completed', 'complete'], true);
     }
 
-    private function isPaidPaymentStatus(string $normalized): bool
-    {
-        return in_array($normalized, ['paid', 'confirmed', 'completed', 'success', 'successful'], true);
-    }
-
     public function isReviewAllowedOrder(Order $order): bool
     {
         $status = $this->normalizeStatus($order->order_status);
         if (in_array($status, ['cancelled', 'refunded'], true)) {
             return false;
         }
-        if ($this->isDeliveredStatus($status)) {
-            return true;
-        }
 
-        return $this->isPaidPaymentStatus($this->normalizeStatus($order->payment_status));
+        return $this->isDeliveredStatus($status);
     }
 
     private function loadOwnedOrder(int $orderId, int $userId): ?Order
@@ -219,7 +211,7 @@ class ProductReviewController extends Controller
     private function reviewDeniedMessage(?int $orderId, int $userId, string $itemType): string
     {
         if ($orderId === null) {
-            return "You can only review {$itemType}s from paid or delivered orders.";
+            return "You can only review {$itemType}s after your order has been delivered.";
         }
 
         $order = $this->loadOwnedOrder($orderId, $userId);
@@ -228,10 +220,21 @@ class ProductReviewController extends Controller
         }
 
         if (! $this->isReviewAllowedOrder($order)) {
-            return 'This order is not eligible for reviews yet. Reviews open after payment is confirmed or the order is delivered.';
+            return 'Reviews are available after your order is marked as delivered.';
         }
 
         return "This {$itemType} was not found on the selected order.";
+    }
+
+    private function existingReviewForUser(int $userId, ?int $productId, ?int $bundleId): ?ProductReveiews
+    {
+        $query = ProductReveiews::query()->where('user_id', $userId);
+
+        if ($bundleId !== null) {
+            return $query->where('bundle_id', $bundleId)->first();
+        }
+
+        return $query->where('product_id', $productId)->first();
     }
 
     public function store(StoreProductReviewRequest $request)
@@ -262,15 +265,21 @@ class ProductReviewController extends Controller
                     ], 422);
                 }
 
-                $review = ProductReveiews::updateOrCreate(
-                    ['user_id' => $userId, 'bundle_id' => $bundleId],
-                    [
-                        'product_id' => null,
-                        'order_id' => $orderId,
-                        'review' => $data['review'],
-                        'rating' => $data['rating'],
-                    ]
-                )->load(['user:id,first_name,sur_name', 'bundle:id,title', 'order:id,order_number']);
+                if ($this->existingReviewForUser($userId, null, $bundleId)) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'You have already submitted a review for this bundle.',
+                    ], 422);
+                }
+
+                $review = ProductReveiews::create([
+                    'user_id' => $userId,
+                    'product_id' => null,
+                    'bundle_id' => $bundleId,
+                    'order_id' => $orderId,
+                    'review' => $data['review'],
+                    'rating' => $data['rating'],
+                ])->load(['user:id,first_name,sur_name', 'bundle:id,title', 'order:id,order_number']);
             } else {
                 if (! $this->userCanReviewProduct($userId, (int) $productId, $orderId)) {
                     return response()->json([
@@ -279,15 +288,21 @@ class ProductReviewController extends Controller
                     ], 422);
                 }
 
-                $review = ProductReveiews::updateOrCreate(
-                    ['user_id' => $userId, 'product_id' => $productId],
-                    [
-                        'bundle_id' => null,
-                        'order_id' => $orderId,
-                        'review' => $data['review'],
-                        'rating' => $data['rating'],
-                    ]
-                )->load(['user:id,first_name,sur_name', 'product:id,title', 'order:id,order_number']);
+                if ($this->existingReviewForUser($userId, $productId, null)) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'You have already submitted a review for this product.',
+                    ], 422);
+                }
+
+                $review = ProductReveiews::create([
+                    'user_id' => $userId,
+                    'product_id' => $productId,
+                    'bundle_id' => null,
+                    'order_id' => $orderId,
+                    'review' => $data['review'],
+                    'rating' => $data['rating'],
+                ])->load(['user:id,first_name,sur_name', 'product:id,title', 'order:id,order_number']);
             }
 
             return response()->json([
@@ -303,63 +318,4 @@ class ProductReviewController extends Controller
         }
     }
 
-    public function update(StoreProductReviewRequest $request, $id)
-    {
-        try {
-            if (! auth()->check()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Unauthorized',
-                ], 401);
-            }
-
-            $review = ProductReveiews::findOrFail($id);
-
-            if ($review->user_id !== auth()->id()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Unauthorized',
-                ], 403);
-            }
-
-            $data = $request->validated();
-            $userId = (int) auth()->id();
-            $orderId = ! empty($data['order_id']) ? (int) $data['order_id'] : null;
-
-            if ($review->bundle_id) {
-                if ($blocked = $this->assertBundleReviewsSupported()) {
-                    return $blocked;
-                }
-
-                if (! $this->userCanReviewBundle($userId, (int) $review->bundle_id, $orderId)) {
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => $this->reviewDeniedMessage($orderId, $userId, 'bundle'),
-                    ], 422);
-                }
-            } elseif (! $this->userCanReviewProduct($userId, (int) $review->product_id, $orderId)) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => $this->reviewDeniedMessage($orderId, $userId, 'product'),
-                ], 422);
-            }
-
-            $review->update([
-                'review' => $data['review'],
-                'rating' => $data['rating'],
-                ...( $orderId !== null ? ['order_id' => $orderId] : [] ),
-            ]);
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Review updated successfully',
-                'data' => $review->load(['user:id,first_name,sur_name', 'product:id,title', 'bundle:id,title', 'order:id,order_number']),
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Update failed: '.$e->getMessage(),
-            ], 500);
-        }
-    }
 }

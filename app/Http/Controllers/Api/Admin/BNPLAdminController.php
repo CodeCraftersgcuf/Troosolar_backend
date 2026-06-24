@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Controller;
 use App\Mail\BNPLStatusEmail;
+use App\Support\MailBrand;
 use App\Models\BnplSettings;
 use App\Models\Bundles;
 use App\Models\Guarantor;
@@ -426,11 +427,12 @@ class BNPLAdminController extends Controller
             $userId = $application->user_id;
             $status = $request->status;
             if ($userId && in_array($status, ['approved', 'counter_offer', 'rejected'])) {
+                $bnpl = MailBrand::BNPL_LABEL;
                 $message = $status === 'approved'
-                    ? 'Your BNPL application has been approved. Please pay your initial down payment to complete the order.'
+                    ? "Your {$bnpl} application has been approved. Please pay your initial down payment to complete the order."
                     : ($status === 'counter_offer'
-                        ? 'You have a counter offer on your BNPL application. Please review and accept or decline.'
-                        : 'We cannot process your BNPL application at this time. Thank you for choosing Troosolar.');
+                        ? "You have a counter offer on your {$bnpl} application. Please review and accept or decline."
+                        : "We cannot process your {$bnpl} application at this time. Thank you for choosing Troosolar.");
                 Notification::create([
                     'user_id' => $userId,
                     'message' => $message,

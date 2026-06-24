@@ -30,7 +30,7 @@
 
         <div class="message">
             <p>Thank you for shopping with Troosolar. We have received your order and our team will contact you with delivery updates.</p>
-            <p>You can review your order details anytime in your account.</p>
+            <p>You can view your order details anytime in your account.</p>
         </div>
 
         @include('emails.partials.order_email_simple_order_box', ['order' => $order, 'orderView' => $orderView])

@@ -78,4 +78,86 @@ public function index()
             return ResponseHelper::error('Failed to create ticket: ' . $e->getMessage(), 500);
         }
     }
+
+    public function show($id)
+    {
+        try {
+            $user = Auth::user();
+            if (! $user) {
+                return ResponseHelper::error('Unauthorized', 401);
+            }
+
+            $ticket = Ticket::with(['messages' => function ($query) {
+                $query->orderBy('created_at');
+            }])
+                ->where('user_id', $user->id)
+                ->findOrFail($id);
+
+            return ResponseHelper::success($this->formatTicket($ticket), 'Ticket retrieved successfully.');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return ResponseHelper::error('Ticket not found', 404);
+        } catch (\Exception $e) {
+            return ResponseHelper::error('Failed to fetch ticket: ' . $e->getMessage(), 500);
+        }
+    }
+
+    public function reply(\Illuminate\Http\Request $request, $id)
+    {
+        try {
+            $user = Auth::user();
+            if (! $user) {
+                return ResponseHelper::error('Unauthorized', 401);
+            }
+
+            $request->validate([
+                'message' => 'required|string|max:5000',
+            ]);
+
+            $ticket = Ticket::where('user_id', $user->id)->findOrFail($id);
+
+            if (strtolower((string) $ticket->status) === 'closed') {
+                return ResponseHelper::error('This ticket is closed. You cannot send more messages.', 422);
+            }
+
+            TicketMessage::create([
+                'ticket_id' => $ticket->id,
+                'user_id'   => $user->id,
+                'message'   => trim($request->message),
+                'sender'    => 'user',
+            ]);
+
+            $ticket->update(['status' => 'pending']);
+
+            $ticket->load(['messages' => function ($query) {
+                $query->orderBy('created_at');
+            }]);
+
+            return ResponseHelper::success($this->formatTicket($ticket), 'Message sent successfully.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return ResponseHelper::error('Ticket not found', 404);
+        } catch (\Exception $e) {
+            return ResponseHelper::error('Failed to send message: ' . $e->getMessage(), 500);
+        }
+    }
+
+    private function formatTicket(Ticket $ticket): array
+    {
+        return [
+            'id' => $ticket->id,
+            'ticket_id' => $ticket->id,
+            'subject' => $ticket->subject,
+            'status' => $ticket->status,
+            'created_at' => $ticket->created_at?->format('Y-m-d H:i:s'),
+            'date' => $ticket->created_at?->format('Y-m-d H:i:s'),
+            'messages' => $ticket->messages->map(function ($msg) {
+                return [
+                    'sender' => $msg->sender,
+                    'message' => $msg->message,
+                    'created_at' => $msg->created_at?->format('Y-m-d H:i:s'),
+                ];
+            })->values()->all(),
+        ];
+    }
 }

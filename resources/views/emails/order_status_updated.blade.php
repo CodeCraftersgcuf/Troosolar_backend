@@ -1,7 +1,3 @@
-@php
-    $newSlug = strtolower((string) ($order->order_status ?? ''));
-    $isDelivered = in_array($newSlug, ['delivered', 'completed'], true);
-@endphp
 <!DOCTYPE html>
 <html>
 <head>
@@ -29,24 +25,15 @@
     <div class="container">
         @include('emails.partials.brand_header', ['brandSubtitle' => 'Order Update'])
 
-        @if($isDelivered)
-            <h1>Thank you — your order is delivered</h1>
-        @else
-            <h1>Your order status has been updated</h1>
-        @endif
+        <h1>Your order status has been updated</h1>
 
         <p>Hello {{ trim($user->first_name . ' ' . $user->sur_name) }},</p>
 
         <div class="message">
-            @if($isDelivered)
-                <p>Great news: your Troosolar order has been marked as <strong>delivered</strong>. We hope everything arrived safely and that you are happy with your purchase.</p>
-                <p>If you have a moment, we would love to hear from you. Your feedback helps other customers and helps us improve.</p>
-            @else
-                <p>We have updated your order. The status is now:</p>
-                <p><span class="status-badge">{{ $newStatusHuman }}</span></p>
-                @if($previousStatusHuman !== '' && $previousStatusHuman !== '—' && strcasecmp($previousStatusHuman, $newStatusHuman) !== 0)
-                    <p style="font-size: 14px; color: #64748b;">Previous status: {{ $previousStatusHuman }}</p>
-                @endif
+            <p>We have updated your order. The status is now:</p>
+            <p><span class="status-badge">{{ $newStatusHuman }}</span></p>
+            @if($previousStatusHuman !== '' && $previousStatusHuman !== '—' && strcasecmp($previousStatusHuman, $newStatusHuman) !== 0)
+                <p style="font-size: 14px; color: #64748b;">Previous status: {{ $previousStatusHuman }}</p>
             @endif
         </div>
 

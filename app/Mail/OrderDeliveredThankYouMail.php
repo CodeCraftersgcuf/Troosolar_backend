@@ -29,7 +29,7 @@ class OrderDeliveredThankYouMail extends Mailable
         $this->order = $order;
         $this->user = $user;
         $this->orderSummaryLine = $orderSummaryLine;
-        $this->dashboardOrdersUrl = rtrim((string) config('app.frontend_url', 'https://app.troosolar.io'), '/').'/more?section=myOrders';
+        $this->dashboardOrdersUrl = rtrim((string) config('app.frontend_url', 'https://app.troosolar.io'), '/').'/more?section=myOrders&orderId='.$order->id;
     }
 
     public function envelope(): Envelope

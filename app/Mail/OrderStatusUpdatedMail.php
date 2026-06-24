@@ -55,14 +55,11 @@ class OrderStatusUpdatedMail extends Mailable
 
     public function envelope(): Envelope
     {
-        $new = strtolower((string) ($this->order->order_status ?? ''));
-        $subject = in_array($new, ['delivered', 'completed'], true)
-            ? 'Your order has been delivered – thank you from Troosolar'
-            : sprintf(
-                'Order %s update: %s',
-                $this->order->order_number ?? ('#'.$this->order->id),
-                $this->newStatusHuman
-            );
+        $subject = sprintf(
+            'Order %s update: %s',
+            $this->order->order_number ?? ('#'.$this->order->id),
+            $this->newStatusHuman
+        );
 
         return new Envelope(
             subject: $subject,
