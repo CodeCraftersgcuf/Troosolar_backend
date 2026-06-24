@@ -1140,44 +1140,21 @@ class OrderController extends Controller
                 $productPrice = max(0, $productPrice - $outrightDiscountAmount);
             }
 
-            // Get delivery and installation fees
-            // For bundles, try to get from bundle materials first, then fallback to state/location
-            $deliveryFee = 25000; // Default
-            $installationFee = 50000; // Default
-            $inspectionFeeFromBundle = 0;
-
-            // If bundle, check for fees in bundle materials
-            if ($bundle && $bundle->bundleMaterials) {
-                foreach ($bundle->bundleMaterials as $bm) {
-                    $materialName = $bm->material->name ?? '';
-                    if (str_contains($materialName, 'Installation Fees')) {
-                        $installationFee = (float) ($bm->material->selling_rate ?? $bm->material->rate ?? $installationFee);
-                    } elseif (str_contains($materialName, 'Delivery Fees')) {
-                        $deliveryFee = (float) ($bm->material->selling_rate ?? $bm->material->rate ?? $deliveryFee);
-                    } elseif (str_contains($materialName, 'Inspection Fees')) {
-                        $inspectionFeeFromBundle = (float) ($bm->material->selling_rate ?? $bm->material->rate ?? 0);
-                    }
-                }
-            }
-            
-            // If not found in bundle, try state/delivery location
-            if (isset($data['delivery_location_id']) && $data['delivery_location_id']) {
-                $deliveryLocation = \App\Models\DeliveryLocation::find($data['delivery_location_id']);
-                if ($deliveryLocation) {
-                    $deliveryFee = $deliveryLocation->delivery_fee ?? $deliveryFee;
-                    $installationFee = $deliveryLocation->installation_fee ?? $installationFee;
-                }
-            } elseif (isset($data['state_id']) && $data['state_id']) {
-                $state = \App\Models\State::find($data['state_id']);
-                if ($state) {
-                    $deliveryFee = $state->default_delivery_fee ?? $deliveryFee;
-                    $installationFee = $state->default_installation_fee ?? $installationFee;
-                }
-            }
+            // Delivery / installation: admin checkout settings, bundle materials, or non-legacy location/state — never hardcoded ₦25k/₦50k.
+            $checkoutSettings = CheckoutSetting::get();
+            $resolvedFees = CheckoutPricing::resolveBuyNowCheckoutFees(
+                $bundle,
+                isset($data['delivery_location_id']) ? (int) $data['delivery_location_id'] : null,
+                isset($data['state_id']) ? (int) $data['state_id'] : null,
+                $checkoutSettings,
+            );
+            $deliveryFee = $resolvedFees['delivery_fee'];
+            $installationFee = $resolvedFees['installation_fee'];
+            $inspectionFeeFromBundle = $resolvedFees['inspection_fee_from_bundle'];
 
             // Calculate fees
             $materialCost = 0;
-            $inspectionFee = $inspectionFeeFromBundle; // Use from bundle if available
+            $inspectionFee = $inspectionFeeFromBundle;
             $insuranceFee = 0;
             $addOnsTotal = 0;
             $addOns = [];
@@ -1185,21 +1162,11 @@ class OrderController extends Controller
             // Installation fee (only if using Troosolar installer)
             $installerChoice = $data['installer_choice'] ?? null;
             if ($installerChoice === 'troosolar') {
-                // For bundles, material cost is included in bundle price
-                // For custom builds, calculate from materials
-                if (!$bundle) {
-                    $materialCost = 30000; // Material cost (cables, breakers, etc.)
-                }
-                
-                // Inspection fee (optional for Buy Now, use bundle fee if available)
-                if ($data['include_inspection'] ?? false && !$inspectionFeeFromBundle) {
-                    $inspectionFee = 15000;
-                }
+                // Optional inspection from bundle materials only (no hardcoded inspection fee)
             } else {
-                // If using own installer, no installation fee
+                // Own installer: no Troosolar installation fee
                 $installationFee = 0;
-                // But keep inspection fee if it was in bundle
-                if (!$inspectionFeeFromBundle) {
+                if ($inspectionFeeFromBundle <= 0) {
                     $inspectionFee = 0;
                 }
             }
@@ -1251,6 +1218,21 @@ class OrderController extends Controller
                     'total_cost' => round((float) $line['line_total'], 2),
                 ];
             }, $multiProductLines);
+
+            if (count($productLineItems) === 0 && $product && $productId) {
+                $productLineItems[] = [
+                    'product_id' => $product->id,
+                    'description' => (string) ($product->title ?? 'Product'),
+                    'quantity' => 1,
+                    'unit' => 'Nos',
+                    'rate' => round($catalogTotalBeforeDiscount, 2),
+                    'total_cost' => round($catalogTotalBeforeDiscount, 2),
+                ];
+            }
+
+            if (count($productLineItems) === 0) {
+                $productLineItems = $this->productLineItemsFromBreakdown($productBreakdown);
+            }
 
             // Prepare order data - check if columns exist before including them
             $orderData = [
@@ -2328,6 +2310,39 @@ class OrderController extends Controller
         }
 
         return $breakdown;
+    }
+
+    /**
+     * @param  array{solar_inverter: array, solar_panels: array, batteries: array}  $breakdown
+     * @return array<int, array{product_id: null, description: string, quantity: int, unit: string, rate: float, total_cost: float}>
+     */
+    private function productLineItemsFromBreakdown(array $breakdown): array
+    {
+        $rows = [];
+        $buckets = [
+            'solar_inverter' => 'Solar Inverter',
+            'batteries' => 'Battery',
+            'solar_panels' => 'Solar Panels',
+        ];
+
+        foreach ($buckets as $key => $fallback) {
+            $bucket = $breakdown[$key] ?? null;
+            $price = (float) ($bucket['price'] ?? 0);
+            if ($price <= 0) {
+                continue;
+            }
+            $qty = max(1, (int) ($bucket['quantity'] ?? 1));
+            $rows[] = [
+                'product_id' => null,
+                'description' => (string) (($bucket['description'] ?? '') !== '' ? $bucket['description'] : $fallback),
+                'quantity' => $qty,
+                'unit' => 'Nos',
+                'rate' => round($price / $qty, 2),
+                'total_cost' => round($price, 2),
+            ];
+        }
+
+        return $rows;
     }
 
     /**

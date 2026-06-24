@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'delivery_fee' => env('CHECKOUT_DELIVERY_FEE', 2000),
+    'delivery_fee' => env('CHECKOUT_DELIVERY_FEE', 0),
     'delivery_min_working_days' => (int) env('CHECKOUT_DELIVERY_MIN_DAYS', 7),
     'delivery_max_working_days' => (int) env('CHECKOUT_DELIVERY_MAX_DAYS', 10),
     'insurance_fee' => (int) env('CHECKOUT_INSURANCE_FEE', 0),

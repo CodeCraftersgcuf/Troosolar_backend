@@ -39,7 +39,7 @@ class CheckoutSetting extends Model
         $row = self::query()->first();
         if (! $row) {
             $row = self::create([
-                'delivery_fee' => (int) config('checkout.delivery_fee', 2000),
+                'delivery_fee' => (int) config('checkout.delivery_fee', 0),
                 'delivery_min_working_days' => (int) config('checkout.delivery_min_working_days', 7),
                 'delivery_max_working_days' => (int) config('checkout.delivery_max_working_days', 10),
                 'insurance_fee' => (int) config('checkout.insurance_fee', 0),
