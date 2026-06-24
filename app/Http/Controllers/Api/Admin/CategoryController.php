@@ -277,18 +277,21 @@ private function syncAllInOneProductsForCategory(int $categoryId): void
         ->where('is_active', true)
         ->get();
 
-    foreach ($materials as $material) {
-        if (!$this->isAllInOneProductTitle((string) ($material->name ?? ''))) {
-            continue;
-        }
+        foreach ($materials as $material) {
+            if (!$this->isAllInOneProductTitle((string) ($material->name ?? ''))) {
+                continue;
+            }
 
-        Product::updateOrCreate(
-            ['title' => $material->name],
-            [
-                'category_id' => $categoryId,
-                'brand_id' => $defaultBrand->id,
-                'price' => 1000.00,
-                'discount_price' => 1000.00,
+            $existing = Product::query()->where('title', $material->name)->first();
+            $price = \App\Support\ProductMaterialPricing::priceFromMaterial($material, $existing);
+
+            Product::updateOrCreate(
+                ['title' => $material->name],
+                [
+                    'category_id' => $categoryId,
+                    'brand_id' => $defaultBrand->id,
+                    'price' => $price,
+                    'discount_price' => $price,
                 'stock' => 'In Stock',
                 'installation_price' => 0.00,
                 'top_deal' => false,
@@ -348,16 +351,16 @@ private function syncAccessoriesProductsForCategory(int $categoryId): void
     }
 
     foreach ($materials as $material) {
-        $rawRate = (float) ($material->selling_rate ?? $material->rate ?? 0);
-        $safePrice = $rawRate > 0 ? $rawRate : 1000.00;
+        $existing = Product::query()->where('title', $material->name)->first();
+        $price = \App\Support\ProductMaterialPricing::priceFromMaterial($material, $existing);
 
         Product::updateOrCreate(
             ['title' => $material->name],
             [
                 'category_id' => $categoryId,
                 'brand_id' => $defaultBrand->id,
-                'price' => $safePrice,
-                'discount_price' => $safePrice,
+                'price' => $price,
+                'discount_price' => $price,
                 'stock' => 'In Stock',
                 'installation_price' => 0.00,
                 'top_deal' => false,

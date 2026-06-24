@@ -984,6 +984,8 @@ class OrderController extends Controller
             // Dynamic validation based on product_category
             $validationRules = [
                 'product_id' => 'nullable|exists:products,id',
+                'product_ids' => 'nullable|array',
+                'product_ids.*' => 'integer|exists:products,id',
                 'bundle_id' => 'nullable|exists:bundles,id',
                 'amount' => 'nullable|numeric|min:0',
                 'customer_type' => 'nullable|in:residential,sme,commercial',
@@ -1074,20 +1076,44 @@ class OrderController extends Controller
             }
 
             $productPrice = 0;
+            $catalogTotalBeforeDiscount = 0.0;
             $product = null;
             $bundle = null;
+            $multiProductLines = [];
 
-            // Get product price from product_id, bundle_id, or amount
-            $productId = isset($data['product_id']) && !empty($data['product_id']) ? $data['product_id'] : null;
-            $bundleId = isset($data['bundle_id']) && !empty($data['bundle_id']) ? $data['bundle_id'] : null;
-            $amount = isset($data['amount']) && !empty($data['amount']) ? (float) $data['amount'] : null;
-            
-            if ($productId) {
+            // Get product price from product_id, product_ids[], bundle_id, or amount
+            $productId = isset($data['product_id']) && ! empty($data['product_id']) ? (int) $data['product_id'] : null;
+            $bundleId = isset($data['bundle_id']) && ! empty($data['bundle_id']) ? (int) $data['bundle_id'] : null;
+            $amount = isset($data['amount']) && $data['amount'] !== '' && $data['amount'] !== null
+                ? (float) $data['amount']
+                : null;
+
+            $productIds = [];
+            if ($request->filled('product_ids')) {
+                $rawIds = $request->input('product_ids');
+                $productIds = is_array($rawIds) ? $rawIds : [$rawIds];
+                $productIds = array_values(array_unique(array_filter(array_map('intval', $productIds))));
+            }
+
+            if (count($productIds) > 0) {
+                if ($productId || $bundleId) {
+                    return ResponseHelper::error('Provide either product_ids or a single product_id/bundle_id, not both.', 422);
+                }
+
+                $multiProductLines = $this->resolveMultiProductCheckoutLines($productIds);
+                if ($multiProductLines === null) {
+                    return ResponseHelper::error('One or more selected products could not be found.', 422);
+                }
+
+                $catalogTotalBeforeDiscount = round(array_sum(array_column($multiProductLines, 'line_total')), 2);
+                $productPrice = $catalogTotalBeforeDiscount;
+            } elseif ($productId) {
                 $product = Product::findOrFail($productId);
                 $productDiscount = (float) ($product->discount_price ?? 0);
                 $productPrice = $productDiscount > 0
                     ? $productDiscount
                     : (float) ($product->price ?? 0);
+                $catalogTotalBeforeDiscount = $productPrice;
             } elseif ($bundleId) {
                 $bundle = Bundles::with('bundleMaterials.material')->findOrFail($bundleId);
                 $bundleDiscount = (float) ($bundle->discount_price ?? 0);
@@ -1098,10 +1124,12 @@ class OrderController extends Controller
                 if ($productPrice <= 0 && $amount !== null) {
                     $productPrice = (float) $amount;
                 }
+                $catalogTotalBeforeDiscount = $productPrice;
             } elseif ($amount !== null) {
                 $productPrice = (float) $amount;
+                $catalogTotalBeforeDiscount = $productPrice;
             } else {
-                return ResponseHelper::error('Either product_id, bundle_id, or amount is required. Please provide one of them in your request.', 422);
+                return ResponseHelper::error('Either product_id, product_ids, bundle_id, or amount is required. Please provide one of them in your request.', 422);
             }
 
             $settings = ReferralSettings::getSettings();
@@ -1207,7 +1235,22 @@ class OrderController extends Controller
 
             // Calculate product breakdown (inverter, panels, batteries)
             $_bundleLineItems = null;
-            $productBreakdown = $this->calculateProductBreakdown($product, $bundle, $productPrice, $_bundleLineItems);
+            if (count($multiProductLines) > 0) {
+                $productBreakdown = $this->calculateMultiProductBreakdown($multiProductLines, $productPrice, $_bundleLineItems);
+            } else {
+                $productBreakdown = $this->calculateProductBreakdown($product, $bundle, $productPrice, $_bundleLineItems);
+            }
+
+            $productLineItems = array_map(static function (array $line) {
+                return [
+                    'product_id' => $line['product']->id,
+                    'description' => (string) ($line['product']->title ?? 'Product'),
+                    'quantity' => (int) $line['quantity'],
+                    'unit' => 'Nos',
+                    'rate' => round((float) $line['unit_price'], 2),
+                    'total_cost' => round((float) $line['line_total'], 2),
+                ];
+            }, $multiProductLines);
 
             // Prepare order data - check if columns exist before including them
             $orderData = [
@@ -1260,7 +1303,24 @@ class OrderController extends Controller
             $order = Order::create($orderData);
 
             // Line items for My Orders / GET /orders/{id} (legacy orders had empty order_items)
-            if ($productId && $product) {
+            if (count($multiProductLines) > 0) {
+                $lineCount = count($multiProductLines);
+                foreach ($multiProductLines as $line) {
+                    $catalogLine = (float) $line['line_total'];
+                    $chargedLine = $catalogTotalBeforeDiscount > 0
+                        ? round($productPrice * ($catalogLine / $catalogTotalBeforeDiscount), 2)
+                        : round($productPrice / max(1, $lineCount), 2);
+
+                    OrderItem::create([
+                        'order_id' => $order->id,
+                        'itemable_type' => Product::class,
+                        'itemable_id' => $line['product']->id,
+                        'quantity' => (int) $line['quantity'],
+                        'unit_price' => $chargedLine,
+                        'subtotal' => $chargedLine,
+                    ]);
+                }
+            } elseif ($productId && $product) {
                 OrderItem::create([
                     'order_id'      => $order->id,
                     'itemable_type' => Product::class,
@@ -1286,6 +1346,7 @@ class OrderController extends Controller
                 'outright_discount_percentage' => $outrightDiscountPercentage,
                 'outright_discount_amount' => $outrightDiscountAmount,
                 'product_breakdown' => $productBreakdown,
+                'product_line_items' => $productLineItems,
                 'installation_fee' => $installationFee,
                 'material_cost' => $materialCost,
                 'delivery_fee' => $deliveryFee,
@@ -1357,11 +1418,14 @@ class OrderController extends Controller
     public function getBuyNowOrder($id)
     {
         try {
-            $order = Order::with(['items.itemable', 'deliveryAddress', 'bundle', 'product', 'user'])
+            $order = Order::with(['items.itemable', 'deliveryAddress', 'bundle', 'product', 'user:id,first_name,sur_name,email,phone'])
                 ->where('order_type', 'buy_now')
                 ->findOrFail($id);
 
-            return ResponseHelper::success($order, 'Buy Now order retrieved successfully');
+            return ResponseHelper::success(
+                $this->formatOrder($order, ['user' => $order->user]),
+                'Buy Now order retrieved successfully'
+            );
         } catch (Exception $e) {
             Log::error('Buy Now Order Admin Error: ' . $e->getMessage());
             return ResponseHelper::error('Failed to retrieve Buy Now order', 500);
@@ -1839,6 +1903,182 @@ class OrderController extends Controller
     }
 
     /**
+     * @param  \Illuminate\Support\Collection<int, OrderItem>|\Illuminate\Database\Eloquent\Collection<int, OrderItem>  $orderItems
+     * @return array<int, array{name: string, description: string, quantity: int, price: float, type?: string}>
+     */
+    private function buildOrderSummaryItemsFromOrderItems($orderItems): array
+    {
+        $items = [];
+
+        foreach ($orderItems as $orderItem) {
+            $itemable = $orderItem->itemable;
+            if (! $itemable) {
+                continue;
+            }
+
+            if ($itemable instanceof Bundles) {
+                $itemable->loadMissing(['bundleItems.product.category']);
+                $bundleItems = $itemable->bundleItems;
+                if ($bundleItems->isNotEmpty()) {
+                    foreach ($bundleItems as $bundleRow) {
+                        if (! $bundleRow->product) {
+                            continue;
+                        }
+                        $product = $bundleRow->product;
+                        $productDetails = [];
+                        try {
+                            if (method_exists($product, 'details') && $product->details) {
+                                $productDetails = $product->details->pluck('detail')->toArray();
+                            }
+                        } catch (\Exception $e) {
+                            Log::warning('Error getting product details: '.$e->getMessage());
+                        }
+
+                        $items[] = [
+                            'name' => $product->title ?? 'Unknown Product',
+                            'description' => ! empty($productDetails)
+                                ? implode(', ', $productDetails)
+                                : ($product->title ?? 'No description'),
+                            'quantity' => (int) ($bundleRow->quantity ?? 1) * max(1, (int) ($orderItem->quantity ?? 1)),
+                            'price' => $this->resolveCatalogUnitPrice($product),
+                            'type' => 'product',
+                        ];
+                    }
+
+                    continue;
+                }
+
+                $desc = trim((string) ($itemable->product_model ?? ''));
+                if ($desc === '') {
+                    $desc = trim((string) ($itemable->what_is_inside_bundle_text ?? $itemable->detailed_description ?? ''));
+                }
+                $items[] = [
+                    'name' => $itemable->title ?? 'Bundle',
+                    'description' => $desc !== '' ? $desc : ($itemable->title ?? 'Bundle'),
+                    'quantity' => max(1, (int) ($orderItem->quantity ?? 1)),
+                    'price' => (float) ($orderItem->unit_price ?? 0) > 0
+                        ? (float) $orderItem->unit_price
+                        : $this->resolveCatalogUnitPrice($itemable),
+                    'type' => 'bundle',
+                ];
+
+                continue;
+            }
+
+            if ($itemable instanceof Product) {
+                $productDetails = [];
+                try {
+                    if (method_exists($itemable, 'details') && $itemable->details) {
+                        $productDetails = $itemable->details->pluck('detail')->toArray();
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Error getting product details: '.$e->getMessage());
+                }
+
+                $qty = max(1, (int) ($orderItem->quantity ?? 1));
+                $unit = (float) ($orderItem->unit_price ?? 0);
+                if ($unit <= 0) {
+                    $unit = $this->resolveCatalogUnitPrice($itemable);
+                }
+
+                $items[] = [
+                    'name' => $itemable->title ?? 'Unknown Product',
+                    'description' => ! empty($productDetails)
+                        ? implode(', ', $productDetails)
+                        : ($itemable->title ?? 'No description'),
+                    'quantity' => $qty,
+                    'price' => round($unit, 2),
+                    'type' => 'product',
+                ];
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * @return array<int, array{name: string, description: string, quantity: int, price: float, type?: string}>
+     */
+    private function buildOrderSummaryItemsFromLoanSnapshot(Order $order): array
+    {
+        $order->loadMissing('loanApplication');
+        $application = $order->loanApplication;
+        if (! $application || ! is_array($application->order_items_snapshot)) {
+            return [];
+        }
+
+        $snapshot = $application->order_items_snapshot;
+        $bundleIds = collect($snapshot)
+            ->where('itemable_type', Bundles::class)
+            ->pluck('itemable_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $productIds = collect($snapshot)
+            ->where('itemable_type', Product::class)
+            ->pluck('itemable_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $bundleMap = ! empty($bundleIds)
+            ? Bundles::with(['bundleItems.product'])->whereIn('id', $bundleIds)->get()->keyBy('id')
+            : collect();
+        $productMap = ! empty($productIds)
+            ? Product::whereIn('id', $productIds)->get()->keyBy('id')
+            : collect();
+
+        $items = [];
+        foreach ($snapshot as $row) {
+            $itemableType = $row['itemable_type'] ?? null;
+            $itemableId = $row['itemable_id'] ?? null;
+            $qty = max(1, (int) ($row['quantity'] ?? 1));
+            $unitPrice = (float) ($row['unit_price'] ?? 0);
+            $subtotal = (float) ($row['subtotal'] ?? ($unitPrice * $qty));
+
+            if ($itemableType === Bundles::class && $itemableId && $bundleMap->has($itemableId)) {
+                $bundle = $bundleMap->get($itemableId);
+                $fakeItem = new OrderItem([
+                    'quantity' => $qty,
+                    'unit_price' => $unitPrice > 0 ? $unitPrice : $subtotal,
+                    'subtotal' => $subtotal > 0 ? $subtotal : $unitPrice * $qty,
+                ]);
+                $fakeItem->setRelation('itemable', $bundle);
+                $bundleComponentItems = $this->buildOrderSummaryItemsFromOrderItems(collect([$fakeItem]));
+                if (! empty($bundleComponentItems)) {
+                    $items = array_merge($items, $bundleComponentItems);
+                    continue;
+                }
+            }
+
+            $name = 'Item';
+            $type = null;
+            if ($itemableType === Bundles::class && $itemableId && $bundleMap->has($itemableId)) {
+                $bundle = $bundleMap->get($itemableId);
+                $name = $bundle->title ?? $bundle->name ?? $name;
+                $type = 'bundle';
+            } elseif ($itemableType === Product::class && $itemableId && $productMap->has($itemableId)) {
+                $product = $productMap->get($itemableId);
+                $name = $product->title ?? $product->name ?? $name;
+                $type = 'product';
+            }
+
+            $price = $unitPrice > 0 ? $unitPrice : ($qty > 0 ? round($subtotal / $qty, 2) : $subtotal);
+            $items[] = [
+                'name' => $name,
+                'description' => $name,
+                'quantity' => $qty,
+                'price' => round($price, 2),
+                'type' => $type,
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
      * Classify a bundle catalog line using category + product title (categories are often missing or generic).
      */
     private function classifyInvoiceBundleLineType(string $categoryTitle, string $productTitle): string
@@ -2091,6 +2331,89 @@ class OrderController extends Controller
     }
 
     /**
+     * @param  array<int, int>  $productIds
+     * @return array<int, array{product: Product, quantity: int, unit_price: float, line_total: float}>|null
+     */
+    private function resolveMultiProductCheckoutLines(array $productIds): ?array
+    {
+        $lines = [];
+
+        foreach ($productIds as $productId) {
+            $product = Product::find($productId);
+            if (! $product) {
+                return null;
+            }
+
+            $quantity = 1;
+            $unitPrice = $this->resolveCatalogUnitPrice($product);
+            $lineTotal = round($unitPrice * $quantity, 2);
+
+            $lines[] = [
+                'product' => $product,
+                'quantity' => $quantity,
+                'unit_price' => $unitPrice,
+                'line_total' => $lineTotal,
+            ];
+        }
+
+        return $lines;
+    }
+
+    /**
+     * @param  array<int, array{product: Product, quantity: int, unit_price: float, line_total: float}>  $multiProductLines
+     * @param  array<int, array{type: string, description: string, quantity: int, price: float}>|null  $bundleLineItemsOut
+     */
+    private function calculateMultiProductBreakdown(array $multiProductLines, float $chargedTotal, ?array &$bundleLineItemsOut = null): array
+    {
+        if ($bundleLineItemsOut !== null) {
+            $bundleLineItemsOut = [];
+        }
+
+        $breakdown = [
+            'solar_inverter' => ['quantity' => 0, 'price' => 0, 'description' => ''],
+            'solar_panels' => ['quantity' => 0, 'price' => 0, 'description' => ''],
+            'batteries' => ['quantity' => 0, 'price' => 0, 'description' => ''],
+        ];
+
+        $catalogTotal = round(array_sum(array_column($multiProductLines, 'line_total')), 2);
+        $chargedTotal = (float) $chargedTotal;
+
+        foreach ($multiProductLines as $line) {
+            $product = $line['product'];
+            $catalogLine = (float) $line['line_total'];
+            $scaledPrice = $catalogTotal > 0
+                ? round($chargedTotal * ($catalogLine / $catalogTotal), 2)
+                : round($chargedTotal / max(1, count($multiProductLines)), 2);
+
+            $singleBundleItems = null;
+            $singleBreakdown = $this->calculateProductBreakdown($product, null, $scaledPrice, $singleBundleItems);
+
+            foreach (['solar_inverter', 'solar_panels', 'batteries'] as $bucket) {
+                if ((float) ($singleBreakdown[$bucket]['price'] ?? 0) <= 0) {
+                    continue;
+                }
+
+                $breakdown[$bucket]['quantity'] += (int) ($singleBreakdown[$bucket]['quantity'] ?? 0);
+                $breakdown[$bucket]['price'] = round((float) $breakdown[$bucket]['price'] + (float) $singleBreakdown[$bucket]['price'], 2);
+                if ($breakdown[$bucket]['description'] === '' && ! empty($singleBreakdown[$bucket]['description'])) {
+                    $breakdown[$bucket]['description'] = (string) $singleBreakdown[$bucket]['description'];
+                }
+            }
+
+            if ($bundleLineItemsOut !== null) {
+                $bundleLineItemsOut[] = [
+                    'type' => 'product',
+                    'description' => (string) ($product->title ?? 'Product'),
+                    'quantity' => (int) $line['quantity'],
+                    'price' => $scaledPrice,
+                ];
+            }
+        }
+
+        return $breakdown;
+    }
+
+    /**
      * GET /api/orders/{id}/summary
      * Get order summary with item details, appliances, backup time
      */
@@ -2128,14 +2451,28 @@ class OrderController extends Controller
             [$resolvedProduct, $resolvedBundle] = $this->resolveOrderBundleAndProductForInvoice($order);
 
             $items = [];
-            $appliances = 'Standard household appliances';
-            $backupTime = '8-12 hours (depending on usage)';
+            $appliances = null;
+            $backupTime = null;
+
+            $order->loadMissing(['items.itemable']);
+            $persistedItems = $this->buildOrderSummaryItemsFromOrderItems($order->items);
 
             try {
-                if ($resolvedBundle) {
+                if (count($persistedItems) > 0) {
+                    $items = $persistedItems;
+                    foreach ($order->items as $orderItem) {
+                        if ($orderItem->itemable instanceof Bundles) {
+                            $bundle = $orderItem->itemable;
+                            if (isset($bundle->total_output) && $bundle->total_output) {
+                                $backupTime = $this->calculateBackupTime($bundle->total_output, $bundle->total_load ?? 1000);
+                            }
+                            break;
+                        }
+                    }
+                } elseif ($resolvedBundle) {
                     $bundle = $resolvedBundle;
                     $bundleItems = $bundle->bundleItems()->with('product.category')->get();
-                    
+
                     foreach ($bundleItems as $item) {
                         if ($item->product) {
                             $productDetails = [];
@@ -2144,19 +2481,19 @@ class OrderController extends Controller
                                     $productDetails = $item->product->details->pluck('detail')->toArray();
                                 }
                             } catch (\Exception $e) {
-                                Log::warning('Error getting product details: ' . $e->getMessage());
+                                Log::warning('Error getting product details: '.$e->getMessage());
                             }
 
                             $items[] = [
                                 'name' => $item->product->title ?? 'Unknown Product',
-                                'description' => !empty($productDetails) ? implode(', ', $productDetails) : ($item->product->title ?? 'No description'),
+                                'description' => ! empty($productDetails) ? implode(', ', $productDetails) : ($item->product->title ?? 'No description'),
                                 'quantity' => $item->quantity ?? 1,
-                        'price' => $this->resolveCatalogUnitPrice($item->product),
+                                'price' => $this->resolveCatalogUnitPrice($item->product),
+                                'type' => 'product',
                             ];
                         }
                     }
 
-                    // Calculate backup time based on bundle specs
                     if (isset($bundle->total_output) && $bundle->total_output) {
                         $backupTime = $this->calculateBackupTime($bundle->total_output, $bundle->total_load ?? 1000);
                     }
@@ -2168,40 +2505,29 @@ class OrderController extends Controller
                             $productDetails = $product->details->pluck('detail')->toArray();
                         }
                     } catch (\Exception $e) {
-                        Log::warning('Error getting product details: ' . $e->getMessage());
+                        Log::warning('Error getting product details: '.$e->getMessage());
                     }
 
                     $items[] = [
                         'name' => $product->title ?? 'Unknown Product',
-                        'description' => !empty($productDetails) ? implode(', ', $productDetails) : ($product->title ?? 'No description'),
+                        'description' => ! empty($productDetails) ? implode(', ', $productDetails) : ($product->title ?? 'No description'),
                         'quantity' => 1,
                         'price' => $this->resolveCatalogUnitPrice($product),
+                        'type' => 'product',
                     ];
                 } else {
-                    // If no product or bundle, try to get items from order_items
-                    try {
-                        $orderItems = $order->items()->with('itemable')->get();
-                        foreach ($orderItems as $orderItem) {
-                            if ($orderItem->itemable) {
-                                $itemName = $orderItem->itemable->title ?? 'Unknown Item';
-                                $items[] = [
-                                    'name' => $itemName,
-                                    'description' => $itemName,
-                                    'quantity' => $orderItem->quantity ?? 1,
-                                    'price' => $orderItem->unit_price ?? 0,
-                                ];
-                            }
-                        }
-                    } catch (\Exception $e) {
-                        Log::warning('Error getting order items: ' . $e->getMessage());
-                    }
+                    $items = $this->buildOrderSummaryItemsFromLoanSnapshot($order);
                 }
             } catch (\Exception $e) {
-                Log::error('Error processing order items: ' . $e->getMessage(), [
+                Log::error('Error processing order items: '.$e->getMessage(), [
                     'order_id' => $order->id,
-                    'trace' => $e->getTraceAsString()
+                    'trace' => $e->getTraceAsString(),
                 ]);
-                // Continue with empty items array rather than failing completely
+            }
+
+            if (count($items) === 0) {
+                $appliances = 'Standard household appliances';
+                $backupTime = '8-12 hours (depending on usage)';
             }
 
             // Bundle linked but no component rows — still show the selected bundle as one line
@@ -2238,12 +2564,21 @@ class OrderController extends Controller
             return ResponseHelper::success([
                 'order_id' => $order->id,
                 'order_number' => $order->order_number ?? null,
+                'order_type' => $order->order_type ?? null,
                 'items' => $items,
                 'appliances' => $appliances,
                 'backup_time' => $backupTime,
                 'total_price' => $order->total_price ?? 0,
+                'product_price' => Schema::hasColumn('orders', 'product_price') ? (float) ($order->product_price ?? 0) : null,
+                'installation_fee' => Schema::hasColumn('orders', 'installation_price') ? (float) ($order->installation_price ?? 0) : null,
+                'material_cost' => Schema::hasColumn('orders', 'material_cost') ? (float) ($order->material_cost ?? 0) : null,
+                'delivery_fee' => Schema::hasColumn('orders', 'delivery_fee') ? (float) ($order->delivery_fee ?? 0) : null,
+                'inspection_fee' => Schema::hasColumn('orders', 'inspection_fee') ? (float) ($order->inspection_fee ?? 0) : null,
+                'insurance_fee' => Schema::hasColumn('orders', 'insurance_fee') ? (float) ($order->insurance_fee ?? 0) : null,
+                'vat_amount' => Schema::hasColumn('orders', 'vat_amount') ? (float) ($order->vat_amount ?? 0) : null,
                 'bundle_title' => $resolvedBundle?->title ?? $order->bundle?->title,
                 'product_title' => $resolvedProduct?->title ?? $order->product?->title,
+                'product_category' => $order->loanApplication?->product_category,
                 'delivery_address' => $this->formatDeliveryAddressForApi($order->deliveryAddress, $order->user),
                 'installation_requested_date' => $installationRequested,
             ], 'Order summary retrieved successfully');
@@ -2348,7 +2683,7 @@ class OrderController extends Controller
             }
 
             [$product, $bundle] = $this->resolveOrderBundleAndProductForInvoice($order);
-            
+
             // Calculate total price for breakdown
             $totalPrice = 0;
             if (Schema::hasColumn('orders', 'product_price') && $order->product_price) {
@@ -2358,12 +2693,40 @@ class OrderController extends Controller
             }
 
             $bundleLineItems = [];
-            $productBreakdown = $this->calculateProductBreakdown(
-                $product,
-                $bundle,
-                (float) $totalPrice,
-                $bundleLineItems
-            );
+            $order->loadMissing(['items.itemable']);
+            $productOrderItems = $order->items->filter(fn ($row) => $row->itemable instanceof Product)->values();
+
+            if ($productOrderItems->count() > 1) {
+                $multiLines = [];
+                foreach ($productOrderItems as $orderItem) {
+                    $multiLines[] = [
+                        'product' => $orderItem->itemable,
+                        'quantity' => max(1, (int) ($orderItem->quantity ?? 1)),
+                        'unit_price' => (float) ($orderItem->unit_price ?? 0),
+                        'line_total' => (float) ($orderItem->subtotal ?? 0) > 0
+                            ? (float) $orderItem->subtotal
+                            : (float) ($orderItem->unit_price ?? 0) * max(1, (int) ($orderItem->quantity ?? 1)),
+                    ];
+                }
+                $productBreakdown = $this->calculateMultiProductBreakdown($multiLines, (float) $totalPrice, $bundleLineItems);
+            } elseif ($productOrderItems->count() === 1) {
+                $only = $productOrderItems->first();
+                $product = $only->itemable;
+                $bundle = null;
+                $productBreakdown = $this->calculateProductBreakdown(
+                    $product,
+                    null,
+                    (float) $totalPrice,
+                    $bundleLineItems
+                );
+            } else {
+                $productBreakdown = $this->calculateProductBreakdown(
+                    $product,
+                    $bundle,
+                    (float) $totalPrice,
+                    $bundleLineItems
+                );
+            }
 
             $installationRequested = null;
             if (Schema::hasColumn('orders', 'installation_requested_date') && $order->installation_requested_date) {

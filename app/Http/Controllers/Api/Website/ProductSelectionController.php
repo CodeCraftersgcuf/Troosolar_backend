@@ -9,6 +9,7 @@ use App\Models\Category;
 use App\Models\Material;
 use App\Models\MaterialCategory;
 use App\Models\Product;
+use App\Support\ProductMaterialPricing;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -74,6 +75,17 @@ class ProductSelectionController extends Controller
                 $products = $this->filterProductsByGroup($retryQuery->get(), $normalizedGroup);
             }
 
+            if ($normalizedGroup === 'inverter-only' && $products->isEmpty()) {
+                $this->seedInverterProductsFromMaterials();
+
+                $retryQuery = Product::query()->with(['details', 'images', 'reviews.user', 'category']);
+                $this->applyPublicAvailabilityFilters($retryQuery);
+                $retryQuery->orderByDisplayProminence();
+                $products = $this->filterProductsByGroup($retryQuery->get(), $normalizedGroup);
+            }
+
+            ProductMaterialPricing::syncPricesFromMaterials($products);
+
             return ResponseHelper::success($products, 'Products fetched successfully.');
         } catch (Exception $e) {
             return ResponseHelper::error('Failed to fetch products for this group.', 500);
@@ -98,7 +110,6 @@ class ProductSelectionController extends Controller
             $products = $query->get();
 
             // Self-heal for categories that were historically uploaded under materials/wrong category.
-            // For All-In-One, retag existing matching products and seed from material category "C".
             if ($products->isEmpty() && $this->isAllInOneCategoryTitle((string) $category->title)) {
                 $this->syncAllInOneProductsForCategory((int) $categoryId);
 
@@ -109,6 +120,8 @@ class ProductSelectionController extends Controller
                 $retryQuery->orderByDisplayProminence();
                 $products = $retryQuery->get();
             }
+
+            ProductMaterialPricing::syncPricesFromMaterials($products);
 
             return ResponseHelper::success($products, 'Products fetched by category.');
         } catch (Exception $e) {
@@ -219,13 +232,74 @@ class ProductSelectionController extends Controller
             ->get();
 
         foreach ($materials as $material) {
+            $existing = Product::query()->where('title', $material->name)->first();
+            $price = ProductMaterialPricing::priceFromMaterial($material, $existing);
+
             Product::updateOrCreate(
                 ['title' => $material->name],
                 [
                     'category_id' => $batteryProductCategory->id,
                     'brand_id' => $defaultBrand->id,
-                    'price' => 1000.00,
-                    'discount_price' => 1000.00,
+                    'price' => $price,
+                    'discount_price' => $price,
+                    'stock' => 'In Stock',
+                    'installation_price' => 0.00,
+                    'top_deal' => false,
+                    'installation_compulsory' => false,
+                    'is_available' => true,
+                    'featured_image' => 'https://api.troosolar.com/storage/products/e212b55b-057a-4a39-8d80-d241169cdac0.png',
+                ]
+            );
+        }
+    }
+
+    private function seedInverterProductsFromMaterials(): void
+    {
+        $inverterProductCategory = Category::firstOrCreate(
+            ['title' => 'Solar Hybrid Inverters'],
+            ['icon' => null]
+        );
+
+        $defaultBrand = Brand::query()->where('category_id', $inverterProductCategory->id)->first()
+            ?? Brand::first();
+
+        if (! $defaultBrand) {
+            $defaultBrand = Brand::create([
+                'title' => 'Default Brand',
+                'category_id' => $inverterProductCategory->id,
+                'icon' => null,
+            ]);
+        }
+
+        $inverterMaterialCategoryIds = MaterialCategory::query()
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->where('code', 'B')
+                    ->orWhereRaw('LOWER(name) like ?', ['%inverter%']);
+            })
+            ->pluck('id')
+            ->all();
+
+        if (empty($inverterMaterialCategoryIds)) {
+            return;
+        }
+
+        $materials = Material::query()
+            ->whereIn('material_category_id', $inverterMaterialCategoryIds)
+            ->where('is_active', true)
+            ->get();
+
+        foreach ($materials as $material) {
+            $existing = Product::query()->where('title', $material->name)->first();
+            $price = ProductMaterialPricing::priceFromMaterial($material, $existing);
+
+            Product::updateOrCreate(
+                ['title' => $material->name],
+                [
+                    'category_id' => $inverterProductCategory->id,
+                    'brand_id' => $defaultBrand->id,
+                    'price' => $price,
+                    'discount_price' => $price,
                     'stock' => 'In Stock',
                     'installation_price' => 0.00,
                     'top_deal' => false,
@@ -306,17 +380,20 @@ class ProductSelectionController extends Controller
             ->get();
 
         foreach ($materials as $material) {
-            if (!$this->isAllInOneProductTitle((string) ($material->name ?? ''))) {
+            if (! $this->isAllInOneProductTitle((string) ($material->name ?? ''))) {
                 continue;
             }
+
+            $existing = Product::query()->where('title', $material->name)->first();
+            $price = ProductMaterialPricing::priceFromMaterial($material, $existing);
 
             Product::updateOrCreate(
                 ['title' => $material->name],
                 [
                     'category_id' => $categoryId,
                     'brand_id' => $defaultBrand->id,
-                    'price' => 1000.00,
-                    'discount_price' => 1000.00,
+                    'price' => $price,
+                    'discount_price' => $price,
                     'stock' => 'In Stock',
                     'installation_price' => 0.00,
                     'top_deal' => false,
