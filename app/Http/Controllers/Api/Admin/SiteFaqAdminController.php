@@ -33,6 +33,33 @@ class SiteFaqAdminController extends Controller
         return ResponseHelper::success($faqs, 'FAQs retrieved successfully');
     }
 
+    /**
+     * POST /admin/site/faqs/reorder
+     * Body: { "orders": [ { "id": 1, "sort_order": 1 }, ... ] }
+     */
+    public function reorder(Request $request)
+    {
+        if ($unauthorized = $this->ensureAdmin()) {
+            return $unauthorized;
+        }
+
+        $entries = $request->input('orders', []);
+        if (! is_array($entries) || $entries === []) {
+            return ResponseHelper::error('Invalid payload.', 422);
+        }
+
+        foreach ($entries as $entry) {
+            $id = $entry['id'] ?? null;
+            $order = $entry['sort_order'] ?? null;
+            if ($id === null || $order === null) {
+                continue;
+            }
+            SiteFaq::where('id', (int) $id)->update(['sort_order' => (int) $order]);
+        }
+
+        return ResponseHelper::success(null, 'FAQ order updated successfully');
+    }
+
     public function store(Request $request)
     {
         if ($unauthorized = $this->ensureAdmin()) {
@@ -46,10 +73,15 @@ class SiteFaqAdminController extends Controller
             'is_active' => 'nullable|boolean',
         ]);
 
+        $requestedOrder = isset($validated['sort_order']) ? (int) $validated['sort_order'] : 0;
+        $nextOrder = $requestedOrder > 0
+            ? $requestedOrder
+            : ((int) SiteFaq::max('sort_order')) + 1;
+
         $faq = SiteFaq::create([
             'question' => trim($validated['question']),
             'answer' => trim($validated['answer']),
-            'sort_order' => (int) ($validated['sort_order'] ?? 0),
+            'sort_order' => $nextOrder,
             'is_active' => array_key_exists('is_active', $validated)
                 ? (bool) $validated['is_active']
                 : true,

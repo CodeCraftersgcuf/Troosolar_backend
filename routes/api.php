@@ -501,6 +501,7 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
         Route::delete('/banner', [\App\Http\Controllers\Api\Admin\SiteBannerAdminController::class, 'destroy']);
 
         Route::get('/faqs', [\App\Http\Controllers\Api\Admin\SiteFaqAdminController::class, 'index']);
+        Route::post('/faqs/reorder', [\App\Http\Controllers\Api\Admin\SiteFaqAdminController::class, 'reorder']);
         Route::post('/faqs', [\App\Http\Controllers\Api\Admin\SiteFaqAdminController::class, 'store']);
         Route::put('/faqs/{id}', [\App\Http\Controllers\Api\Admin\SiteFaqAdminController::class, 'update']);
         Route::delete('/faqs/{id}', [\App\Http\Controllers\Api\Admin\SiteFaqAdminController::class, 'destroy']);

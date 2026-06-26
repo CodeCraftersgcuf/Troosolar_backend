@@ -25,7 +25,7 @@
     <div class="container">
         @include('emails.partials.brand_header', ['brandSubtitle' => 'Order Update'])
 
-        <h1>Your order status has been updated</h1>
+        <h1>{{ \App\Support\MailBrand::heading('Your order status has been updated') }}</h1>
 
         <p>Hello {{ trim($user->first_name . ' ' . $user->sur_name) }},</p>
 

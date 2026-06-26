@@ -19,7 +19,7 @@
     <div class="container">
         @include('emails.partials.brand_header', ['brandSubtitle' => 'Verification'])
 
-        <h2>Your OTP code</h2>
+        <h2>{{ \App\Support\MailBrand::heading('Your OTP code') }}</h2>
 
         @if(isset($first_name) && !empty($first_name))
             <p>Hi {{ $first_name }},</p>

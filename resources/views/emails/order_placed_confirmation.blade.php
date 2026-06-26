@@ -24,7 +24,7 @@
     <div class="container">
         @include('emails.partials.brand_header', ['brandSubtitle' => 'Order Confirmation'])
 
-        <h1>Your order is confirmed</h1>
+        <h1>{{ \App\Support\MailBrand::heading('Your order is confirmed') }}</h1>
 
         <p>Hello {{ trim($user->first_name . ' ' . $user->sur_name) }},</p>
 

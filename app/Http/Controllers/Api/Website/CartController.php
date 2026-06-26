@@ -120,12 +120,12 @@ class CartController extends Controller
                 $insuranceAmount = $includeInstallation
                     ? CheckoutPricing::insuranceAmountFromPercent(0.0, (float) $installationFull, $insPct)
                     : 0;
-                $taxableBase = (float) $itemsSubtotal + (float) $deliveryFee;
+                $vatAmount = CheckoutPricing::vatAmount(0.0, $vatPct);
+                $taxableBase = (float) $deliveryFee;
                 if ($includeInstallation) {
-                    $taxableBase += (float) $installationFull + (float) $insuranceAmount;
+                    $taxableBase += (float) $installationFull;
                 }
-                $vatAmount = CheckoutPricing::vatAmount($taxableBase, $vatPct);
-                $grandTotal = (int) round($taxableBase + (float) $vatAmount);
+                $grandTotal = (int) round($taxableBase + (float) $insuranceAmount + (float) $vatAmount);
 
                 return response()->json([
                     'status'  => 'success',
@@ -184,9 +184,7 @@ class CartController extends Controller
                 }
 
                 $catalogUnit = $this->resolveItemUnitPrice($item->itemable);
-                $unit = $outrightPct > 0
-                    ? $this->applyOutrightDiscount($catalogUnit, $outrightPct)
-                    : $catalogUnit;
+                $unit = (float) $catalogUnit;
                 $subtotal = round($unit * $qty, 2);
 
                 $product = $this->transformItemable($item->itemable);
@@ -203,11 +201,6 @@ class CartController extends Controller
                     'product'    => $product,           // <── full product/bundle details
                 ];
 
-                if ($outrightPct > 0 && $catalogUnit > $unit + 0.005) {
-                    $row['list_unit_price'] = round($catalogUnit, 2);
-                    $row['referral_outright_discount_percent'] = $outrightPct;
-                }
-
                 return $row;
             })->filter()->values();
 
@@ -223,19 +216,23 @@ class CartController extends Controller
             $installationFromProducts = CheckoutPricing::installationTotalFromCartItems($rawItems);
             $installationFull = $installationFromProducts + $installationFlatAddon;
 
-            // 3) Totals
-            $itemsSubtotal = (float) round($cartItems->sum('subtotal'), 2);
+            // 3) Totals — outright discount applies to items subtotal once (not per line); insurance on pre-discount subtotal.
+            $catalogItemsSubtotal = (float) round($cartItems->sum('subtotal'), 2);
+            $outrightDiscountAmount = $outrightPct > 0
+                ? round($catalogItemsSubtotal * ($outrightPct / 100), 2)
+                : 0.0;
+            $itemsSubtotalAfterDiscount = max(0, round($catalogItemsSubtotal - $outrightDiscountAmount, 2));
             $itemsCount    = (int) $cartItems->sum('quantity');
 
             $insuranceAmount = $includeInstallation
-                ? CheckoutPricing::insuranceAmountFromPercent((float) $itemsSubtotal, (float) $installationFull, $insPct)
+                ? CheckoutPricing::insuranceAmountFromPercent($catalogItemsSubtotal, (float) $installationFull, $insPct)
                 : 0;
-            $taxableBase = (float) $itemsSubtotal + (float) $deliveryFee;
+            $vatAmount = CheckoutPricing::vatAmount((float) $itemsSubtotalAfterDiscount, $vatPct);
+            $taxableBase = (float) $itemsSubtotalAfterDiscount + (float) $deliveryFee;
             if ($includeInstallation) {
-                $taxableBase += (float) $installationFull + (float) $insuranceAmount;
+                $taxableBase += (float) $installationFull;
             }
-            $vatAmount = CheckoutPricing::vatAmount($taxableBase, $vatPct);
-            $grandTotal = (int) round($taxableBase + (float) $vatAmount);
+            $grandTotal = (int) round($taxableBase + (float) $insuranceAmount + (float) $vatAmount);
 
             // 4) Addresses (+ contact name fallback to account holder)
             $viewer = Auth::user();
@@ -281,13 +278,17 @@ class CartController extends Controller
                     'cart' => [
                         'items'       => $cartItems,
                         'items_count' => $itemsCount,
-                        'items_total' => $itemsSubtotal,
+                        'items_total' => $catalogItemsSubtotal,
                     ],
                     'addresses' => $addresses,
                     'delivery' => $delivery,
                     'installation' => $installation,
                     'totals' => [
-                        'items_total' => $itemsSubtotal,
+                        'items_total' => $catalogItemsSubtotal,
+                        'items_subtotal_before_discount' => $catalogItemsSubtotal,
+                        'outright_discount_percentage' => $outrightPct,
+                        'outright_discount_amount' => $outrightDiscountAmount,
+                        'items_subtotal_after_discount' => $itemsSubtotalAfterDiscount,
                         'delivery' => $deliveryFee,
                         'installation_products' => $installationFromProducts,
                         'installation_flat_addon' => $installationFlatAddon,

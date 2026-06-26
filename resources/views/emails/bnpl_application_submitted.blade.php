@@ -17,7 +17,7 @@
     <div class="container">
         @include('emails.partials.brand_header', ['brandSubtitle' => \App\Support\MailBrand::BNPL_LABEL . ' Application'])
 
-        <h2>Application submitted</h2>
+        <h2>{{ \App\Support\MailBrand::heading('Application submitted') }}</h2>
         <p>Hello {{ trim(($user->first_name ?? '') . ' ' . ($user->sur_name ?? '')) ?: 'Customer' }},</p>
 
         <p>Your {{ \App\Support\MailBrand::BNPL_LABEL }} application has been submitted successfully.</p>

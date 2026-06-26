@@ -388,10 +388,7 @@ class OrderController extends Controller
             $fqcn = $itemable instanceof Product ? Product::class : Bundles::class;
 
             $catalogUnit = $this->resolveCatalogUnitPrice($itemable);
-            $effectiveUnit = $isOutrightCheckout
-                ? $this->applyOutrightDiscount($catalogUnit, $outrightDiscountPercentage)
-                : $catalogUnit;
-            $unit = (float) $effectiveUnit;
+            $unit = (float) $catalogUnit;
             $qty      = max(1, (int) $ci->quantity);
             $subtotal = (float) round($unit * $qty, 2);
 
@@ -441,16 +438,21 @@ class OrderController extends Controller
         }
 
         // 5) Persist totals (+ delivery / optional installation + insurance % + VAT)
-        $itemsSubtotalOrder = (float) $total;
-        $insuranceFee = $includeInstallation
-            ? (float) CheckoutPricing::insuranceAmountFromPercent($itemsSubtotalOrder, $installationSumFull, $insPct)
+        $catalogItemsSubtotal = (float) $total;
+        $outrightDiscountAmount = $applyOutrightDiscount && $outrightDiscountPercentage > 0
+            ? round($catalogItemsSubtotal * ($outrightDiscountPercentage / 100), 2)
             : 0.0;
-        $taxableBase = $itemsSubtotalOrder + $deliveryFee;
+        $itemsSubtotalAfterDiscount = max(0, round($catalogItemsSubtotal - $outrightDiscountAmount, 2));
+
+        $insuranceFee = $includeInstallation
+            ? (float) CheckoutPricing::insuranceAmountFromPercent($catalogItemsSubtotal, $installationSumFull, $insPct)
+            : 0.0;
+        $vatAmount = (float) CheckoutPricing::vatAmount((float) $itemsSubtotalAfterDiscount, $vatPct);
+        $taxableBase = $itemsSubtotalAfterDiscount + $deliveryFee;
         if ($includeInstallation) {
-            $taxableBase += $installationSumFull + $insuranceFee;
+            $taxableBase += $installationSumFull;
         }
-        $vatAmount = (float) CheckoutPricing::vatAmount((float) $taxableBase, $vatPct);
-        $orderTotal = round($taxableBase + $vatAmount, 2);
+        $orderTotal = round($taxableBase + $insuranceFee + $vatAmount, 2);
 
         $updatePayload = [
             'total_price' => $orderTotal,
@@ -673,7 +675,7 @@ class OrderController extends Controller
             return (float) ($i['subtotal'] ?? 0);
         }, $items));
 
-        // Receipt: pre-discount catalog subtotal vs charged (same idea as cart checkout-summary).
+        // Receipt: pre-discount catalog subtotal vs charged (order-level discount, not per-line).
         $catalogItemsSubtotal = 0.0;
         $hasListPrices = false;
         foreach ($items as $i) {
@@ -690,6 +692,23 @@ class OrderController extends Controller
         $onlineCheckoutDiscount = 0.0;
         if ($hasListPrices) {
             $onlineCheckoutDiscount = max(0.0, round($catalogItemsSubtotal - $itemsSubtotalSum, 2));
+        }
+        if (
+            $onlineCheckoutDiscount <= 0.005
+            && ($order->order_type ?? null) === 'buy_now'
+            && Schema::hasColumn('orders', 'product_price')
+            && $catalogItemsSubtotal > 0
+        ) {
+            $discountedProducts = (float) ($order->product_price ?? 0);
+            $buyNowDiscount = max(0.0, round($catalogItemsSubtotal - $discountedProducts, 2));
+            if ($buyNowDiscount > 0.005) {
+                $onlineCheckoutDiscount = $buyNowDiscount;
+            }
+        }
+
+        $itemsSubtotalAfterDiscount = $itemsSubtotalSum;
+        if ($onlineCheckoutDiscount > 0.005) {
+            $itemsSubtotalAfterDiscount = max(0.0, round($catalogItemsSubtotal - $onlineCheckoutDiscount, 2));
         }
 
         $vatAmount = Schema::hasColumn('orders', 'vat_amount') ? (float) ($order->vat_amount ?? 0) : 0.0;
@@ -709,8 +728,8 @@ class OrderController extends Controller
             'created_at'       => optional($order->created_at)->format('Y-m-d H:i:s'),
             'delivery_address' => $order->relationLoaded('deliveryAddress') ? $order->deliveryAddress : null,
             'items'            => $items,
-            'items_subtotal'   => round($itemsSubtotalSum, 2),
-            'catalog_items_subtotal' => $hasListPrices ? round($catalogItemsSubtotal, 2) : null,
+            'items_subtotal'   => round($itemsSubtotalAfterDiscount, 2),
+            'catalog_items_subtotal' => $catalogItemsSubtotal > 0.005 ? round($catalogItemsSubtotal, 2) : null,
             'online_checkout_discount_amount' => $onlineCheckoutDiscount > 0.005 ? round($onlineCheckoutDiscount, 2) : null,
             'delivery_fee'     => $order->delivery_fee,
             'insurance_fee'    => $order->insurance_fee,
@@ -1132,13 +1151,15 @@ class OrderController extends Controller
                 return ResponseHelper::error('Either product_id, product_ids, bundle_id, or amount is required. Please provide one of them in your request.', 422);
             }
 
+            $itemsSubtotal = round((float) $catalogTotalBeforeDiscount, 2);
+
             $settings = ReferralSettings::getSettings();
             $outrightDiscountPercentage = (float) ($settings->outright_discount_percentage ?? 0);
             $outrightDiscountAmount = 0.0;
-            if ($outrightDiscountPercentage > 0 && $productPrice > 0) {
-                $outrightDiscountAmount = round(($productPrice * $outrightDiscountPercentage) / 100, 2);
-                $productPrice = max(0, $productPrice - $outrightDiscountAmount);
+            if ($outrightDiscountPercentage > 0 && $itemsSubtotal > 0) {
+                $outrightDiscountAmount = round(($itemsSubtotal * $outrightDiscountPercentage) / 100, 2);
             }
+            $itemsSubtotalAfterDiscount = max(0, round($itemsSubtotal - $outrightDiscountAmount, 2));
 
             // Delivery / installation: admin checkout settings, bundle materials, or non-legacy location/state — never hardcoded ₦25k/₦50k.
             $checkoutSettings = CheckoutSetting::get();
@@ -1171,9 +1192,10 @@ class OrderController extends Controller
                 }
             }
 
-            // Insurance fee (optional for Buy Now, compulsory for BNPL)
+            // Insurance fee: % of catalog items subtotal (before outright discount), not after discount.
+            $insPct = (float) ($checkoutSettings->insurance_fee_percentage ?? config('checkout.insurance_fee_percentage', 3));
             if ($data['include_insurance'] ?? false) {
-                $insuranceFee = round($productPrice * 0.03, 2); // 3% of product price
+                $insuranceFee = round($itemsSubtotal * ($insPct / 100), 2);
             }
 
             // Calculate add-ons total
@@ -1186,7 +1208,7 @@ class OrderController extends Controller
                     $addOnPrice = $addOn->price;
                     // If price is 0, it might be calculated (like insurance)
                     if ($addOnPrice == 0 && strtolower($addOn->title) == 'insurance') {
-                        $addOnPrice = round($productPrice * 0.03, 2);
+                        $addOnPrice = round($itemsSubtotal * ($insPct / 100), 2);
                     }
                     $addOnsTotal += $addOnPrice;
                     $addOns[] = [
@@ -1198,14 +1220,14 @@ class OrderController extends Controller
                 }
             }
 
-            $total = $productPrice + $installationFee + $materialCost + $deliveryFee + $inspectionFee + $insuranceFee + $addOnsTotal;
+            $total = $itemsSubtotalAfterDiscount + $installationFee + $materialCost + $deliveryFee + $inspectionFee + $insuranceFee + $addOnsTotal;
 
             // Calculate product breakdown (inverter, panels, batteries)
             $_bundleLineItems = null;
             if (count($multiProductLines) > 0) {
-                $productBreakdown = $this->calculateMultiProductBreakdown($multiProductLines, $productPrice, $_bundleLineItems);
+                $productBreakdown = $this->calculateMultiProductBreakdown($multiProductLines, $itemsSubtotal, $_bundleLineItems);
             } else {
-                $productBreakdown = $this->calculateProductBreakdown($product, $bundle, $productPrice, $_bundleLineItems);
+                $productBreakdown = $this->calculateProductBreakdown($product, $bundle, $itemsSubtotal, $_bundleLineItems);
             }
 
             $productLineItems = array_map(static function (array $line) {
@@ -1248,7 +1270,7 @@ class OrderController extends Controller
             // Add optional columns only if they exist in the database
             $columnsToCheck = [
                 'order_type' => 'buy_now',
-                'product_price' => $productPrice,
+                'product_price' => $itemsSubtotalAfterDiscount,
                 'installation_price' => $installationFee,
                 'material_cost' => $materialCost,
                 'delivery_fee' => $deliveryFee,
@@ -1286,20 +1308,14 @@ class OrderController extends Controller
 
             // Line items for My Orders / GET /orders/{id} (legacy orders had empty order_items)
             if (count($multiProductLines) > 0) {
-                $lineCount = count($multiProductLines);
                 foreach ($multiProductLines as $line) {
-                    $catalogLine = (float) $line['line_total'];
-                    $chargedLine = $catalogTotalBeforeDiscount > 0
-                        ? round($productPrice * ($catalogLine / $catalogTotalBeforeDiscount), 2)
-                        : round($productPrice / max(1, $lineCount), 2);
-
                     OrderItem::create([
                         'order_id' => $order->id,
                         'itemable_type' => Product::class,
                         'itemable_id' => $line['product']->id,
                         'quantity' => (int) $line['quantity'],
-                        'unit_price' => $chargedLine,
-                        'subtotal' => $chargedLine,
+                        'unit_price' => round((float) $line['unit_price'], 2),
+                        'subtotal' => round((float) $line['line_total'], 2),
                     ]);
                 }
             } elseif ($productId && $product) {
@@ -1308,8 +1324,8 @@ class OrderController extends Controller
                     'itemable_type' => Product::class,
                     'itemable_id'   => $product->id,
                     'quantity'      => 1,
-                    'unit_price'    => round($total, 2),
-                    'subtotal'      => round($total, 2),
+                    'unit_price'    => round($itemsSubtotal, 2),
+                    'subtotal'      => round($itemsSubtotal, 2),
                 ]);
             } elseif ($bundleId && $bundle) {
                 OrderItem::create([
@@ -1317,14 +1333,15 @@ class OrderController extends Controller
                     'itemable_type' => Bundles::class,
                     'itemable_id'   => $bundle->id,
                     'quantity'      => 1,
-                    'unit_price'    => round($total, 2),
-                    'subtotal'      => round($total, 2),
+                    'unit_price'    => round($itemsSubtotal, 2),
+                    'subtotal'      => round($itemsSubtotal, 2),
                 ]);
             }
 
             $invoice = [
                 'order_id' => $order->id,
-                'product_price' => $productPrice,
+                'product_price' => $itemsSubtotalAfterDiscount,
+                'items_subtotal_before_discount' => $itemsSubtotal,
                 'outright_discount_percentage' => $outrightDiscountPercentage,
                 'outright_discount_amount' => $outrightDiscountAmount,
                 'product_breakdown' => $productBreakdown,
@@ -2699,31 +2716,56 @@ class OrderController extends Controller
 
             [$product, $bundle] = $this->resolveOrderBundleAndProductForInvoice($order);
 
-            // Calculate total price for breakdown
-            $totalPrice = 0;
-            if (Schema::hasColumn('orders', 'product_price') && $order->product_price) {
-                $totalPrice = $order->product_price;
-            } else {
-                $totalPrice = $order->total_price ?? 0;
-            }
-
-            $bundleLineItems = [];
             $order->loadMissing(['items.itemable']);
             $productOrderItems = $order->items->filter(fn ($row) => $row->itemable instanceof Product)->values();
 
+            $catalogItemsSubtotal = 0.0;
+            $productLineItems = [];
+            if ($productOrderItems->count() > 0) {
+                foreach ($productOrderItems as $orderItem) {
+                    $qty = max(1, (int) ($orderItem->quantity ?? 1));
+                    $catalogUnit = $orderItem->itemable
+                        ? $this->resolveCatalogUnitPrice($orderItem->itemable)
+                        : (float) ($orderItem->unit_price ?? 0);
+                    $lineTotal = round($catalogUnit * $qty, 2);
+                    $catalogItemsSubtotal += $lineTotal;
+                    $productLineItems[] = [
+                        'product_id' => $orderItem->itemable_id,
+                        'description' => (string) ($orderItem->itemable->title ?? 'Product'),
+                        'quantity' => $qty,
+                        'unit' => 'Nos',
+                        'rate' => round($catalogUnit, 2),
+                        'total_cost' => $lineTotal,
+                    ];
+                }
+                $catalogItemsSubtotal = round($catalogItemsSubtotal, 2);
+            } elseif (Schema::hasColumn('orders', 'product_price') && $order->product_price) {
+                $catalogItemsSubtotal = (float) $order->product_price;
+            } else {
+                $catalogItemsSubtotal = (float) ($order->total_price ?? 0);
+            }
+
+            $itemsSubtotalAfterDiscount = Schema::hasColumn('orders', 'product_price') && $order->product_price !== null
+                ? (float) $order->product_price
+                : $catalogItemsSubtotal;
+            $outrightDiscountAmount = max(0.0, round($catalogItemsSubtotal - $itemsSubtotalAfterDiscount, 2));
+
+            $bundleLineItems = [];
             if ($productOrderItems->count() > 1) {
                 $multiLines = [];
                 foreach ($productOrderItems as $orderItem) {
+                    $qty = max(1, (int) ($orderItem->quantity ?? 1));
+                    $catalogUnit = $orderItem->itemable
+                        ? $this->resolveCatalogUnitPrice($orderItem->itemable)
+                        : (float) ($orderItem->unit_price ?? 0);
                     $multiLines[] = [
                         'product' => $orderItem->itemable,
-                        'quantity' => max(1, (int) ($orderItem->quantity ?? 1)),
-                        'unit_price' => (float) ($orderItem->unit_price ?? 0),
-                        'line_total' => (float) ($orderItem->subtotal ?? 0) > 0
-                            ? (float) $orderItem->subtotal
-                            : (float) ($orderItem->unit_price ?? 0) * max(1, (int) ($orderItem->quantity ?? 1)),
+                        'quantity' => $qty,
+                        'unit_price' => $catalogUnit,
+                        'line_total' => round($catalogUnit * $qty, 2),
                     ];
                 }
-                $productBreakdown = $this->calculateMultiProductBreakdown($multiLines, (float) $totalPrice, $bundleLineItems);
+                $productBreakdown = $this->calculateMultiProductBreakdown($multiLines, $catalogItemsSubtotal, $bundleLineItems);
             } elseif ($productOrderItems->count() === 1) {
                 $only = $productOrderItems->first();
                 $product = $only->itemable;
@@ -2731,14 +2773,14 @@ class OrderController extends Controller
                 $productBreakdown = $this->calculateProductBreakdown(
                     $product,
                     null,
-                    (float) $totalPrice,
+                    $catalogItemsSubtotal,
                     $bundleLineItems
                 );
             } else {
                 $productBreakdown = $this->calculateProductBreakdown(
                     $product,
                     $bundle,
-                    (float) $totalPrice,
+                    $catalogItemsSubtotal,
                     $bundleLineItems
                 );
             }
@@ -2762,12 +2804,15 @@ class OrderController extends Controller
                     'solar_panels' => $productBreakdown['solar_panels'],
                     'batteries' => $productBreakdown['batteries'],
                     'bundle_line_items' => $bundleLineItems,
+                    'product_line_items' => $productLineItems,
                     'material_cost' => (Schema::hasColumn('orders', 'material_cost') ? ($order->material_cost ?? 0) : 0),
                     'installation_fee' => $order->installation_price ?? 0,
                     'delivery_fee' => (Schema::hasColumn('orders', 'delivery_fee') ? ($order->delivery_fee ?? 0) : 0),
                     'inspection_fee' => (Schema::hasColumn('orders', 'inspection_fee') ? ($order->inspection_fee ?? 0) : 0),
                     'insurance_fee' => (Schema::hasColumn('orders', 'insurance_fee') ? ($order->insurance_fee ?? 0) : 0),
-                    'subtotal' => $totalPrice,
+                    'items_subtotal_before_discount' => $catalogItemsSubtotal,
+                    'outright_discount_amount' => $outrightDiscountAmount > 0.005 ? $outrightDiscountAmount : null,
+                    'subtotal' => $itemsSubtotalAfterDiscount,
                     'total' => $order->total_price ?? 0,
                 ],
             ], 'Invoice details retrieved successfully');

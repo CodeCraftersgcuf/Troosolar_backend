@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your order has been delivered</title>
+    <title>{{ \App\Support\MailBrand::heading('Your order has been delivered') }}</title>
     <style>
         body { font-family: Arial, Helvetica, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
         .container { background-color: #f5f7ff; border-radius: 12px; padding: 32px; margin: 20px 0; border: 1px solid #e2e8f0; overflow: hidden; }
@@ -22,7 +22,7 @@
     <div class="container">
         @include('emails.partials.brand_header', ['brandSubtitle' => 'Order Delivered'])
 
-        <h1>Thank you — your order is delivered</h1>
+        <h1>{{ \App\Support\MailBrand::heading('Thank you — your order is delivered') }}</h1>
 
         <p>Hello {{ trim($user->first_name . ' ' . $user->sur_name) }},</p>
 

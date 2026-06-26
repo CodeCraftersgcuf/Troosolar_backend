@@ -47,19 +47,19 @@ class BNPLStatusEmail extends Mailable
 
         if ($status === 'approved') {
             $this->subjectLine = "Your {$bnpl} application has been approved – Troosolar";
-            $this->headingText = 'Congratulations! Your loan has been approved';
+            $this->headingText = MailBrand::heading('Congratulations! Your loan has been approved');
             $this->bodyText = "Your {$bnpl} application has been approved. Please complete your initial deposit to confirm your order and proceed with your purchase.";
         } elseif ($status === 'counter_offer') {
             $this->subjectLine = "You have a counter offer on your {$bnpl} application – Troosolar";
-            $this->headingText = "Counter offer on your {$bnpl} application";
+            $this->headingText = MailBrand::heading("Counter offer on your {$bnpl} application");
             $this->bodyText = "We have sent you a counter offer on your {$bnpl} application. Please log in to review the terms and accept or decline.";
         } elseif ($status === 'installation_date_rejected') {
             $this->subjectLine = 'Installation date – please choose another date – Troosolar';
-            $this->headingText = 'Installation date could not be confirmed';
+            $this->headingText = MailBrand::heading('Installation date could not be confirmed');
             $this->bodyText = "Your requested installation date could not be confirmed. Please log in to your {$bnpl} loan page and book another date. Choose a date at least 72 hours from today; Sundays are not available.";
         } else {
             $this->subjectLine = "Update on your {$bnpl} application – Troosolar";
-            $this->headingText = "Update on your {$bnpl} application";
+            $this->headingText = MailBrand::heading("Update on your {$bnpl} application");
             $this->bodyText = "We are unable to approve your {$bnpl} application at this time. Thank you for your interest in Troosolar.";
         }
     }

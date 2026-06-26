@@ -25,6 +25,9 @@
         .detail-label, .detail-value { display: table-cell; padding: 6px 0; font-size: 13px; vertical-align: top; }
         .detail-label { color: #6b7280; width: 42%; padding-right: 12px; }
         .detail-value { color: #111827; font-weight: 600; }
+        .property-list { margin-top: 4px; }
+        .property-line { font-size: 13px; margin: 8px 0; color: #111827; line-height: 1.55; }
+        .property-label { color: #374151; font-weight: 600; }
         .status-pill { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #dbeafe; color: #1e40af; text-transform: capitalize; }
         .summary-card { background: #fff; border: 1px solid #d1fae5; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
         .summary-card table { width: 100%; border-collapse: collapse; }
@@ -66,7 +69,7 @@
 <div class="wrap">
     @include('emails.partials.brand_header')
     <div class="header">
-        <h1>Loan application for credit evaluation</h1>
+        <h1>{{ \App\Support\MailBrand::heading('Loan application for credit evaluation') }}</h1>
         <p>Application #{{ $app['id'] ?? $loanApplication->id }} · Troosolar</p>
     </div>
 
@@ -81,7 +84,7 @@
 
         {{-- Application overview --}}
         <div class="section section-blue">
-            <h2>Application overview</h2>
+            <h2>{{ \App\Support\MailBrand::heading('Application overview') }}</h2>
             <div class="detail-table">
                 <div class="detail-row">
                     <div class="detail-label">Application ID</div>
@@ -139,7 +142,7 @@
 
         {{-- Customer --}}
         <div class="section section-white">
-            <h2>Customer details</h2>
+            <h2>{{ \App\Support\MailBrand::heading('Customer details') }}</h2>
             <div class="detail-table">
                 @if(!empty($customer['full_name']))
                 <div class="detail-row">
@@ -178,7 +181,7 @@
         {{-- Ordered items table --}}
         @if(count($ordered['lines'] ?? []) > 0)
         <div class="section section-white">
-            <h2>Product / bundle ordered</h2>
+            <h2>{{ \App\Support\MailBrand::heading('Product / bundle ordered') }}</h2>
             <table class="items-table">
                 <thead>
                     <tr>
@@ -206,47 +209,41 @@
 
         {{-- Property --}}
         <div class="section section-white">
-            <h2>Property</h2>
-            <div class="detail-table">
-                <div class="detail-row">
-                    <div class="detail-label">State</div>
-                    <div class="detail-value">{{ $property['state'] ?? '—' }}</div>
-                </div>
-                <div class="detail-row">
-                    <div class="detail-label">Address</div>
-                    <div class="detail-value">{{ $property['address'] ?? '—' }}</div>
-                </div>
-                @if(!empty($currentPowerSources))
-                <div class="detail-row">
-                    <div class="detail-label">Current power sources</div>
-                    <div class="detail-value">{{ $currentPowerSources }}</div>
-                </div>
-                @endif
-                @if(!empty($property['floors']))
-                <div class="detail-row">
-                    <div class="detail-label">Floors</div>
-                    <div class="detail-value">{{ $property['floors'] }}</div>
-                </div>
-                @endif
-                @if(!empty($property['rooms']))
-                <div class="detail-row">
-                    <div class="detail-label">Rooms</div>
-                    <div class="detail-value">{{ $property['rooms'] }}</div>
-                </div>
-                @endif
-                <div class="detail-row">
-                    <div class="detail-label">Gated estate</div>
-                    <div class="detail-value">{{ !empty($property['is_gated_estate']) ? 'Yes' : 'No' }}</div>
-                </div>
+            <h2>{{ \App\Support\MailBrand::heading('Property') }}</h2>
+            <div class="property-list">
+                <p class="property-line">
+                    <span class="property-label">State:</span>
+                    {{ $property['state'] ?? '—' }}
+                </p>
+                <p class="property-line">
+                    <span class="property-label">Address:</span>
+                    {{ $property['address'] ?? '—' }}
+                </p>
+                <p class="property-line">
+                    <span class="property-label">Current Power Sources:</span>
+                    {{ $currentPowerSources ?? '—' }}
+                </p>
+                <p class="property-line">
+                    <span class="property-label">Floors:</span>
+                    {{ isset($property['floors']) && $property['floors'] !== '' ? $property['floors'] : '—' }}
+                </p>
+                <p class="property-line">
+                    <span class="property-label">Rooms:</span>
+                    {{ isset($property['rooms']) && $property['rooms'] !== '' ? $property['rooms'] : '—' }}
+                </p>
+                <p class="property-line">
+                    <span class="property-label">Gated Estate:</span>
+                    {{ !empty($property['is_gated_estate']) ? 'Yes' : 'No' }}
+                </p>
                 @if(!empty($property['is_gated_estate']))
-                <div class="detail-row">
-                    <div class="detail-label">Estate name</div>
-                    <div class="detail-value">{{ $property['estate_name'] ?? '—' }}</div>
-                </div>
-                <div class="detail-row">
-                    <div class="detail-label">Estate address</div>
-                    <div class="detail-value">{{ $property['estate_address'] ?? '—' }}</div>
-                </div>
+                <p class="property-line">
+                    <span class="property-label">Estate name:</span>
+                    {{ $property['estate_name'] ?? '—' }}
+                </p>
+                <p class="property-line">
+                    <span class="property-label">Estate address:</span>
+                    {{ $property['estate_address'] ?? '—' }}
+                </p>
                 @endif
             </div>
         </div>
@@ -254,7 +251,7 @@
         {{-- Loan summary (matches admin BNPL view) --}}
         @if(!empty($loanSummary))
         <div class="section section-green">
-            <h2 style="margin-bottom:16px;">Loan summary</h2>
+            <h2 style="margin-bottom:16px;">{{ \App\Support\MailBrand::heading('Loan summary') }}</h2>
             @foreach($loanSummary['rows'] as $row)
             <div class="summary-card">
                 <table>
@@ -282,7 +279,7 @@
 
         {{-- Credit check --}}
         <div class="section section-white">
-            <h2>Credit check &amp; identity</h2>
+            <h2>{{ \App\Support\MailBrand::heading('Credit check & identity') }}</h2>
             <div class="detail-table">
                 <div class="detail-row">
                     <div class="detail-label">Credit check method</div>
@@ -297,7 +294,7 @@
             </div>
 
             @if($showMono && count($monoSummary) > 0)
-            <h3>Mono calculation</h3>
+            <h3>{{ \App\Support\MailBrand::heading('Mono calculation') }}</h3>
             <div class="detail-table">
                 @foreach($monoSummary as $line)
                 <div class="detail-row">
@@ -308,7 +305,7 @@
             </div>
             @endif
 
-            <h3>Linked bank account</h3>
+            <h3>{{ \App\Support\MailBrand::heading('Linked bank account') }}</h3>
             @if($linkAccount)
             <div class="detail-table">
                 <div class="detail-row">
@@ -332,7 +329,7 @@
         {{-- Beneficiary --}}
         @if(!empty($beneficiary['name']) || !empty($beneficiary['email']) || !empty($beneficiary['phone']))
         <div class="section section-white">
-            <h2>Beneficiary</h2>
+            <h2>{{ \App\Support\MailBrand::heading('Beneficiary') }}</h2>
             <div class="detail-table">
                 <div class="detail-row">
                     <div class="detail-label">Name</div>
@@ -357,7 +354,7 @@
         {{-- Guarantor --}}
         @if(!empty($guarantor))
         <div class="section section-white">
-            <h2>Guarantor</h2>
+            <h2>{{ \App\Support\MailBrand::heading('Guarantor') }}</h2>
             <div class="detail-table">
                 @if(!empty($guarantor['full_name']))
                 <div class="detail-row">
@@ -408,7 +405,7 @@
         {{-- Attachments (no file paths) --}}
         @if(count($kycAttachments) > 0)
         <div class="section section-white">
-            <h2>Documents attached</h2>
+            <h2>{{ \App\Support\MailBrand::heading('Documents attached') }}</h2>
             <ul class="attachments">
                 @foreach($kycAttachments as $doc)
                 <li>{{ $doc['label'] }}</li>
@@ -420,7 +417,7 @@
         {{-- Admin notes --}}
         @if(!empty($admin['notes']) || !empty($admin['counter_offer_min_deposit']) || !empty($admin['counter_offer_min_tenor']))
         <div class="section section-white">
-            <h2>Admin notes</h2>
+            <h2>{{ \App\Support\MailBrand::heading('Admin notes') }}</h2>
             <div class="detail-table">
                 @if(!empty($admin['notes']))
                 <div class="detail-row">

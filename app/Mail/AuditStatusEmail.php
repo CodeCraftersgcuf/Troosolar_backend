@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\AuditRequest;
 use App\Models\User;
+use App\Support\MailBrand;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -35,15 +36,15 @@ class AuditStatusEmail extends Mailable
 
         if ($status === 'approved') {
             $this->subjectLine = 'Your audit request has been approved - Troosolar';
-            $this->headingText = 'Your audit request has been approved';
+            $this->headingText = MailBrand::heading('Your audit request has been approved');
             $this->bodyText = 'Your '.$this->auditTypeLabel.' audit request has been approved. Our team will contact you to confirm the next steps and scheduling.';
         } elseif ($status === 'rejected') {
             $this->subjectLine = 'Update on your audit request - Troosolar';
-            $this->headingText = 'Your audit request was not approved';
+            $this->headingText = MailBrand::heading('Your audit request was not approved');
             $this->bodyText = 'We are unable to approve your '.$this->auditTypeLabel.' audit request at this time. If you have questions, please reply to this email or contact support.';
         } else {
             $this->subjectLine = 'Update on your audit request - Troosolar';
-            $this->headingText = 'Update on your audit request';
+            $this->headingText = MailBrand::heading('Update on your audit request');
             $this->bodyText = 'Your audit request status has been updated.';
         }
     }

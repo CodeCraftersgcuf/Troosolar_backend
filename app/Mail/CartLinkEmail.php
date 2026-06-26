@@ -69,11 +69,11 @@ class CartLinkEmail extends Mailable
         $bnpl = MailBrand::BNPL_LABEL;
         $buyNow = MailBrand::BUY_NOW_CUSTOM_ORDER_LABEL;
         $this->headline = $isBnpl
-            ? "Your {$bnpl} custom order is ready"
-            : "Your {$buyNow} is ready";
+            ? MailBrand::heading("Your {$bnpl} custom order is ready")
+            : MailBrand::heading("Your {$buyNow} is ready");
         $this->ctaLabel = $isBnpl
-            ? "Continue {$bnpl} application"
-            : "Open {$buyNow}";
+            ? MailBrand::heading("Continue {$bnpl} application")
+            : MailBrand::heading("Open {$buyNow}");
     }
 
     public function build()
