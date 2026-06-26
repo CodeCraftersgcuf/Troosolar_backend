@@ -62,7 +62,96 @@ class OrderController extends Controller
         return max(0, round($amount - (($amount * $pct) / 100), 2));
     }
 
-    /** Admin role can be stored as "admin", "Admin", etc. */
+    /**
+     * Resolve catalog subtotal, discount, fees, VAT, and grand total for order receipts / admin invoice.
+     *
+     * @return array<string, float|null>
+     */
+    private function resolveOrderPaymentBreakdown(Order $order, float $catalogItemsSubtotal): array
+    {
+        $settings = CheckoutSetting::get();
+        $vatPct = (float) ($settings->vat_percentage ?? config('checkout.vat_percentage', 7.5));
+
+        $delivery = (float) ($order->delivery_fee ?? 0);
+        $installation = (float) ($order->installation_price ?? 0);
+        $insurance = (float) ($order->insurance_fee ?? 0);
+        $material = Schema::hasColumn('orders', 'material_cost') ? (float) ($order->material_cost ?? 0) : 0.0;
+        $inspection = Schema::hasColumn('orders', 'inspection_fee') ? (float) ($order->inspection_fee ?? 0) : 0.0;
+        $fees = round($delivery + $installation + $insurance + $material + $inspection, 2);
+
+        $itemsAfter = $catalogItemsSubtotal;
+        if (Schema::hasColumn('orders', 'product_price') && $order->product_price !== null) {
+            $itemsAfter = (float) $order->product_price;
+        }
+
+        $vat = Schema::hasColumn('orders', 'vat_amount') ? (float) ($order->vat_amount ?? 0) : 0.0;
+        $storedTotal = (float) ($order->total_price ?? 0);
+        $discount = max(0.0, round($catalogItemsSubtotal - $itemsAfter, 2));
+
+        if ($storedTotal > 0) {
+            $postFees = round($storedTotal - $fees, 2);
+            if ($postFees > 0) {
+                $inferredAfter = round($postFees / (1 + ($vatPct / 100)), 2);
+                $inferredVat = (float) CheckoutPricing::vatAmount($inferredAfter, $vatPct);
+                if (abs($storedTotal - ($inferredAfter + $fees + $inferredVat)) < 1.0) {
+                    if ($discount <= 0.005 || abs($itemsAfter - $catalogItemsSubtotal) < 0.01) {
+                        $itemsAfter = $inferredAfter;
+                        $discount = max(0.0, round($catalogItemsSubtotal - $itemsAfter, 2));
+                    }
+                    if ($vat <= 0.005) {
+                        $vat = $inferredVat;
+                    }
+                } elseif ($discount <= 0.005 && $catalogItemsSubtotal > 0) {
+                    $inferredAfter = round($storedTotal - $fees - $vat, 2);
+                    if ($inferredAfter > 0 && $inferredAfter + 0.005 < $catalogItemsSubtotal) {
+                        $itemsAfter = $inferredAfter;
+                        $discount = round($catalogItemsSubtotal - $inferredAfter, 2);
+                    }
+                }
+            }
+
+            if ($vat <= 0.005 && $itemsAfter > 0) {
+                $expectedVat = (float) CheckoutPricing::vatAmount($itemsAfter, $vatPct);
+                if (abs($storedTotal - ($itemsAfter + $fees + $expectedVat)) < 1.0) {
+                    $vat = $expectedVat;
+                } elseif (abs($storedTotal - ($itemsAfter + $fees)) < 1.0 && $expectedVat > 0.005) {
+                    // Legacy rows: total_price stored pre-VAT while checkout charged VAT on items.
+                    $vat = $expectedVat;
+                }
+            }
+        }
+
+        $sumBeforeVat = round($itemsAfter + $fees, 2);
+        $grandTotal = $storedTotal > 0
+            ? $storedTotal
+            : round($sumBeforeVat + $vat, 2);
+
+        if ($storedTotal > 0 && $vat > 0.005 && abs($storedTotal - $sumBeforeVat) < 1.0) {
+            $grandTotal = round($sumBeforeVat + $vat, 2);
+        }
+
+        $discountPct = null;
+        if ($discount > 0.005 && $catalogItemsSubtotal > 0) {
+            $discountPct = round(100 * ($discount / $catalogItemsSubtotal), 2);
+        }
+
+        return [
+            'catalog_items_subtotal' => round($catalogItemsSubtotal, 2),
+            'outright_discount_amount' => $discount > 0.005 ? round($discount, 2) : 0.0,
+            'outright_discount_percentage' => $discountPct,
+            'items_subtotal_after_discount' => round($itemsAfter, 2),
+            'delivery_fee' => $delivery,
+            'installation_fee' => $installation,
+            'insurance_fee' => $insurance,
+            'material_cost' => $material,
+            'inspection_fee' => $inspection,
+            'fees_total' => $fees,
+            'sum_before_vat' => $sumBeforeVat,
+            'vat_amount' => round($vat, 2),
+            'vat_percentage' => $vatPct,
+            'grand_total' => round($grandTotal, 2),
+        ];
+    }
     private function isAuthenticatedAdmin(): bool
     {
         $user = Auth::user();
@@ -715,6 +804,23 @@ class OrderController extends Controller
         $settingsForVat = CheckoutSetting::get();
         $vatPctDisplay = (float) ($settingsForVat->vat_percentage ?? config('checkout.vat_percentage', 7.5));
 
+        $outrightDiscountPct = null;
+        if ($catalogItemsSubtotal > 0.005) {
+            $breakdown = $this->resolveOrderPaymentBreakdown($order, $catalogItemsSubtotal);
+            if (($order->order_type ?? null) === 'buy_now') {
+                $onlineCheckoutDiscount = (float) $breakdown['outright_discount_amount'];
+                $itemsSubtotalAfterDiscount = (float) $breakdown['items_subtotal_after_discount'];
+                $vatAmount = (float) $breakdown['vat_amount'];
+                $outrightDiscountPct = $breakdown['outright_discount_percentage'];
+            } elseif ($vatAmount <= 0.005 && (float) $breakdown['vat_amount'] > 0.005) {
+                $vatAmount = (float) $breakdown['vat_amount'];
+            }
+        }
+
+        if ($outrightDiscountPct === null && $onlineCheckoutDiscount > 0.005 && $catalogItemsSubtotal > 0) {
+            $outrightDiscountPct = round(100 * ($onlineCheckoutDiscount / $catalogItemsSubtotal), 2);
+        }
+
         $baseData = [
             'id'               => $order->id,
             'order_number'     => $order->order_number,
@@ -731,6 +837,11 @@ class OrderController extends Controller
             'items_subtotal'   => round($itemsSubtotalAfterDiscount, 2),
             'catalog_items_subtotal' => $catalogItemsSubtotal > 0.005 ? round($catalogItemsSubtotal, 2) : null,
             'online_checkout_discount_amount' => $onlineCheckoutDiscount > 0.005 ? round($onlineCheckoutDiscount, 2) : null,
+            'outright_discount_percentage' => $outrightDiscountPct,
+            'order_type'       => $order->order_type ?? null,
+            'product_price'    => Schema::hasColumn('orders', 'product_price') ? $order->product_price : null,
+            'material_cost'    => Schema::hasColumn('orders', 'material_cost') ? $order->material_cost : null,
+            'inspection_fee'   => Schema::hasColumn('orders', 'inspection_fee') ? $order->inspection_fee : null,
             'delivery_fee'     => $order->delivery_fee,
             'insurance_fee'    => $order->insurance_fee,
             'installation_price' => $order->installation_price,
@@ -959,10 +1070,13 @@ class OrderController extends Controller
     }
 
     $order->payment_status="paid";
+        if (Schema::hasColumn('orders', 'total_price')) {
+            $order->total_price = (float) $amount;
+        }
         if ($request->filled('installation_requested_date') && Schema::hasColumn('orders', 'installation_requested_date')) {
             $order->installation_requested_date = $request->installation_requested_date;
         }
-    $order->update();
+    $order->save();
 
         $transaction = $this->recordOrderPaymentTransactionAndReferral(
             $order,
@@ -1222,6 +1336,10 @@ class OrderController extends Controller
 
             $total = $itemsSubtotalAfterDiscount + $installationFee + $materialCost + $deliveryFee + $inspectionFee + $insuranceFee + $addOnsTotal;
 
+            $vatPct = (float) ($checkoutSettings->vat_percentage ?? config('checkout.vat_percentage', 7.5));
+            $vatAmount = (float) CheckoutPricing::vatAmount((float) $itemsSubtotalAfterDiscount, $vatPct);
+            $grandTotal = round($total + $vatAmount, 2);
+
             // Calculate product breakdown (inverter, panels, batteries)
             $_bundleLineItems = null;
             if (count($multiProductLines) > 0) {
@@ -1261,7 +1379,7 @@ class OrderController extends Controller
                 'user_id' => Auth::id(),
                 'product_id' => $productId,
                 'bundle_id' => $bundleId,
-                'total_price' => $total,
+                'total_price' => $grandTotal,
                 'payment_status' => 'pending',
                 'order_status' => 'pending',
                 'payment_method' => 'direct',
@@ -1276,6 +1394,7 @@ class OrderController extends Controller
                 'delivery_fee' => $deliveryFee,
                 'inspection_fee' => $inspectionFee,
                 'insurance_fee' => $insuranceFee,
+                'vat_amount' => $vatAmount,
             ];
 
             foreach ($columnsToCheck as $column => $value) {
@@ -1353,7 +1472,10 @@ class OrderController extends Controller
                 'insurance_fee' => $insuranceFee,
                 'add_ons_total' => $addOnsTotal,
                 'add_ons' => $addOns,
-                'total' => $total,
+                'total_before_vat' => $total,
+                'vat_amount' => $vatAmount,
+                'vat_percentage' => $vatPct,
+                'total' => $grandTotal,
                 'order_type' => 'buy_now',
                 'installer_choice' => $installerChoice,
                 'note' => ($installerChoice === 'troosolar') 
@@ -2750,6 +2872,10 @@ class OrderController extends Controller
                 : $catalogItemsSubtotal;
             $outrightDiscountAmount = max(0.0, round($catalogItemsSubtotal - $itemsSubtotalAfterDiscount, 2));
 
+            $paymentBreakdown = $this->resolveOrderPaymentBreakdown($order, $catalogItemsSubtotal);
+            $itemsSubtotalAfterDiscount = (float) $paymentBreakdown['items_subtotal_after_discount'];
+            $outrightDiscountAmount = (float) $paymentBreakdown['outright_discount_amount'];
+
             $bundleLineItems = [];
             if ($productOrderItems->count() > 1) {
                 $multiLines = [];
@@ -2805,15 +2931,20 @@ class OrderController extends Controller
                     'batteries' => $productBreakdown['batteries'],
                     'bundle_line_items' => $bundleLineItems,
                     'product_line_items' => $productLineItems,
-                    'material_cost' => (Schema::hasColumn('orders', 'material_cost') ? ($order->material_cost ?? 0) : 0),
-                    'installation_fee' => $order->installation_price ?? 0,
-                    'delivery_fee' => (Schema::hasColumn('orders', 'delivery_fee') ? ($order->delivery_fee ?? 0) : 0),
-                    'inspection_fee' => (Schema::hasColumn('orders', 'inspection_fee') ? ($order->inspection_fee ?? 0) : 0),
-                    'insurance_fee' => (Schema::hasColumn('orders', 'insurance_fee') ? ($order->insurance_fee ?? 0) : 0),
-                    'items_subtotal_before_discount' => $catalogItemsSubtotal,
+                    'material_cost' => $paymentBreakdown['material_cost'],
+                    'installation_fee' => $paymentBreakdown['installation_fee'],
+                    'delivery_fee' => $paymentBreakdown['delivery_fee'],
+                    'inspection_fee' => $paymentBreakdown['inspection_fee'],
+                    'insurance_fee' => $paymentBreakdown['insurance_fee'],
+                    'items_subtotal_before_discount' => $paymentBreakdown['catalog_items_subtotal'],
                     'outright_discount_amount' => $outrightDiscountAmount > 0.005 ? $outrightDiscountAmount : null,
+                    'outright_discount_percentage' => $paymentBreakdown['outright_discount_percentage'],
                     'subtotal' => $itemsSubtotalAfterDiscount,
-                    'total' => $order->total_price ?? 0,
+                    'sum_before_vat' => $paymentBreakdown['sum_before_vat'],
+                    'vat_amount' => (float) $paymentBreakdown['vat_amount'] > 0.005 ? $paymentBreakdown['vat_amount'] : null,
+                    'vat_percentage' => $paymentBreakdown['vat_percentage'],
+                    'grand_total' => $paymentBreakdown['grand_total'],
+                    'total' => $paymentBreakdown['grand_total'],
                 ],
             ], 'Invoice details retrieved successfully');
 
