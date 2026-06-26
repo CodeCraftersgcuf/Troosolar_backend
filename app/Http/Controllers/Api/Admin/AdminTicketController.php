@@ -12,6 +12,20 @@ use Illuminate\Http\Request;
 
 class AdminTicketController extends Controller
 {
+    private function userDisplayName(?User $user): string
+    {
+        if (! $user) {
+            return 'Unknown';
+        }
+
+        $name = trim((string) ($user->first_name ?? '').' '.(string) ($user->sur_name ?? ''));
+        if ($name !== '') {
+            return $name;
+        }
+
+        return (string) ($user->email ?? 'Unknown');
+    }
+
     // ✅ List all tickets
     public function index()
     {
@@ -22,7 +36,7 @@ class AdminTicketController extends Controller
                 ->map(function ($ticket) {
                     return [
                         'ticket_id' => $ticket->id,
-                        'user_name' => User::find($ticket->user_id)->first_name ,
+                        'user_name' => $this->userDisplayName($ticket->user),
                         'subject'   => $ticket->subject,
                         'status'    => $ticket->status,
                         'date'      => $ticket->created_at->format('Y-m-d H:i:s'),
@@ -56,7 +70,7 @@ class AdminTicketController extends Controller
             return ResponseHelper::success([
                 'ticket_id' => $ticket->id,
                 'subject'   => $ticket->subject,
-                'user_name' => $ticket->user?->name ?? 'Unknown',
+                'user_name' => $this->userDisplayName($ticket->user),
                 'status'    => $ticket->status,
                 'date'      => $ticket->created_at->format('Y-m-d H:i:s'),
                 'messages'  => $ticket->messages->map(function ($msg) {
