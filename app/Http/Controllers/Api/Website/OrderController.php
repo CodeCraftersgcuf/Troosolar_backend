@@ -1966,8 +1966,10 @@ class OrderController extends Controller
         $product = $order->product_id ? $order->product : null;
         $bundle = $order->bundle_id ? $order->bundle : null;
 
+        $bundleRelations = ['bundleItems.product.category', 'customServices', 'bundleMaterials.material'];
+
         if ($bundle) {
-            $bundle->loadMissing(['bundleItems.product.category']);
+            $bundle->loadMissing($bundleRelations);
         }
         if ($product) {
             $product->loadMissing('category');
@@ -1980,7 +1982,7 @@ class OrderController extends Controller
         foreach ($order->items as $orderItem) {
             $itemable = $orderItem->itemable;
             if ($itemable instanceof Bundles) {
-                $itemable->loadMissing(['bundleItems.product.category']);
+                $itemable->loadMissing($bundleRelations);
 
                 return [null, $itemable];
             }
@@ -2001,7 +2003,7 @@ class OrderController extends Controller
                     continue;
                 }
                 if (class_exists($type) && is_a($type, Bundles::class, true)) {
-                    $b = Bundles::with(['bundleItems.product.category'])->find((int) $oid);
+                    $b = Bundles::with($bundleRelations)->find((int) $oid);
                     if ($b) {
                         return [null, $b];
                     }
@@ -2172,7 +2174,7 @@ class OrderController extends Controller
             ->all();
 
         $bundleMap = ! empty($bundleIds)
-            ? Bundles::with(['bundleItems.product'])->whereIn('id', $bundleIds)->get()->keyBy('id')
+            ? Bundles::with(['bundleItems.product', 'customServices', 'bundleMaterials.material'])->whereIn('id', $bundleIds)->get()->keyBy('id')
             : collect();
         $productMap = ! empty($productIds)
             ? Product::whereIn('id', $productIds)->get()->keyBy('id')
@@ -2338,7 +2340,7 @@ class OrderController extends Controller
         $bundle->loadMissing(['bundleItems.product', 'customServices', 'bundleMaterials.material']);
 
         $customOrderItems = [];
-        foreach ($bundle->customServices ?? [] as $service) {
+        foreach ($bundle->customServices()->orderBy('id')->get() as $service) {
             $rawTitle = (string) ($service->title ?? '');
             if (! $this->isBundleOrderListServiceTitle($rawTitle)) {
                 continue;
@@ -2396,7 +2398,7 @@ class OrderController extends Controller
                     continue;
                 }
                 $name = trim((string) ($material->name ?? $material->title ?? ''));
-                if ($name === '' || $this->isBundleFeeMaterialName($name)) {
+                if ($name === '' || $this->isBundleFeeMaterialName($name) || ! $this->isBundleProductMaterialName($name)) {
                     continue;
                 }
                 $rate = (float) ($bm->rate_override ?? $material->selling_rate ?? $material->rate ?? 0);
@@ -2410,11 +2412,21 @@ class OrderController extends Controller
             }
         }
 
-        if (count($customOrderItems) === 0 && count($productRows) === 0) {
+        $orderListSource = count($customOrderItems) > 0 ? $customOrderItems : $productRows;
+
+        if (count($orderListSource) === 0) {
+            $orderListSource = $this->parseWhatIsInsideBundleTextLines($bundle->what_is_inside_bundle_text ?? null);
+        }
+
+        if (count($orderListSource) === 0) {
+            $orderListSource = $this->parseSystemCapacityDisplayProductLines($bundle->system_capacity_display ?? null);
+        }
+
+        if (count($orderListSource) === 0) {
             $bundleRate = $this->resolveCatalogUnitPrice($bundle);
             $bundleTitle = trim((string) ($bundle->title ?? $bundle->name ?? ''));
             if ($bundleTitle !== '' || $bundleRate > 0) {
-                $productRows[] = [
+                $orderListSource[] = [
                     'description' => $bundleTitle !== '' ? $bundleTitle : 'Solar bundle',
                     'quantity' => 1,
                     'unit' => 'Lots',
@@ -2424,27 +2436,7 @@ class OrderController extends Controller
             }
         }
 
-        $orderListSource = count($customOrderItems) > 0 ? $customOrderItems : $productRows;
-        $rows = [];
-
-        foreach ($orderListSource as $item) {
-            $unit = (string) ($item['unit'] ?? 'Nos');
-            $qtyApplies = (bool) ($item['quantity_applies'] ?? true);
-            $qty = max(1, (int) ($item['quantity'] ?? 1));
-            $multiplier = $qtyApplies ? ($unit === 'Lots' ? 1 : $qty) : 1;
-            $displayQty = $qtyApplies ? ($unit === 'Lots' ? 1 : $qty) : 1;
-            $rate = round((float) ($item['rate'] ?? 0), 2);
-            $rows[] = [
-                'product_id' => null,
-                'description' => (string) ($item['description'] ?? 'Item'),
-                'quantity' => $displayQty,
-                'unit' => $unit,
-                'rate' => $rate,
-                'total_cost' => round($rate * $multiplier, 2),
-            ];
-        }
-
-        return $rows;
+        return $this->formatBundleOrderListRows($orderListSource);
     }
 
     private function isBundleFeeMaterialName(string $name): bool
@@ -2454,6 +2446,120 @@ class OrderController extends Controller
         return str_contains($n, 'installation fee')
             || str_contains($n, 'delivery fee')
             || str_contains($n, 'inspection fee');
+    }
+
+    private function isBundleProductMaterialName(string $name): bool
+    {
+        $n = strtolower(trim($name));
+        if ($n === '') {
+            return false;
+        }
+
+        return str_contains($n, 'inverter')
+            || str_contains($n, 'battery')
+            || str_contains($n, 'solar panel');
+    }
+
+    /**
+     * Parse admin "what is inside" text (newline list) into order-list rows.
+     *
+     * @return array<int, array{description: string, quantity: int, unit: string, quantity_applies: bool, rate: float}>
+     */
+    private function parseWhatIsInsideBundleTextLines(?string $text): array
+    {
+        $text = trim((string) $text);
+        if ($text === '' || ! str_contains($text, "\n")) {
+            return [];
+        }
+
+        $rows = [];
+        foreach (preg_split('/\r\n|\r|\n/', $text) as $rawLine) {
+            $line = trim($rawLine);
+            if ($line === '' || strlen($line) > 240) {
+                continue;
+            }
+
+            if (preg_match('/^(\d+)\s+units?\s+of\s+(.+)$/i', $line, $matches)) {
+                $rows[] = [
+                    'description' => trim($matches[2]),
+                    'quantity' => max(1, (int) $matches[1]),
+                    'unit' => 'Nos',
+                    'quantity_applies' => true,
+                    'rate' => 0.0,
+                ];
+
+                continue;
+            }
+
+            $rows[] = [
+                'description' => $line,
+                'quantity' => 1,
+                'unit' => 'Nos',
+                'quantity_applies' => true,
+                'rate' => 0.0,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return array<int, array{description: string, quantity: int, unit: string, quantity_applies: bool, rate: float}>
+     */
+    private function parseSystemCapacityDisplayProductLines(?string $text): array
+    {
+        $text = trim((string) $text);
+        if ($text === '') {
+            return [];
+        }
+
+        $text = preg_replace('/\s*-\s*[^-]+$/', '', $text) ?? $text;
+        $parts = preg_split('/\s*,\s*|\s*&\s*/', $text) ?: [];
+        $rows = [];
+
+        foreach ($parts as $part) {
+            $part = trim($part);
+            if ($part === '' || ! $this->isBundleProductMaterialName($part)) {
+                continue;
+            }
+            $rows[] = [
+                'description' => $part,
+                'quantity' => 1,
+                'unit' => 'Nos',
+                'quantity_applies' => true,
+                'rate' => 0.0,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  array<int, array{description: string, quantity: int, unit: string, quantity_applies: bool, rate: float}>  $rows
+     * @return array<int, array{product_id: null, description: string, quantity: int, unit: string, rate: float, total_cost: float}>
+     */
+    private function formatBundleOrderListRows(array $rows): array
+    {
+        $formatted = [];
+
+        foreach ($rows as $item) {
+            $unit = (string) ($item['unit'] ?? 'Nos');
+            $qtyApplies = (bool) ($item['quantity_applies'] ?? true);
+            $qty = max(1, (int) ($item['quantity'] ?? 1));
+            $multiplier = $qtyApplies ? ($unit === 'Lots' ? 1 : $qty) : 1;
+            $displayQty = $qtyApplies ? ($unit === 'Lots' ? 1 : $qty) : 1;
+            $rate = round((float) ($item['rate'] ?? 0), 2);
+            $formatted[] = [
+                'product_id' => null,
+                'description' => (string) ($item['description'] ?? 'Item'),
+                'quantity' => $displayQty,
+                'unit' => $unit,
+                'rate' => $rate,
+                'total_cost' => round($rate * $multiplier, 2),
+            ];
+        }
+
+        return $formatted;
     }
 
     /**
@@ -3131,6 +3237,8 @@ class OrderController extends Controller
             $query = Order::with([
                 'product.category',
                 'bundle.bundleItems.product.category',
+                'bundle.customServices',
+                'bundle.bundleMaterials.material',
                 'deliveryAddress',
                 'user',
                 'items.itemable',
