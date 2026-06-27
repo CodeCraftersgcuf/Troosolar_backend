@@ -1334,11 +1334,15 @@ class OrderController extends Controller
                 }
             }
 
-            $total = $itemsSubtotalAfterDiscount + $installationFee + $materialCost + $deliveryFee + $inspectionFee + $insuranceFee + $addOnsTotal;
+            $serviceFeesTotal = round(
+                $installationFee + $materialCost + $deliveryFee + $inspectionFee + $addOnsTotal,
+                2
+            );
+            $totalAmount = round($itemsSubtotalAfterDiscount + $serviceFeesTotal, 2);
 
             $vatPct = (float) ($checkoutSettings->vat_percentage ?? config('checkout.vat_percentage', 7.5));
-            $vatAmount = (float) CheckoutPricing::vatAmount((float) $itemsSubtotalAfterDiscount, $vatPct);
-            $grandTotal = round($total + $vatAmount, 2);
+            $vatAmount = (float) CheckoutPricing::vatAmount((float) $totalAmount, $vatPct);
+            $grandTotal = round($totalAmount + $vatAmount + $insuranceFee, 2);
 
             // Calculate product breakdown (inverter, panels, batteries)
             $_bundleLineItems = null;
@@ -1480,7 +1484,8 @@ class OrderController extends Controller
                 'insurance_fee' => $insuranceFee,
                 'add_ons_total' => $addOnsTotal,
                 'add_ons' => $addOns,
-                'total_before_vat' => $total,
+                'total_before_vat' => $totalAmount,
+                'total_amount' => $totalAmount,
                 'vat_amount' => $vatAmount,
                 'vat_percentage' => $vatPct,
                 'total' => $grandTotal,
