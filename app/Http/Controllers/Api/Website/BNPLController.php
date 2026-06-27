@@ -28,6 +28,7 @@ use App\Services\ReferralRewardService;
 use App\Services\MonoService;
 use App\Models\MonoCreditCheckSession;
 use App\Models\UserMonoAccount;
+use App\Support\FrontendUrl;
 
 class BNPLController extends Controller
 {
@@ -1851,6 +1852,114 @@ class BNPLController extends Controller
             Log::error('BNPL mono credit status error: ' . $e->getMessage());
 
             return ResponseHelper::error('Failed to retrieve credit check status', 500);
+        }
+    }
+
+    /**
+     * POST /api/bnpl/credit-check-fee/mono/initiate
+     * Start Mono DirectPay for the BNPL credit check fee (linked account required).
+     */
+    public function initiateCreditCheckFeeMonoPay(Request $request, MonoService $monoService)
+    {
+        try {
+            $linked = UserMonoAccount::where('user_id', Auth::id())
+                ->where('status', 'linked')
+                ->first();
+
+            if (! $linked || ! $linked->mono_account_id) {
+                return ResponseHelper::error('Link your bank account with Mono before paying with Mono.', 422);
+            }
+
+            $settings = BnplSettings::first();
+            $fee = (float) ($settings->credit_check_fee ?? 1000);
+            $amountKobo = (int) round($fee * 100);
+            if ($amountKobo < 1) {
+                return ResponseHelper::error('Credit check fee is not configured.', 422);
+            }
+
+            $user = Auth::user();
+            $reference = 'bnpl_cc_fee_' . Auth::id() . '_' . time();
+
+            $customer = [
+                'email' => (string) ($user->email ?? ''),
+                'name' => trim(((string) ($user->first_name ?? '')) . ' ' . ((string) ($user->sur_name ?? ''))),
+            ];
+            if (! empty($user->phone)) {
+                $customer['phone'] = (string) $user->phone;
+            }
+
+            $payload = [
+                'amount' => $amountKobo,
+                'type' => 'onetime-debit',
+                'method' => 'account',
+                'account' => $linked->mono_account_id,
+                'description' => 'TrooSolar BNPL credit check fee',
+                'reference' => $reference,
+                'redirect_url' => FrontendUrl::base() . '/bnpl?step=10&mono_fee_ref=' . rawurlencode($reference),
+                'customer' => $customer,
+            ];
+
+            $bvn = preg_replace('/\s+/', '', trim((string) ($user->bvn ?? '')));
+            if ($bvn !== '') {
+                $payload['customer']['identity'] = [
+                    'type' => 'bvn',
+                    'number' => $bvn,
+                ];
+            }
+
+            $init = $monoService->initiateDirectPay($payload);
+            $data = is_array($init['data'] ?? null) ? $init['data'] : $init;
+            $paymentUrl = $data['payment_link']
+                ?? $data['mono_url']
+                ?? $data['url']
+                ?? $data['link']
+                ?? null;
+
+            if (! is_string($paymentUrl) || $paymentUrl === '') {
+                return ResponseHelper::error('Mono did not return a payment link. Please pay with Flutterwave or try again.', 502);
+            }
+
+            return ResponseHelper::success([
+                'payment_url' => $paymentUrl,
+                'reference' => $reference,
+                'amount' => $fee,
+            ], 'Mono payment initiated');
+        } catch (Exception $e) {
+            Log::error('BNPL credit check fee Mono initiate error: ' . $e->getMessage());
+
+            return ResponseHelper::error('Failed to initiate Mono payment: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * POST /api/bnpl/credit-check-fee/mono/verify
+     */
+    public function verifyCreditCheckFeeMonoPay(Request $request, MonoService $monoService)
+    {
+        try {
+            $data = $request->validate([
+                'reference' => 'required|string',
+            ]);
+
+            $reference = (string) $data['reference'];
+            if (! str_starts_with($reference, 'bnpl_cc_fee_' . Auth::id() . '_')) {
+                return ResponseHelper::error('Invalid payment reference.', 422);
+            }
+
+            $verified = $monoService->verifyDirectPay($reference);
+            $payload = is_array($verified['data'] ?? null) ? $verified['data'] : $verified;
+            $status = strtolower((string) ($payload['status'] ?? $verified['status'] ?? ''));
+
+            $paid = in_array($status, ['successful', 'success', 'completed', 'paid'], true);
+
+            return ResponseHelper::success([
+                'paid' => $paid,
+                'status' => $status ?: null,
+            ], $paid ? 'Payment verified' : 'Payment not completed yet');
+        } catch (Exception $e) {
+            Log::error('BNPL credit check fee Mono verify error: ' . $e->getMessage());
+
+            return ResponseHelper::error('Failed to verify Mono payment: ' . $e->getMessage(), 500);
         }
     }
 }

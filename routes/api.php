@@ -259,6 +259,8 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     Route::get('/bnpl/applications', [BNPLController::class, 'getApplications']); // List all user's BNPL applications
     Route::post('/bnpl/apply', [BNPLController::class, 'apply']);
     Route::post('/bnpl/process-credit-check', [BNPLController::class, 'processCreditCheck']);
+    Route::post('/bnpl/credit-check-fee/mono/initiate', [BNPLController::class, 'initiateCreditCheckFeeMonoPay']);
+    Route::post('/bnpl/credit-check-fee/mono/verify', [BNPLController::class, 'verifyCreditCheckFeeMonoPay']);
     Route::get('/bnpl/mono-credit-status/{session_id}', [BNPLController::class, 'monoCreditStatus']);
 
     // User Mono bank account (profile linking)

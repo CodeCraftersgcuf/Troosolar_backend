@@ -345,6 +345,27 @@ class MonoService
     }
 
     /**
+     * Initiate a one-time DirectPay debit (e.g. BNPL credit check fee).
+     *
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    public function initiateDirectPay(array $body): array
+    {
+        return $this->request('POST', '/v2/payments/initiate', $body);
+    }
+
+    /**
+     * Verify a DirectPay transaction by reference.
+     *
+     * @return array<string, mixed>
+     */
+    public function verifyDirectPay(string $reference): array
+    {
+        return $this->request('GET', '/v2/payments/verify/' . rawurlencode($reference));
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function request(string $method, string $path, array $body = [], array $query = []): array
