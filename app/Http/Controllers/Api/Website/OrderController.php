@@ -2389,6 +2389,41 @@ class OrderController extends Controller
             }
         }
 
+        if (count($productRows) === 0) {
+            foreach ($bundle->bundleMaterials ?? [] as $bm) {
+                $material = $bm->material;
+                if (! $material) {
+                    continue;
+                }
+                $name = trim((string) ($material->name ?? $material->title ?? ''));
+                if ($name === '' || $this->isBundleFeeMaterialName($name)) {
+                    continue;
+                }
+                $rate = (float) ($bm->rate_override ?? $material->selling_rate ?? $material->rate ?? 0);
+                $productRows[] = [
+                    'description' => $name,
+                    'quantity' => max(1, (int) ($bm->quantity ?? 1)),
+                    'unit' => 'Nos',
+                    'quantity_applies' => true,
+                    'rate' => $rate,
+                ];
+            }
+        }
+
+        if (count($customOrderItems) === 0 && count($productRows) === 0) {
+            $bundleRate = $this->resolveCatalogUnitPrice($bundle);
+            $bundleTitle = trim((string) ($bundle->title ?? $bundle->name ?? ''));
+            if ($bundleTitle !== '' || $bundleRate > 0) {
+                $productRows[] = [
+                    'description' => $bundleTitle !== '' ? $bundleTitle : 'Solar bundle',
+                    'quantity' => 1,
+                    'unit' => 'Lots',
+                    'quantity_applies' => false,
+                    'rate' => $bundleRate,
+                ];
+            }
+        }
+
         $orderListSource = count($customOrderItems) > 0 ? $customOrderItems : $productRows;
         $rows = [];
 
@@ -2406,6 +2441,51 @@ class OrderController extends Controller
                 'unit' => $unit,
                 'rate' => $rate,
                 'total_cost' => round($rate * $multiplier, 2),
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function isBundleFeeMaterialName(string $name): bool
+    {
+        $n = strtolower($name);
+
+        return str_contains($n, 'installation fee')
+            || str_contains($n, 'delivery fee')
+            || str_contains($n, 'inspection fee');
+    }
+
+    /**
+     * Invoice product rows for bundle / BNPL orders (order list, snapshot, or bundle title).
+     *
+     * @return array<int, array{product_id: null, description: string, quantity: int, unit: string, rate: float, total_cost: float}>
+     */
+    private function buildInvoiceProductLineItemsFromOrder(Order $order, ?Bundles $bundle): array
+    {
+        if ($bundle) {
+            $lines = $this->buildBundleOrderListLineItems($bundle);
+            if (count($lines) > 0) {
+                return $lines;
+            }
+        }
+
+        $summaryItems = $this->buildOrderSummaryItemsFromLoanSnapshot($order);
+        if (count($summaryItems) === 0) {
+            return [];
+        }
+
+        $rows = [];
+        foreach ($summaryItems as $item) {
+            $qty = max(1, (int) ($item['quantity'] ?? 1));
+            $rate = round((float) ($item['price'] ?? 0), 2);
+            $rows[] = [
+                'product_id' => null,
+                'description' => (string) ($item['name'] ?? $item['description'] ?? 'Item'),
+                'quantity' => $qty,
+                'unit' => 'Nos',
+                'rate' => $rate,
+                'total_cost' => round($rate * $qty, 2),
             ];
         }
 
@@ -2594,21 +2674,26 @@ class OrderController extends Controller
                     $hasBuiltLineItems = true;
                 }
             } else {
-                $breakdown['solar_inverter'] = [
-                    'quantity' => 1,
-                    'price' => round($totalPrice * 0.40, 2),
-                    'description' => 'Solar Inverter',
-                ];
-                $breakdown['solar_panels'] = [
-                    'quantity' => 1,
-                    'price' => round($totalPrice * 0.35, 2),
-                    'description' => 'Solar Panels',
-                ];
-                $breakdown['batteries'] = [
-                    'quantity' => 1,
-                    'price' => round($totalPrice * 0.25, 2),
-                    'description' => 'Batteries',
-                ];
+                $orderListLines = $this->buildBundleOrderListLineItems($bundle);
+                if (count($orderListLines) > 0) {
+                    if ($bundleLineItemsOut !== null) {
+                        foreach ($orderListLines as $row) {
+                            $bundleLineItemsOut[] = [
+                                'type' => 'other',
+                                'description' => (string) ($row['description'] ?? 'Item'),
+                                'quantity' => (int) ($row['quantity'] ?? 1),
+                                'price' => round((float) ($row['total_cost'] ?? 0), 2),
+                            ];
+                        }
+                    }
+                } else {
+                    $bundleTitle = trim((string) ($bundle->title ?? $bundle->name ?? ''));
+                    $breakdown['solar_inverter'] = [
+                        'quantity' => 1,
+                        'price' => round($totalPrice, 2),
+                        'description' => $bundleTitle !== '' ? $bundleTitle : 'Bundle',
+                    ];
+                }
             }
         } elseif ($product) {
             try {
@@ -3106,12 +3191,13 @@ class OrderController extends Controller
 
             if ($invoiceBundle) {
                 $invoiceBundle->loadMissing(['bundleItems.product', 'customServices', 'bundleMaterials.material']);
-                $bundleOrderLines = $this->buildBundleOrderListLineItems($invoiceBundle);
-                if (count($bundleOrderLines) > 0) {
-                    $productLineItems = $bundleOrderLines;
-                } elseif ($this->isGenericProductBreakdownLineItems($productLineItems)) {
-                    $productLineItems = [];
-                }
+            }
+
+            $bundleOrderLines = $this->buildInvoiceProductLineItemsFromOrder($order, $invoiceBundle);
+            if (count($bundleOrderLines) > 0) {
+                $productLineItems = $bundleOrderLines;
+            } elseif ($this->isGenericProductBreakdownLineItems($productLineItems)) {
+                $productLineItems = [];
             }
 
             $bundleLineItems = [];
