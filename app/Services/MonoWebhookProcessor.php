@@ -4,11 +4,16 @@ namespace App\Services;
 
 use App\Models\MonoCreditCheckSession;
 use App\Models\UserMonoAccount;
+use App\Services\MonoDirectDebitService;
 use App\Models\MonoWebhookEvent;
 use Illuminate\Support\Facades\Log;
 
 class MonoWebhookProcessor
 {
+    public function __construct(
+        private readonly MonoDirectDebitService $directDebitService
+    ) {}
+
     public function verifySecret(?string $headerSecret): bool
     {
         $expected = (string) config('services.mono.webhook_secret', '');
@@ -45,11 +50,15 @@ class MonoWebhookProcessor
         ]);
 
         try {
-            match ($event) {
-                'mono.events.account_connected' => $this->handleAccountConnected($data),
-                'mono.events.account_credit_worthiness' => $this->handleCreditWorthiness($data),
-                default => Log::info('Mono webhook ignored event', ['event' => $event]),
-            };
+            if (str_starts_with($event, 'events.mandates.') || str_contains($event, 'mandates.')) {
+                $this->directDebitService->handleMandateWebhook($event, $data);
+            } else {
+                match ($event) {
+                    'mono.events.account_connected' => $this->handleAccountConnected($data),
+                    'mono.events.account_credit_worthiness' => $this->handleCreditWorthiness($data),
+                    default => Log::info('Mono webhook ignored event', ['event' => $event]),
+                };
+            }
 
             $webhookEvent->update(['processed_at' => now()]);
         } catch (\Throwable $e) {

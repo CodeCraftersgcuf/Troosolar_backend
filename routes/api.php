@@ -261,6 +261,9 @@ Route::post('bundles/{bundle}/update', [BundleController::class, 'update'])
     Route::post('/bnpl/process-credit-check', [BNPLController::class, 'processCreditCheck']);
     Route::post('/bnpl/credit-check-fee/mono/initiate', [BNPLController::class, 'initiateCreditCheckFeeMonoPay']);
     Route::post('/bnpl/credit-check-fee/mono/verify', [BNPLController::class, 'verifyCreditCheckFeeMonoPay']);
+    Route::get('/bnpl/mandate/status/{mono_calculation_id}', [\App\Http\Controllers\Api\Website\MonoDirectDebitController::class, 'status']);
+    Route::post('/bnpl/mandate/initiate', [\App\Http\Controllers\Api\Website\MonoDirectDebitController::class, 'initiate']);
+    Route::post('/bnpl/installments/{installmentId}/mono-debit', [\App\Http\Controllers\Api\Website\MonoDirectDebitController::class, 'debitInstallment']);
     Route::get('/bnpl/mono-credit-status/{session_id}', [BNPLController::class, 'monoCreditStatus']);
 
     // User Mono bank account (profile linking)

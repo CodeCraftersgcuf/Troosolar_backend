@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Services\BnplLoanPlanCalculator;
 use App\Services\ReferralRewardService;
 use App\Services\MonoService;
+use App\Services\MonoDirectDebitService;
 use App\Models\MonoCreditCheckSession;
 use App\Models\UserMonoAccount;
 use App\Support\FrontendUrl;
@@ -1419,6 +1420,16 @@ class BNPLController extends Controller
                 'repayment_duration' => $order->monoCalculation->repayment_duration,
                 'interest_rate' => $order->monoCalculation->interest_rate,
             ] : null;
+
+            if ($order->mono_calculation_id) {
+                $directDebit = app(MonoDirectDebitService::class);
+                $mandate = $directDebit->findMandateForCalculation((int) $order->mono_calculation_id, (int) $userId);
+                if ($mandate) {
+                    $mandate = $directDebit->syncMandateFromMono($mandate);
+                }
+                $orderData['mono_calculation_id'] = (int) $order->mono_calculation_id;
+                $orderData['mono_debit_mandate'] = $directDebit->formatMandateSummary($mandate);
+            }
 
             return ResponseHelper::success($orderData, 'BNPL order details retrieved successfully');
 

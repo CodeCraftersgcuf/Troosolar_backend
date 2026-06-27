@@ -366,6 +366,49 @@ class MonoService
     }
 
     /**
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    public function initiateDirectDebitMandate(array $body): array
+    {
+        return $this->request('POST', '/v2/payments/initiate', $body);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function retrieveMandate(string $mandateId): array
+    {
+        return $this->request('GET', '/v3/payments/mandates/' . rawurlencode($mandateId));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function mandateBalanceInquiry(string $mandateId): array
+    {
+        return $this->request('GET', '/v3/payments/mandates/' . rawurlencode($mandateId) . '/balance-inquiry');
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    public function debitMandateAccount(string $mandateId, array $body): array
+    {
+        return $this->request('POST', '/v3/payments/mandates/' . rawurlencode($mandateId) . '/debit', $body);
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    public function createCustomer(array $body): array
+    {
+        return $this->request('POST', '/v2/customers', $body);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function request(string $method, string $path, array $body = [], array $query = []): array

@@ -11,6 +11,7 @@ class UserMonoAccount extends Model
         'user_id',
         'mono_account_id',
         'mono_customer_id',
+        'mono_dd_customer_id',
         'bank_name',
         'account_name',
         'account_number_last4',
