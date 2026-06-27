@@ -1371,7 +1371,15 @@ class OrderController extends Controller
             }
 
             if (count($productLineItems) === 0) {
-                $productLineItems = $this->productLineItemsFromBreakdown($productBreakdown);
+                if ($bundle) {
+                    $bundleOrderLines = $this->buildBundleOrderListLineItems($bundle, $installerChoice);
+                    if (count($bundleOrderLines) > 0) {
+                        $productLineItems = $bundleOrderLines;
+                    }
+                }
+                if (count($productLineItems) === 0) {
+                    $productLineItems = $this->productLineItemsFromBreakdown($productBreakdown);
+                }
             }
 
             // Prepare order data - check if columns exist before including them
@@ -2038,7 +2046,21 @@ class OrderController extends Controller
             }
 
             if ($itemable instanceof Bundles) {
-                $itemable->loadMissing(['bundleItems.product.category']);
+                $itemable->loadMissing(['bundleItems.product.category', 'customServices', 'bundleMaterials.material']);
+                $bundleOrderListItems = $this->buildOrderSummaryItemsFromBundleOrderList($itemable);
+                if (count($bundleOrderListItems) > 0) {
+                    $orderQty = max(1, (int) ($orderItem->quantity ?? 1));
+                    if ($orderQty > 1) {
+                        foreach ($bundleOrderListItems as &$bundleLine) {
+                            $bundleLine['quantity'] = (int) $bundleLine['quantity'] * $orderQty;
+                        }
+                        unset($bundleLine);
+                    }
+                    array_push($items, ...$bundleOrderListItems);
+
+                    continue;
+                }
+
                 $bundleItems = $itemable->bundleItems;
                 if ($bundleItems->isNotEmpty()) {
                     foreach ($bundleItems as $bundleRow) {
@@ -2232,6 +2254,201 @@ class OrderController extends Controller
         }
 
         return 'other';
+    }
+
+    private const BUNDLE_OL_PREFIX = '[OL]';
+
+    private const BUNDLE_OL_VIS_TROO = '[OL:TROOSOLAR]';
+
+    private const BUNDLE_OL_VIS_OWN = '[OL:OWN]';
+
+    private function isBundleOrderListServiceTitle(string $title): bool
+    {
+        return str_starts_with($title, self::BUNDLE_OL_PREFIX)
+            || str_starts_with($title, self::BUNDLE_OL_VIS_TROO)
+            || str_starts_with($title, self::BUNDLE_OL_VIS_OWN);
+    }
+
+    private function parseBundleOrderListVisibility(string $title): string
+    {
+        if (str_starts_with($title, self::BUNDLE_OL_VIS_TROO)) {
+            return 'troosolar';
+        }
+        if (str_starts_with($title, self::BUNDLE_OL_VIS_OWN)) {
+            return 'own';
+        }
+
+        return 'both';
+    }
+
+    private function stripBundleOrderListPrefix(string $title): string
+    {
+        if (str_starts_with($title, self::BUNDLE_OL_VIS_TROO)) {
+            return trim(substr($title, strlen(self::BUNDLE_OL_VIS_TROO)));
+        }
+        if (str_starts_with($title, self::BUNDLE_OL_VIS_OWN)) {
+            return trim(substr($title, strlen(self::BUNDLE_OL_VIS_OWN)));
+        }
+        if (str_starts_with($title, self::BUNDLE_OL_PREFIX)) {
+            return trim(substr($title, strlen(self::BUNDLE_OL_PREFIX)));
+        }
+
+        return trim($title);
+    }
+
+    private function parseBundleLineQuantityApplies(mixed $value): bool
+    {
+        if ($value === null || $value === '') {
+            return true;
+        }
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return ! in_array(strtolower(trim((string) $value)), ['false', '0', 'no', 'nil', 'n/a', 'na', 'not_applicable', 'not applicable'], true);
+    }
+
+    private function bundleOrderListVisibleForInstaller(string $visibility, ?string $installerChoice): bool
+    {
+        if ($installerChoice === null) {
+            return true;
+        }
+        if ($visibility === 'troosolar') {
+            return $installerChoice !== 'own';
+        }
+        if ($visibility === 'own') {
+            return $installerChoice === 'own';
+        }
+
+        return true;
+    }
+
+    /**
+     * Real bundle order-list rows (custom [OL] services and/or bundle products) for invoices and summaries.
+     *
+     * @return array<int, array{product_id: null, description: string, quantity: int, unit: string, rate: float, total_cost: float}>
+     */
+    private function buildBundleOrderListLineItems(Bundles $bundle, ?string $installerChoice = null): array
+    {
+        $bundle->loadMissing(['bundleItems.product', 'customServices', 'bundleMaterials.material']);
+
+        $customOrderItems = [];
+        foreach ($bundle->customServices ?? [] as $service) {
+            $rawTitle = (string) ($service->title ?? '');
+            if (! $this->isBundleOrderListServiceTitle($rawTitle)) {
+                continue;
+            }
+            $visibility = $this->parseBundleOrderListVisibility($rawTitle);
+            if (! $this->bundleOrderListVisibleForInstaller($visibility, $installerChoice)) {
+                continue;
+            }
+            $qtyApplies = $this->parseBundleLineQuantityApplies($service->quantity_applies ?? true);
+            $qty = max(1, (int) ($service->quantity ?? 1));
+            $unit = (string) ($service->unit ?? 'Nos');
+            $customOrderItems[] = [
+                'description' => $this->stripBundleOrderListPrefix($rawTitle),
+                'quantity' => $qty,
+                'unit' => $unit,
+                'quantity_applies' => $qtyApplies,
+                'rate' => (float) ($service->service_amount ?? 0),
+            ];
+        }
+
+        $productRows = [];
+        foreach ($bundle->bundleItems ?? [] as $bundleItem) {
+            $product = $bundleItem->product;
+            $name = $product?->title;
+            if (! $name) {
+                continue;
+            }
+            $rateOverride = (float) ($bundleItem->rate_override ?? 0);
+            $rate = $rateOverride > 0 ? $rateOverride : $this->resolveCatalogUnitPrice($product);
+            $productRows[] = [
+                'description' => (string) $name,
+                'quantity' => max(1, (int) ($bundleItem->quantity ?? 1)),
+                'unit' => 'Nos',
+                'quantity_applies' => true,
+                'rate' => $rate,
+            ];
+        }
+
+        if (count($productRows) === 0 && trim((string) ($bundle->product_model ?? '')) !== '') {
+            foreach (array_filter(array_map('trim', explode('/', (string) $bundle->product_model))) as $part) {
+                $productRows[] = [
+                    'description' => $part,
+                    'quantity' => 1,
+                    'unit' => 'Nos',
+                    'quantity_applies' => true,
+                    'rate' => 0.0,
+                ];
+            }
+        }
+
+        $orderListSource = count($customOrderItems) > 0 ? $customOrderItems : $productRows;
+        $rows = [];
+
+        foreach ($orderListSource as $item) {
+            $unit = (string) ($item['unit'] ?? 'Nos');
+            $qtyApplies = (bool) ($item['quantity_applies'] ?? true);
+            $qty = max(1, (int) ($item['quantity'] ?? 1));
+            $multiplier = $qtyApplies ? ($unit === 'Lots' ? 1 : $qty) : 1;
+            $displayQty = $qtyApplies ? ($unit === 'Lots' ? 1 : $qty) : 1;
+            $rate = round((float) ($item['rate'] ?? 0), 2);
+            $rows[] = [
+                'product_id' => null,
+                'description' => (string) ($item['description'] ?? 'Item'),
+                'quantity' => $displayQty,
+                'unit' => $unit,
+                'rate' => $rate,
+                'total_cost' => round($rate * $multiplier, 2),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  array<int, array{description?: string}>  $rows
+     */
+    private function isGenericProductBreakdownLineItems(array $rows): bool
+    {
+        if (count($rows) === 0) {
+            return false;
+        }
+
+        $generic = ['solar inverter', 'solar panels', 'battery', 'batteries'];
+        $matched = 0;
+
+        foreach ($rows as $row) {
+            $desc = strtolower(trim((string) ($row['description'] ?? '')));
+            foreach ($generic as $label) {
+                if ($desc === $label || str_starts_with($desc, $label)) {
+                    $matched++;
+                    break;
+                }
+            }
+        }
+
+        return $matched === count($rows) && $matched <= 3;
+    }
+
+    /**
+     * @return array<int, array{name: string, description: string, quantity: int, price: float, type: string}>
+     */
+    private function buildOrderSummaryItemsFromBundleOrderList(Bundles $bundle, ?string $installerChoice = null): array
+    {
+        $items = [];
+        foreach ($this->buildBundleOrderListLineItems($bundle, $installerChoice) as $line) {
+            $items[] = [
+                'name' => (string) ($line['description'] ?? 'Item'),
+                'description' => (string) ($line['description'] ?? 'Item'),
+                'quantity' => (int) ($line['quantity'] ?? 1),
+                'price' => (float) ($line['rate'] ?? 0),
+                'type' => 'product',
+            ];
+        }
+
+        return $items;
     }
 
     /**
@@ -2625,26 +2842,31 @@ class OrderController extends Controller
                     }
                 } elseif ($resolvedBundle) {
                     $bundle = $resolvedBundle;
-                    $bundleItems = $bundle->bundleItems()->with('product.category')->get();
+                    $bundle->loadMissing(['bundleItems.product.category', 'customServices', 'bundleMaterials.material']);
+                    $items = $this->buildOrderSummaryItemsFromBundleOrderList($bundle);
 
-                    foreach ($bundleItems as $item) {
-                        if ($item->product) {
-                            $productDetails = [];
-                            try {
-                                if (method_exists($item->product, 'details') && $item->product->details) {
-                                    $productDetails = $item->product->details->pluck('detail')->toArray();
+                    if (count($items) === 0) {
+                        $bundleItems = $bundle->bundleItems()->with('product.category')->get();
+
+                        foreach ($bundleItems as $item) {
+                            if ($item->product) {
+                                $productDetails = [];
+                                try {
+                                    if (method_exists($item->product, 'details') && $item->product->details) {
+                                        $productDetails = $item->product->details->pluck('detail')->toArray();
+                                    }
+                                } catch (\Exception $e) {
+                                    Log::warning('Error getting product details: '.$e->getMessage());
                                 }
-                            } catch (\Exception $e) {
-                                Log::warning('Error getting product details: '.$e->getMessage());
-                            }
 
-                            $items[] = [
-                                'name' => $item->product->title ?? 'Unknown Product',
-                                'description' => ! empty($productDetails) ? implode(', ', $productDetails) : ($item->product->title ?? 'No description'),
-                                'quantity' => $item->quantity ?? 1,
-                                'price' => $this->resolveCatalogUnitPrice($item->product),
-                                'type' => 'product',
-                            ];
+                                $items[] = [
+                                    'name' => $item->product->title ?? 'Unknown Product',
+                                    'description' => ! empty($productDetails) ? implode(', ', $productDetails) : ($item->product->title ?? 'No description'),
+                                    'quantity' => $item->quantity ?? 1,
+                                    'price' => $this->resolveCatalogUnitPrice($item->product),
+                                    'type' => 'product',
+                                ];
+                            }
                         }
                     }
 
@@ -2837,6 +3059,7 @@ class OrderController extends Controller
             }
 
             [$product, $bundle] = $this->resolveOrderBundleAndProductForInvoice($order);
+            $invoiceBundle = $bundle;
 
             $order->loadMissing(['items.itemable']);
             $productOrderItems = $order->items->filter(fn ($row) => $row->itemable instanceof Product)->values();
@@ -2876,6 +3099,16 @@ class OrderController extends Controller
             $itemsSubtotalAfterDiscount = (float) $paymentBreakdown['items_subtotal_after_discount'];
             $outrightDiscountAmount = (float) $paymentBreakdown['outright_discount_amount'];
 
+            if ($invoiceBundle) {
+                $invoiceBundle->loadMissing(['bundleItems.product', 'customServices', 'bundleMaterials.material']);
+                $bundleOrderLines = $this->buildBundleOrderListLineItems($invoiceBundle);
+                if (count($bundleOrderLines) > 0) {
+                    $productLineItems = $bundleOrderLines;
+                } elseif ($this->isGenericProductBreakdownLineItems($productLineItems)) {
+                    $productLineItems = [];
+                }
+            }
+
             $bundleLineItems = [];
             if ($productOrderItems->count() > 1) {
                 $multiLines = [];
@@ -2895,7 +3128,6 @@ class OrderController extends Controller
             } elseif ($productOrderItems->count() === 1) {
                 $only = $productOrderItems->first();
                 $product = $only->itemable;
-                $bundle = null;
                 $productBreakdown = $this->calculateProductBreakdown(
                     $product,
                     null,
@@ -2905,10 +3137,20 @@ class OrderController extends Controller
             } else {
                 $productBreakdown = $this->calculateProductBreakdown(
                     $product,
-                    $bundle,
+                    $invoiceBundle,
                     $catalogItemsSubtotal,
                     $bundleLineItems
                 );
+            }
+
+            $hasRealProductLines = count($productLineItems) > 0
+                && ! $this->isGenericProductBreakdownLineItems($productLineItems);
+            if ($hasRealProductLines) {
+                $productBreakdown = [
+                    'solar_inverter' => ['quantity' => 0, 'price' => 0, 'description' => ''],
+                    'solar_panels' => ['quantity' => 0, 'price' => 0, 'description' => ''],
+                    'batteries' => ['quantity' => 0, 'price' => 0, 'description' => ''],
+                ];
             }
 
             $installationRequested = null;
@@ -2921,7 +3163,7 @@ class OrderController extends Controller
             return ResponseHelper::success([
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
-                'bundle_title' => $bundle?->title ?? $order->bundle?->title,
+                'bundle_title' => $invoiceBundle?->title ?? $order->bundle?->title,
                 'product_title' => $product?->title ?? $order->product?->title,
                 'delivery_address' => $this->formatDeliveryAddressForApi($order->deliveryAddress, $order->user),
                 'installation_requested_date' => $installationRequested,
